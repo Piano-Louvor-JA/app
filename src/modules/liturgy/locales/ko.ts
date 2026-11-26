@@ -1,6 +1,6 @@
 export default {
   "liturgy": {
-  "fileFilters": { "video": "동영상", "all": "모두" },
+  "fileFilters": { "video": "동영상", "presentation": "프레젠테이션 (PowerPoint/LibreOffice)", "all": "모두" },
   "fallback": { "music": "음악", "video": "동영상", "audio": "오디오" },
     "title": "예배 순서",
     "subtitle": "예배 구성",

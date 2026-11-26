@@ -396,6 +396,7 @@ export default {
     },
     "fileFilters": {
       "video": "Видео",
+      "presentation": "Презентации (PowerPoint/LibreOffice)",
       "all": "Все"
     },
     "fallback": {

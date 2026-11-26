@@ -545,10 +545,15 @@ export type PresentationApi = {
   /** Engine de conversão: auto (padrão) até o usuário escolher outro. */
   getEngine?: () => Promise<PresentationEngine>
   setEngine?: (engine: PresentationEngine) => Promise<boolean>
-  /** Abre o .pptx no aplicativo externo (PowerPoint/Impress) em modo slideshow. */
+  /**
+   * Abre o .pptx no aplicativo externo (PowerPoint/Impress) em modo slideshow.
+   * `monitorIds`: telas de projeção; o LibreOffice abre na 1ª e o app espelha
+   * nas demais.
+   */
   openExternal?: (
     filePath: string,
     engine: Exclude<PresentationEngine, 'auto'>,
+    options?: { monitorIds?: number[] },
   ) => Promise<{ ok: boolean; error?: string }>
   /** Define o app externo custom de apresentação (executável escolhido). */
   setCustomApp?: (appPath: string) => Promise<boolean>

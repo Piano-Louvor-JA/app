@@ -1,6 +1,6 @@
 export default {
   "liturgy": {
-  "fileFilters": { "video": "動画", "all": "すべて" },
+  "fileFilters": { "video": "動画", "presentation": "プレゼンテーション (PowerPoint/LibreOffice)", "all": "すべて" },
   "fallback": { "music": "音楽", "video": "動画", "audio": "オーディオ" },
     "title": "礼拝の順序",
     "subtitle": "礼拝の構成",

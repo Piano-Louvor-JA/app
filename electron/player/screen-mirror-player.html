@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Espelho da apresentação</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        background: #000;
+        overflow: hidden;
+        cursor: none;
+      }
+
+      /* Imagem inteira na tela: formato diferente vira faixa preta, sem corte. */
+      #mirror {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        background: #000;
+      }
+    </style>
+  </head>
+  <body>
+    <video id="mirror" autoplay muted playsinline></video>
+    <script>
+      ;(function () {
+        // Repete um monitor inteiro (slideshow do LibreOffice) nesta tela.
+        var video = document.getElementById('mirror')
+        var sourceId = new URLSearchParams(location.search).get('source')
+        var stream = null
+        var attempts = 0
+
+        function stop() {
+          if (!stream) return
+          stream.getTracks().forEach(function (track) {
+            track.stop()
+          })
+          stream = null
+        }
+
+        async function start() {
+          if (!sourceId) return
+          attempts += 1
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({
+              audio: false,
+              video: {
+                mandatory: {
+                  chromeMediaSource: 'desktop',
+                  chromeMediaSourceId: sourceId,
+                  maxWidth: 1920,
+                  maxHeight: 1080,
+                  maxFrameRate: 30,
+                },
+              },
+            })
+            video.srcObject = stream
+          } catch (error) {
+            console.error('[screen-mirror]', error && error.message ? error.message : error)
+            if (attempts < 20) setTimeout(start, 500)
+          }
+        }
+
+        window.addEventListener('beforeunload', stop)
+        start()
+      })()
+    </script>
+  </body>
+</html>

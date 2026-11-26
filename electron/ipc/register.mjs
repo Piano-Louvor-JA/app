@@ -205,9 +205,12 @@ export function registerWorkspaceIpc() {
 
   // Abre a apresentação no aplicativo externo (PowerPoint/Impress) em
   // modo slideshow — escolha explícita do usuário no item da liturgia.
-  ipcMain.handle('presentation:open-external', async (_event, filePath, engine) => {
+  ipcMain.handle('presentation:open-external', async (_event, filePath, engine, options) => {
     try {
-      return await openPresentationExternal(String(filePath ?? ''), engine)
+      const monitorIds = Array.isArray(options?.monitorIds)
+        ? options.monitorIds.filter((id) => typeof id === 'number' && Number.isFinite(id))
+        : []
+      return await openPresentationExternal(String(filePath ?? ''), engine, { monitorIds })
     } catch (error) {
       console.error('[ipc] presentation:open-external', error)
       return { ok: false, error: 'unexpected' }

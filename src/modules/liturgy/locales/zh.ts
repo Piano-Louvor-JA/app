@@ -1,6 +1,6 @@
 export default {
   "liturgy": {
-  "fileFilters": { "video": "视频", "all": "全部" },
+  "fileFilters": { "video": "视频", "presentation": "演示文稿 (PowerPoint/LibreOffice)", "all": "全部" },
   "fallback": { "music": "音乐", "video": "视频", "audio": "音频" },
     "title": "崇拜礼仪",
     "subtitle": "崇拜安排",

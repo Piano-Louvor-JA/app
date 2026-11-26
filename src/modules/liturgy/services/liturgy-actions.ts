@@ -8,6 +8,8 @@ import type { ExternalPlayerPreference } from '@shared/types/desktop-bridge'
 import type { Router } from 'vue-router'
 
 import type { LiturgyItem, LiturgyMusicMode } from '../types/liturgy'
+import { isPresentationPath, isTextDocumentPath } from './liturgy-file-detect'
+import { resolveTargetMonitorIds } from './liturgy-projection-targets'
 import { isExecutableItem } from './liturgy-item-helpers'
 import { useScheduledStore } from '../stores/useScheduledStore'
 import i18n from '@plugins/i18n'
@@ -16,7 +18,6 @@ import { getLiturgyVideoObjectUrl } from './liturgy-local-video'
 import {
   openLiturgyLocalImageControl,
   openLiturgyLocalPdfControl,
-  openLiturgyLocalPresentationControl,
   openLiturgyLocalVideoControl,
   openLiturgySiteControl,
   openLiturgySiteOnScreens,
@@ -51,6 +52,30 @@ export type LiturgyActionResult =
  * 0/NaN/null (sem música) → null.
  * scheduled também resolve (placeholder delega pro tipo música — PR #416).
  */
+type OpenPresentationExternal = NonNullable<
+  NonNullable<ReturnType<typeof getDesktopBridge>>['presentation']
+>['openExternal']
+
+/**
+ * App externo em slideshow. LibreOffice recebe as telas de projeção: abre na
+ * 1ª e o app espelha nas demais (monitor do operador fica livre).
+ */
+async function openPresentationExternally(
+  openExternal: NonNullable<OpenPresentationExternal>,
+  filePath: string,
+  engine: Parameters<NonNullable<OpenPresentationExternal>>[1],
+) {
+  if (engine !== 'libreoffice') return openExternal(filePath, engine)
+  let monitorIds: number[] = []
+  try {
+    monitorIds = await resolveTargetMonitorIds()
+  } catch (error) {
+    // Sem lista de telas, o LibreOffice abre no monitor padrão dele.
+    console.error('[liturgy] telas de projeção indisponíveis', error)
+  }
+  return openExternal(filePath, engine, { monitorIds })
+}
+
 export function resolveMusicId(item: LiturgyItem): number | null {
   if (item.type !== 'music' && item.type !== 'scheduled') return null
   const musicId = Number(item.musicId)
@@ -155,7 +180,7 @@ async function executeScheduledRef(
         opened = await playLiturgyLocalImageOnScreens([filePath], title)
       } else if (ext === 'pdf') {
         opened = await playLiturgyLocalPdfOnScreens(filePath, title)
-      } else if (['ppt', 'pptx'].includes(ext)) {
+      } else if (isPresentationPath(filePath)) {
         opened = await playLiturgyLocalPresentationOnScreens(filePath, title)
       } else {
         // Arquivo agendado herda o player escolhido no placeholder.
@@ -426,10 +451,11 @@ export async function executeLiturgyItem(
         engine = await bridge.presentation.getEngine()
       }
       engine ||= 'auto'
-      if (engine !== 'auto') {
+      // .odt (Writer) não tem slideshow no app externo: projeta pelo app.
+      if (engine !== 'auto' && !isTextDocumentPath(filePath)) {
         const result =
           bridge && bridge.presentation && bridge.presentation.openExternal
-            ? await bridge.presentation.openExternal(filePath, engine)
+            ? await openPresentationExternally(bridge.presentation.openExternal, filePath, engine)
             : undefined
         if (!result?.ok) {
           return { ok: false, messageKey: 'liturgy.messages.projectionFailed' }
@@ -448,7 +474,8 @@ export async function executeLiturgyItem(
         }
       }
 
-      const opened = await openLiturgyLocalPresentationControl(
+      // Apresentação abre já em modo apresentação: projeta direto nas telas.
+      const opened = await playLiturgyLocalPresentationOnScreens(
         filePath,
         item.name?.trim() || filePath,
         item.presentationEngine,
@@ -548,10 +575,10 @@ export async function playLiturgyItemOnScreens(
       engine = await bridge.presentation.getEngine()
     }
     engine ||= 'auto'
-    if (engine !== 'auto') {
+    if (engine !== 'auto' && !isTextDocumentPath(filePath)) {
       const result =
         bridge && bridge.presentation && bridge.presentation.openExternal
-          ? await bridge.presentation.openExternal(filePath, engine)
+          ? await openPresentationExternally(bridge.presentation.openExternal, filePath, engine)
           : undefined
       if (!result?.ok) {
         return { ok: false, messageKey: 'liturgy.messages.projectionFailed' }
