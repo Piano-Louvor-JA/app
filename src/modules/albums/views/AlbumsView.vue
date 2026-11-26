@@ -647,7 +647,7 @@ async function runAction(
     </div>
 
     <div
-      v-if="lastErrorKey && !isHubSearching"
+      v-if="lastErrorKey && !isHubSearching && categories.length > 0"
       class="albums-view__alert"
       role="alert"
     >
