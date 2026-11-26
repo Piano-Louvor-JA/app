@@ -1,5 +1,6 @@
 export default {
   "bible": {
+    "convite_catalogo": "इस भाषा में बाइबल की सामग्री अभी उपलब्ध नहीं है। अनुवाद में LouvorJA समुदाय की सहायता करें।",
     "title": "बाइबल",
     "version": "अनुवाद",
     "selectVersion": "अनुवाद चुनें",
@@ -44,7 +45,6 @@ export default {
     "close": "बंद करें",
     "inAppProjection": "बाइबल पूर्वावलोकन",
     "projectionHotkeyHint": "ESC प्रोजेक्शन समाप्त · Ctrl+Alt+P संचालक स्क्रीन से टॉगल",
-    "convite_catalogo": "इस भाषा में बाइबल सामग्री अभी उपलब्ध नहीं है। समुदाय के अनुवाद में मदद करें: अधिक जानकारी LouvorJA पर।",
     "emptyChapter": "इस अध्याय में कोई पद नहीं मिला।",
     "loading": "बाइबल लोड हो रही है…",
     "noSelection": "प्रोजेक्ट करने हेतु पद चुनें",

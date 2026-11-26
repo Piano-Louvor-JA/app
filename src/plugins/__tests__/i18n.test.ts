@@ -28,12 +28,12 @@ describe('SUPPORTED_LOCALES', () => {
   })
 })
 
-// uk usa o fallback de catálogo pt: a interface troca mesmo sem catálogo uk.
+// Um locale sem catálogo mantém o próprio prefixo e exibe o convite.
 describe('locale sem catálogo', () => {
-  it('aceita uk salvo e mantém o catálogo no prefixo pt', () => {
+  it('aceita uk salvo e mantém o prefixo uk', () => {
     vi.mocked(getUserPreference).mockReturnValue('uk')
     expect(detectInitialLocale()).toBe('uk')
-    expect(localeToApiPrefix('uk')).toBe('pt')
+    expect(localeToApiPrefix('uk')).toBe('uk')
   })
 })
 
@@ -104,8 +104,8 @@ describe('localeToApiPrefix', () => {
     expect(localeToApiPrefix('pt-PT')).toBe('pt')
   })
 
-  it('retorna pt para idioma nao suportado (fr-FR)', () => {
-    expect(localeToApiPrefix('fr-FR')).toBe('pt')
+  it('mantém fr para idioma sem catálogo (fr-FR)', () => {
+    expect(localeToApiPrefix('fr-FR')).toBe('fr')
   })
 
   it('retorna pt para string vazia', () => {

@@ -85,8 +85,8 @@ export default {
       "close": "Close lyrics"
     },
     "messages": {
-      convite_catalogo: 'The music catalog is not yet available in your language. Join the community and help build the LouvorJA catalog in your own language.',
-      convite_titulo: 'Catalog under construction',
+      "convite_catalogo": "Er is nog geen muziekcatalogus beschikbaar in deze taal. Sluit je aan bij de LouvorJA-gemeenschap en help collecties te vertalen en te publiceren!",
+      "convite_titulo": "Catalogus in opbouw",
       convite_hint: 'The preview above shows the Portuguese catalog — soon in your language, with your help.',
 
       "catalogEmpty": "No collection found in the local catalog.",

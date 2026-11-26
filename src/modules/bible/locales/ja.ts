@@ -1,5 +1,6 @@
 export default {
   "bible": {
+    "convite_catalogo": "この言語の聖書コンテンツはまだありません。LouvorJA コミュニティで翻訳にご協力ください。",
     "title": "聖書",
     "version": "翻訳版",
     "selectVersion": "翻訳版を選択",
@@ -44,7 +45,6 @@ export default {
     "close": "閉じる",
     "inAppProjection": "聖書プレビュー",
     "projectionHotkeyHint": "ESCで投影終了  ·  Ctrl+Alt+P で操作画面と切り替え",
-    "convite_catalogo": "この言語の聖書コンテンツはまだありません。コミュニティの翻訳にご協力ください：詳しくは LouvorJA をご覧ください。",
     "emptyChapter": "この章には聖句が見つかりません。",
     "loading": "聖書を読み込み中…",
     "noSelection": "投影する聖句を選択してください",
