@@ -26,6 +26,12 @@ vi.mock("@modules/starting/components/StartingOverlay.vue", () => ({
   default: { name: "StartingOverlay", render: () => null },
 }));
 
+vi.mock("@modules/onboarding/composables/useOnboarding", () => ({
+  useOnboarding: () => ({ start: vi.fn() }),
+}));
+vi.mock("@modules/onboarding/components/OnboardingDialog.vue", () => ({
+  default: { name: "OnboardingDialog", template: "<div />" },
+}));
 vi.mock("@layouts/AppTitlebar.vue", () => ({
   default: { name: "AppTitlebar", render: () => null },
 }));

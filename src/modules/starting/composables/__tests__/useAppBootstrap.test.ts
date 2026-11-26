@@ -171,6 +171,8 @@ describe('useAppBootstrap', () => {
     expect(mocks.markBootstrapComplete).toHaveBeenCalled()
     expect(reloadSpy).toHaveBeenCalled()
     expect(store.progress).toBe(100)
+    // Instalação nova fica gravada antes do reload (assistente completo depois).
+    expect(JSON.parse(localStorage.getItem('user_data') ?? '{}')['onboarding.state']?.freshInstall).toBe(true)
     app.unmount()
   })
 

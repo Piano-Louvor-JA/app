@@ -91,6 +91,14 @@ vi.mock('@shared/components/UpdateDialog.vue', () => ({
   },
 }))
 
+const onboardingStartMock = vi.hoisted(() => vi.fn())
+vi.mock('@modules/onboarding/composables/useOnboarding', () => ({
+  useOnboarding: () => ({ start: onboardingStartMock }),
+}))
+vi.mock('@modules/onboarding/components/OnboardingDialog.vue', () => ({
+  default: { name: 'OnboardingDialog', template: '<div class="onboarding-dialog-mock" />' },
+}))
+
 vi.mock('@layouts/AppTitlebar.vue', () => ({
   default: { name: 'AppTitlebar', template: '<div class="app-titlebar-mock" />' },
 }))
@@ -150,6 +158,9 @@ describe('App.vue — janela principal', () => {
     expect(updateCheckerMock.init).toHaveBeenCalled()
     expect(palcoBridgeMock.startPalcoBridge).toHaveBeenCalled()
     expect(console.info).toHaveBeenCalledWith('[palco-bridge] subiu no boot')
+    expect(w.find('.onboarding-dialog-mock').exists()).toBe(true)
+    // Janela pronta → checa o assistente uma única vez (store sem first boot).
+    expect(onboardingStartMock).toHaveBeenCalledWith({ isFirstBoot: false })
     w.unmount()
   })
 
