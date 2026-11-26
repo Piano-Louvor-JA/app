@@ -36,6 +36,11 @@ async function prepareAndPlay(gloss: string) {
   try {
     const playback = await prepareGlossForPlayback(gloss)
     if (sequence !== playSequence) return
+    if (!playback) {
+      // glosa vazia: nenhum playNow com payload vazio (REWORK 2)
+      fingerspellingCaption.value = ''
+      return
+    }
     fingerspellingCaption.value = playback.fingerspelled.map((token) => `soletrando: ${token}`).join(' · ')
     playPreparedGloss(playback.gloss)
   } catch {

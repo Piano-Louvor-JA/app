@@ -9,7 +9,7 @@ import { getLibrasGloss } from '../services/libras-translate'
 import { applyRegionalism } from '../services/libras-preferences'
 import { prepareGlossForPlayback, type PlaybackGloss } from '../services/libras-trie'
 
-export type LibrasLiveResult = PlaybackGloss
+export type LibrasLiveResult = PlaybackGloss | null
 
 export async function prepareLibrasLivePlayback(gloss: string): Promise<LibrasLiveResult> {
   return prepareGlossForPlayback(gloss)

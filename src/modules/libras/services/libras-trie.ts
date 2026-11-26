@@ -1,6 +1,8 @@
 import synonyms from './gloss-synonyms.json'
 
 const TRIE_URL = 'https://dicionario2.vlibras.gov.br/static/TREES/2018.3.1.json'
+/** Trie oficial empacotada no app (cópia exata, SHA 24a4f5c7…) — offline-first (SPEC AC-3). */
+const PACKAGED_TRIE_URL = '/libras/trie-2018.3.1.json'
 const DB_NAME = 'louvorja-libras-trie'
 const STORE_NAME = 'trie'
 const CACHE_KEY = '2018.3.1'
@@ -39,27 +41,40 @@ function openDb(): Promise<IDBDatabase | null> {
   })
 }
 
-async function readCachedTrie(): Promise<TrieDoc | null> {
+async function withDb<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequest<T>): Promise<T | null> {
+  if (typeof indexedDB === 'undefined') return null
   const db = await openDb()
   if (!db) return null
-  return new Promise((resolve, reject) => {
-    const request = db.transaction(STORE_NAME).objectStore(STORE_NAME).get(CACHE_KEY)
-    request.onsuccess = () => resolve((request.result as TrieDoc | undefined) ?? null)
-    request.onerror = () => reject(request.error)
-  })
+  try {
+    return await new Promise<T>((resolve, reject) => {
+      const request = run(db.transaction(STORE_NAME, mode).objectStore(STORE_NAME))
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+  } finally {
+    db.close()
+  }
+}
+
+async function readCachedTrie(): Promise<TrieDoc | null> {
+  return await withDb<TrieDoc>('readonly', (store) => store.get(CACHE_KEY) as IDBRequest<TrieDoc>)
 }
 
 async function cacheTrie(doc: TrieDoc): Promise<void> {
-  const db = await openDb()
-  if (!db) return
-  await new Promise<void>((resolve, reject) => {
-    const request = db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).put(doc, CACHE_KEY)
-    request.onsuccess = () => resolve()
-    request.onerror = () => reject(request.error)
-  })
+  await withDb('readwrite', (store) => store.put(doc, CACHE_KEY) as IDBRequest<unknown>)
 }
 
-/** Carrega uma vez, persiste no IndexedDB; chamadas posteriores não usam rede. */
+/** Valida doc oficial e devolve a raiz de children. */
+function extractRoot(doc: unknown): TrieNode {
+  const children = (doc as TrieDoc)?.root?.children
+  if (!children) throw new Error('LibrasTrie: formato inesperado (sem root.children)')
+  return { children }
+}
+
+/**
+ * Offline-first (SPEC AC-3): memória → IndexedDB → asset local empacotado.
+ * A API gov é apenas atualização de oportunidade em background — NUNCA bloqueia o prepare.
+ */
 export async function loadLibrasTrie(): Promise<TrieNode> {
   if (memoryTrie) return memoryTrie
   const cached = await readCachedTrie()
@@ -67,13 +82,25 @@ export async function loadLibrasTrie(): Promise<TrieNode> {
     memoryTrie = { children: cached.root.children }
     return memoryTrie
   }
-  const response = await fetch(TRIE_URL)
-  if (!response.ok) throw new Error(`LibrasTrie: HTTP ${response.status}`)
-  const doc = await response.json() as TrieDoc
-  if (!doc?.root?.children) throw new Error('LibrasTrie: formato inesperado (sem root.children)')
-  await cacheTrie(doc)
-  memoryTrie = { children: doc.root.children }
-  return memoryTrie
+  // Asset local empacotado: cópia exata da Trie oficial no build (nunca depende de rede)
+  try {
+    const response = await fetch(PACKAGED_TRIE_URL)
+    if (!response.ok) throw new Error(`LibrasTrie asset: HTTP ${response.status}`)
+    const doc = await response.json()
+    const root = extractRoot(doc)
+    void cacheTrie(doc as TrieDoc).catch(() => {})
+    memoryTrie = root
+    return memoryTrie
+  } catch {
+    // fallback final: atualização via API gov (não confundir com o caminho primário)
+    const response = await fetch(TRIE_URL)
+    if (!response.ok) throw new Error(`LibrasTrie: HTTP ${response.status}`)
+    const doc = await response.json()
+    const root = extractRoot(doc)
+    await cacheTrie(doc as TrieDoc)
+    memoryTrie = root
+    return memoryTrie
+  }
 }
 
 /** Uppercase preservando acentos (a Trie oficial guarda GRAÇA, CANÇÃO... acentuadas). */
@@ -124,8 +151,9 @@ function resolveToken(raw: string, root: TrieNode, fingerspelled: string[]): str
   return upperRaw.split('').join(' ')
 }
 
-/** Resolve cada token antes do playNow; ausentes são soletrados deliberadamente. */
-export async function prepareGlossForPlayback(gloss: string): Promise<PlaybackGloss> {
+/** Resolve cada token antes do playNow; ausentes são soletrados deliberadamente. Glosa vazia → null. */
+export async function prepareGlossForPlayback(gloss: string): Promise<PlaybackGloss | null> {
+  if (!gloss.trim()) return null
   const root = await loadLibrasTrie()
   const fingerspelled: string[] = []
   const tokens = gloss.split(/\s+/).filter(Boolean).map((raw) => resolveToken(raw, root, fingerspelled))

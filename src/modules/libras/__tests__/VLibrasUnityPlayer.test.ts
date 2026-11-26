@@ -146,6 +146,19 @@ describe('F-B.1 — VLibrasUnityPlayer', () => {
     expect(playNowCalls(postMessage)).toHaveLength(0)
   })
 
+  // REWORK 2 (AC-2/AC-3): glosa vazia → prepare devolve null → NENHUM postMessage ao Unity
+  it('REWORK 2: glosa vazia → playNow NÃO é chamado (nenhum payload vazio ao Unity)', async () => {
+    prepareMock.mockReset()
+    prepareMock.mockResolvedValue(null)
+    const { w, iframeEl, postMessage } = mountPlayer()
+    unityEvent(iframeEl.contentWindow, 'on_load_player')
+    postMessage.mockClear()
+    ;(w.vm as unknown as { playGloss: (g: string) => void }).playGloss('')
+    await vi.waitFor(() => expect(prepareMock).toHaveBeenCalledWith(''))
+    await new Promise((r) => setTimeout(r, 20))
+    expect(postMessage).not.toHaveBeenCalled()
+  })
+
   it('stop envia stopAll quando ready', () => {
     const { w, iframeEl, postMessage } = mountPlayer()
     unityEvent(iframeEl.contentWindow, 'on_load_player')
