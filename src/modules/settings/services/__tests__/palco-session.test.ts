@@ -392,6 +392,7 @@ describe('com electron', () => {
     await palcoSession.project('bible', { text: 'No princípio', footerRef: 'João 1:1' })
     let payload = palco.send.mock.calls[0]?.[0] as Record<string, unknown>
     expect(payload.transition).toBe('zoom')
+    expect(payload.transitionName).toBe('zoom')
     expect(payload.transitionMs).toBe(450)
 
     readEffectiveStageSettings.mockReturnValue({
@@ -410,12 +411,16 @@ describe('com electron', () => {
     await palcoSession.project('bible', { text: 'No princípio', footerRef: 'João 1:1' })
     payload = palco.send.mock.calls[2]?.[0] as Record<string, unknown>
     expect(payload.transition).toBeUndefined()
+    expect(payload.transitionName).toBeUndefined()
 
     // Catálogo do app → a mais próxima que a TV conhece.
     readEffectiveStageSettings.mockReturnValue({ ...readEffectiveStageSettings(), lyricTransitionEnabled: true, lyricTransition: 'drop' })
-    await palcoSession.project('hymns', { text: 'Santo' })
+    await palcoSession.project('hymns', { text: 'Santo', slideIndex: 2 })
     payload = palco.send.mock.calls[3]?.[0] as Record<string, unknown>
+    expect(payload.slideIndex).toBe(2)
     expect(payload.transition).toBe('slide')
+    // Nome real para o espelho/OBS animarem igual aos monitores.
+    expect(payload.transitionName).toBe('drop')
 
     await palcoSession.project('clock', { text: '10:00' })
     payload = palco.send.mock.calls[4]?.[0] as Record<string, unknown>

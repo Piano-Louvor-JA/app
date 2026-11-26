@@ -59,6 +59,8 @@ export type StageReturnMessage =
       background?: string
       /** Presente só com transições de slides ligadas; senão o receiver usa o flyer. */
       transition?: 'fade' | 'slide' | 'zoom'
+      /** Nome real da transição (catálogo inteiro); receivers antigos ignoram. */
+      transitionName?: StageTransition
       transitionMs?: number
       style: StageReturnStyle
     }
@@ -73,7 +75,8 @@ export function buildStageReturn(runtime: MediaProjectionRuntime, stage: StageSe
   // Personalização própria do retorno; campo vazio = igual aos slides.
   const ret = resolveReturnScreen(stage)
   const baseSize = ret.fontSize ?? stage.lyricFontSize ?? stage.fontSize
-  const transition = receiverReturnTransition(effectiveLyricTransition(stage))
+  const lyricTransition = effectiveLyricTransition(stage)
+  const transition = receiverReturnTransition(lyricTransition)
   return {
     v: 1,
     type: 'stageReturn',
@@ -90,6 +93,7 @@ export function buildStageReturn(runtime: MediaProjectionRuntime, stage: StageSe
     ...(transition
       ? {
           transition,
+          transitionName: lyricTransition,
           transitionMs: bibleTransitionMs(stage.lyricTransitionSpeed),
         }
       : {}),

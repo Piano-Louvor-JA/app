@@ -376,6 +376,14 @@ describe('palco-bridge — projeção por módulo (owner)', () => {
     expect((proj!.msg as { input: { isCover: boolean } }).input.isCover).toBe(true)
   })
 
+  it('media: o número do slide vai para o palco (letra repetida também anima)', async () => {
+    startPalcoBridge()
+    publish(MEDIA_CH, mediaPayload({ slideIndex: 4, slideCount: 8 }))
+    await settle()
+    const proj = sendBuf.buf.find((s) => s.msg.type === 'projection')
+    expect((proj!.msg as { input: { slideIndex?: number } }).input.slideIndex).toBe(4)
+  })
+
   it('media capa do hinário: o número do hino vai para o palco', async () => {
     startPalcoBridge()
     publish(MEDIA_CH, mediaPayload({ isCover: true, lyric: '', hymnNumber: 45 }))

@@ -225,6 +225,7 @@ function ownerInput(): ProjectionInput | { timer: TimerOpts } | null {
         footerRef: '',
         background: bgOrResolved(r.imageUrl),
         isCover: r.isCover === true,
+        slideIndex: r.slideIndex,
         hymnNumber: r.isCover === true ? r.hymnNumber ?? undefined : undefined,
         hymnalName: r.isCover === true ? coverName(r.title, r.subtitle) : undefined,
       }
@@ -291,6 +292,7 @@ async function renderModuleTo(m: 'bible' | 'media', slotId: string): Promise<voi
     footerRef: '',
     background: bgOrResolved(r.imageUrl),
     isCover: r.isCover === true,
+    slideIndex: r.slideIndex,
     hymnNumber: r.isCover === true ? r.hymnNumber ?? undefined : undefined,
     hymnalName: r.isCover === true ? coverName(r.title, r.subtitle) : undefined,
   })
