@@ -29,6 +29,9 @@ vi.mock("@modules/starting/components/StartingOverlay.vue", () => ({
 vi.mock("@modules/onboarding/composables/useOnboarding", () => ({
   useOnboarding: () => ({ start: vi.fn() }),
 }));
+vi.mock("@modules/telemetry/services/heartbeat-loop", () => ({
+  startHeartbeatLoop: vi.fn(),
+}));
 vi.mock("@modules/onboarding/components/OnboardingDialog.vue", () => ({
   default: { name: "OnboardingDialog", template: "<div />" },
 }));

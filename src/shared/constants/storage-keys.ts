@@ -38,6 +38,10 @@ export const USER_PREFERENCE_KEYS = {
   homeLocation: 'home.location',
   /** Último distrito/igreja não vazios já digitados (por campo). Local: não sincroniza; usado no envio de telemetria quando o campo for apagado. */
   homeLocationLastKnown: 'home.locationLastKnown',
+  /** Telemetria de dispositivos: UUID anônimo desta instalação. Local: não sincroniza. */
+  telemetryInstallId: 'telemetry.installId',
+  /** Telemetria de dispositivos: "Enviar estatísticas de uso" (ausente = ligado). Local: não sincroniza. */
+  telemetryEnabled: 'telemetry.enabled',
   /** Assistente de primeira execução e lembrete de distrito/igreja. Local por instalação: não sincroniza. */
   onboarding: 'onboarding.state',
   /** Zoom da UI do operador (fator 0.7–1.5). */

@@ -95,6 +95,9 @@ const onboardingStartMock = vi.hoisted(() => vi.fn())
 vi.mock('@modules/onboarding/composables/useOnboarding', () => ({
   useOnboarding: () => ({ start: onboardingStartMock }),
 }))
+vi.mock('@modules/telemetry/services/heartbeat-loop', () => ({
+  startHeartbeatLoop: vi.fn(),
+}))
 vi.mock('@modules/onboarding/components/OnboardingDialog.vue', () => ({
   default: { name: 'OnboardingDialog', template: '<div class="onboarding-dialog-mock" />' },
 }))

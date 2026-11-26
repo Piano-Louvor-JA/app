@@ -770,9 +770,18 @@ export type DiagnosticsApi = {
   reportJank?: (snapshot: unknown) => void
 }
 
+/** SO legível para a telemetria de dispositivos (IPC `system:info`). */
+export type SystemInfo = {
+  platform: string
+  name: string
+  release: string
+  arch: string
+}
+
 export type LouvorJaBridge = {
   platform: string
   isElectron: boolean
+  systemInfo?: () => Promise<SystemInfo>
   fonts?: FontsApi
   diagnostics?: DiagnosticsApi
   window?: WindowApi

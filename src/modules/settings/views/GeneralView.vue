@@ -34,12 +34,23 @@ import AppBackupCard from '../components/AppBackupCard.vue'
 import DiagnosticsCard from '../components/DiagnosticsCard.vue'
 import { ensureCatalogForLocale } from '@modules/starting/services/catalog-locale-service'
 import { isLibrasEnabled, setLibrasEnabled } from '@modules/libras/services/libras-preferences'
+import { sendHeartbeat } from '@modules/telemetry/services/heartbeat'
+import { isTelemetryEnabled, setTelemetryEnabled } from '@modules/telemetry/services/telemetry-preferences'
 
 const librasOn = ref(isLibrasEnabled())
 
 function toggleLibras() {
   librasOn.value = !librasOn.value
   setLibrasEnabled(librasOn.value)
+}
+
+// Telemetria de dispositivos: "Enviar estatísticas de uso" (ligado por padrão).
+const telemetryOn = ref(isTelemetryEnabled())
+
+function onTelemetryChange() {
+  setTelemetryEnabled(telemetryOn.value)
+  // Ao religar, o painel volta a ver este aparelho sem esperar 5 min.
+  if (telemetryOn.value) void sendHeartbeat().catch(() => {})
 }
 
 const { t, locale } = useI18n()
@@ -474,6 +485,34 @@ async function clearAllLocalData() {
           @change="toggleLibras"
         >
         <span>{{ t('settings.general.librasToggleLabel') }}</span>
+      </label>
+    </GlassCard>
+
+    <!-- Estatísticas de uso (telemetria de dispositivos) -->
+    <GlassCard class="general-settings__card" elevated>
+      <div class="general-settings__accent" aria-hidden="true" />
+
+      <div class="general-settings__header">
+        <div class="general-settings__heading">
+          <i class="ti ti-chart-dots general-settings__icon" aria-hidden="true" />
+          <h3 class="general-settings__title">
+            {{ t('settings.general.telemetryTitle') }}
+          </h3>
+        </div>
+      </div>
+
+      <p class="general-settings__hint">
+        {{ t('settings.general.telemetryHint') }}
+      </p>
+
+      <label class="general-settings__libras-row" data-testid="telemetry-toggle-row">
+        <input
+          v-model="telemetryOn"
+          type="checkbox"
+          data-testid="telemetry-toggle"
+          @change="onTelemetryChange"
+        >
+        <span>{{ t('settings.general.telemetryToggleLabel') }}</span>
       </label>
     </GlassCard>
 
