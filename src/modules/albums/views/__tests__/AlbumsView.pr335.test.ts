@@ -95,6 +95,7 @@ function useAlbumsMockFactory() {
   const r = <T>(v: T) => vueRef<T>(v)
   return {
       categories: r(s.categories ?? []),
+      previewCategories: r(s.previewCategories ?? []),
       activeCollection: r(null),
       tracks: r([]),
       searchQuery: r(''),
@@ -898,7 +899,7 @@ describe('AlbumsView', () => {
     Object.defineProperty(input, 'files', { value: [file], configurable: true })
     input.dispatchEvent(new Event('change', { bubbles: true }))
     await flushPromises()
-    expect(body().querySelector('.albums-view__playlists-feedback')?.textContent).toContain('faixa(s) adicionada(s)')
+    expect(body().querySelector('.albums-view__playlists-feedback')?.textContent).toContain('albums.playlists.importedList')
     const culto = listPlaylists().find((p) => p.name === 'Culto')!
     expect(culto.items).toHaveLength(2)
     w.unmount()
@@ -917,7 +918,7 @@ describe('AlbumsView', () => {
     Object.defineProperty(input, 'files', { value: [file], configurable: true })
     input.dispatchEvent(new Event('change', { bubbles: true }))
     await flushPromises()
-    expect(body().querySelector('.albums-view__playlists-feedback')?.textContent).toContain('Nada novo')
+    expect(body().querySelector('.albums-view__playlists-feedback')?.textContent).toContain('albums.playlists.importedNothingNew')
     w.unmount()
   })
 
@@ -967,6 +968,18 @@ describe('AlbumsView', () => {
     expect(w4.find('.albums-view__editor-btn').exists()).toBe(false)
     await w4.find('.hc-cancel').trigger('click')
     expect((globalThis as AnyObj).__albumsCancelMock).toHaveBeenCalled()
+  })
+
+  it('catálogo vazio mostra convite sem catálogo português de fundo', async () => {
+    setState({ categories: [], isLoadingCatalog: false, previewCategories: [{
+      id: 'pt-preview', name: 'Catálogo em português', collections: [],
+    }] })
+    const wrapper = await mountView()
+    expect(wrapper.text()).toContain('albums.messages.convite_catalogo')
+    expect(wrapper.text()).not.toContain('Catálogo em português')
+    expect(wrapper.find('.albums-view__convite-backdrop').exists()).toBe(false)
+    expect(wrapper.find('.albums-view__convite-hint').exists()).toBe(false)
+    wrapper.unmount()
   })
 
   it('gaps onda1 2: catálogo vazio sem loading → catalogEmpty (689); cc-cancel (762); hydrate reentrante real (147)', async () => {

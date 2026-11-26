@@ -44,7 +44,7 @@ export default {
     "close": "Close",
     "inAppProjection": "Bible preview",
     "projectionHotkeyHint": "ESC ends projection  ·  Ctrl+Alt+P toggles with the operator screen",
-    "emptyCatalog": "No Bible content available. Complete the app initialization.",
+    "convite_catalogo": "No Bible content available in this language yet. Help the community translate: learn more at LouvorJA.",
     "emptyChapter": "No verse found in this chapter.",
     "loading": "Loading Bible...",
     "noSelection": "Select a verse to project",
@@ -56,6 +56,5 @@ export default {
       "loadCatalogFailed": "Could not load Bible books and versions.",
       "loadChapterFailed": "Could not load the selected chapter."
     },
-    "convite_catalogo": "No Bible content available for this language yet. Help the community translate: learn how at LouvorJA."
   }
 }

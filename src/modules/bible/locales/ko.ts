@@ -45,7 +45,6 @@ export default {
     "close": "닫기",
     "inAppProjection": "성경 미리보기",
     "projectionHotkeyHint": "ESC 투영 종료  ·  Ctrl+Alt+P 운영자 화면 전환",
-    "emptyCatalog": "성경 콘텐츠가 없습니다. 앱 초기 설정을 완료하세요.",
     "emptyChapter": "이 장에 절이 없습니다.",
     "loading": "성경 불러오는 중…",
     "noSelection": "투영할 절을 선택하세요",

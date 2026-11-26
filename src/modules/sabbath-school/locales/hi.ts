@@ -37,6 +37,22 @@ export default {
     "toneMinDurationWarning": "अवधि ऑडियो की कुल लंबाई से कम है ({min})। चेतावनियाँ अतिव्यापी हो सकती हैं।",
     "markerOffsetLabel": "चेतावनी बजने पर शेष मिनट",
     "markerPresetLabel": "चेतावनी ध्वनि",
+    "presetNone": "— अक्षम —",
+
+    "presetAbertura": "उद्घाटन (आधिकारिक LouvorJA)",
+
+    "preset5min": "5 मिनट (आधिकारिक LouvorJA)",
+
+    "preset1min": "1 मिनट (आधिकारिक LouvorJA)",
+
+    "presetBeep": "बीप (सिंथेटिक)",
+
+    "presetChime": "चाइम (सिंथेटिक)",
+
+    "presetGong": "गोंग (सिंथेटिक)",
+
+    "presetCustom": "डिवाइस का कस्टम ऑडियो",
+
     "markerGroupPresets": "डिफ़ॉल्ट ध्वनियाँ",
     "markerGroupLibrary": "मेरी ध्वनियाँ",
     "markerPreview": "चेतावनी पूर्वावलोकन",

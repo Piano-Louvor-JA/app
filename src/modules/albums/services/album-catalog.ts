@@ -72,9 +72,9 @@ export function sortCollectionsRecentFirst(
   })
 }
 
-async function buildHymnalCollections(): Promise<AlbumCollection[]> {
+async function buildHymnalCollections(prefixOverride?: string): Promise<AlbumCollection[]> {
   const collections: AlbumCollection[] = []
-  const langPrefix = getCurrentApiPrefix()
+  const langPrefix = prefixOverride ?? getCurrentApiPrefix()
 
   const hymnal = await readOrFetchCatalog<CatalogHymnalEntry[]>(`${langPrefix}_hymnal`)
   if (Array.isArray(hymnal) && hymnal.length > 0) {
@@ -140,13 +140,16 @@ export function buildCustomCollectionCard(
   }
 }
 
-/** Catálogo oficial (hinários + categorias) — capas resolvidas do disco em 1 IPC. */
-export async function loadAlbumCategories(): Promise<AlbumCategory[]> {
+/** Catálogo oficial (hinários + categorias) — capas resolvidas do disco em 1 IPC.
+ *  `prefixOverride` permite ler outro idioma (preview pt-BR do convite). */
+export async function loadAlbumCategories(
+  prefixOverride?: string,
+): Promise<AlbumCategory[]> {
   const result: AlbumCategory[] = []
-  const langPrefix = getCurrentApiPrefix()
+  const langPrefix = prefixOverride ?? getCurrentApiPrefix()
 
   const [hymnals, categories] = await Promise.all([
-    buildHymnalCollections(),
+    buildHymnalCollections(prefixOverride),
     readOrFetchCatalog<CatalogCategory[]>(`${langPrefix}_categories`),
   ])
 

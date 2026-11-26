@@ -115,6 +115,16 @@ export default {
       "audioUploadFailed": "Ses yüklenemedi",
       "audioLinked": "«{name}» sesi bağlandı",
       "audioRemoveFailed": "Ses kaldırılamadı",
+      "collectionRenamedToast": "Koleksiyon yeniden adlandırıldı",
+
+      "renameCollectionFailed": "Koleksiyon yeniden adlandırılamadı",
+
+      "singlesPrepareFailed": "Singles koleksiyonu hazırlanamadı",
+
+      "singleCreateFailed": "Single oluşturulamadı",
+
+      "singleCoverUpdated": "Single kapağı güncellendi",
+
       "audioRemoved": "Ses kaldırıldı",
       "showPanels": "Panelleri göster",
       "hidePanels": "Panelleri gizle",

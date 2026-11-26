@@ -26,7 +26,7 @@ export function hasCatalogForPrefix(prefix: string): boolean {
 
 export function localeToApiPrefix(locale: string): string {
   const prefix = locale.slice(0, 2).toLowerCase()
-  return ['pt', 'en', 'es', 'fr', 'ru', 'uk', 'ja', 'ko', 'zh', 'tr', 'ar', 'hi'].includes(prefix) ? prefix : 'pt'
+  return ['pt', 'en', 'es', 'fr', 'ru', 'uk', 'ja', 'ko', 'zh', 'tr', 'ar', 'hi', 'it', 'nl', 'pl'].includes(prefix) ? prefix : 'pt'
 }
 
 export function getCurrentApiPrefix(customLocale?: string): string {

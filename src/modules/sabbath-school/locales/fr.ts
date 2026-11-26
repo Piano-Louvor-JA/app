@@ -37,6 +37,22 @@ export default {
     "toneMinDurationWarning": "Durée inférieure à la longueur totale de l'audio ({min}). Les alertes peuvent se chevaucher.",
     "markerOffsetLabel": "Minutes restantes au déclenchement de l'alerte",
     "markerPresetLabel": "Son de l'alerte",
+    "presetNone": "— Désactivé —",
+
+    "presetAbertura": "Ouverture (officiel LouvorJA)",
+
+    "preset5min": "5 min (officiel LouvorJA)",
+
+    "preset1min": "1 min (officiel LouvorJA)",
+
+    "presetBeep": "Bip (synthétique)",
+
+    "presetChime": "Carillon (synthétique)",
+
+    "presetGong": "Gong (synthétique)",
+
+    "presetCustom": "Audio personnalisé de l’appareil",
+
     "markerGroupPresets": "Sons par défaut",
     "markerGroupLibrary": "Mes sons",
     "markerPreview": "Écouter l'alerte",

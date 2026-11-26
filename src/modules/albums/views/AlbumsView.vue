@@ -314,9 +314,9 @@ function onImportFile(event: Event) {
     savePlaylists(current)
     playlists.value = listPlaylists()
     const parts = []
-    if (newLists > 0) parts.push(`${newLists} playlist(s) nova(s)`)
-    if (addedTracks > 0) parts.push(`${addedTracks} faixa(s) adicionada(s)`)
-    showImportFeedback(parts.length > 0 ? `Importado: ${parts.join(', ')}.` : 'Nada novo para importar.')
+    if (newLists > 0) parts.push(t('albums.playlists.importedNewPlaylists', { count: newLists }))
+    if (addedTracks > 0) parts.push(t('albums.playlists.importedAddedTracks', { count: addedTracks }))
+    showImportFeedback(parts.length > 0 ? t('albums.playlists.importedList', { parts: parts.join(', ') }) : t('albums.playlists.importedNothingNew'))
   })
 }
 
@@ -744,7 +744,7 @@ async function runAction(
                   </span>
                   <span class="albums-view__playlist-name">
                     <strong>{{ playlist.name }}</strong>
-                    <small>{{ playlist.items.length }} faixa(s)</small>
+                    <small>{{ t('albums.playlists.trackCount', { count: playlist.items.length }) }}</small>
                   </span>
                   <i
                     class="ti albums-view__playlist-chevron"
@@ -921,9 +921,14 @@ async function runAction(
 
     <div
       v-else-if="!isLoadingCatalog && categories.length === 0 && !isHubSearching"
-      class="albums-view__state"
+      class="albums-view__convite"
     >
-      {{ t('albums.messages.convite_catalogo') }}
+      <!-- Convite premium em cima do preview. -->
+      <div class="albums-view__convite-card">
+        <i class="ti ti-seedling" aria-hidden="true" />
+        <h2>{{ t('albums.messages.convite_titulo') }}</h2>
+        <p>{{ t('albums.messages.convite_catalogo') }}</p>
+      </div>
     </div>
 
     <div
@@ -1603,6 +1608,101 @@ async function runAction(
   border: none;
   border-radius: 0;
   background: transparent;
+}
+
+/* Convite a contribuir: preview pt-BR desfocado + card premium na frente. */
+.albums-view__convite {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--ds-radius-lg, 1rem 0 1rem 0);
+}
+
+.albums-view__convite-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  filter: blur(5px) saturate(.85);
+  opacity: .8;
+  pointer-events: none;
+  user-select: none;
+  transform: scale(1.03);
+}
+
+.albums-view__convite-card {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .75rem;
+  padding: 2rem;
+  text-align: center;
+  background: color-mix(in srgb, var(--ds-color-surface-card) 82%, transparent);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--ds-color-outline-strong);
+  border-radius: inherit;
+  max-width: 34rem;
+  margin: 0 auto;
+
+  i {
+    font-size: 2.5rem;
+    color: var(--ds-color-primary);
+  }
+
+  h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--ds-color-on-surface);
+  }
+
+  p {
+    margin: 0;
+    max-width: 26rem;
+    line-height: 1.55;
+    color: var(--ds-color-on-surface-variant);
+  }
+}
+
+.albums-view__convite-hint {
+  font-size: .8rem;
+  color: var(--ds-color-on-surface-variant);
+  opacity: .8;
+}
+
+/* Mockup de catálogo (fallback do preview pt-BR). */
+.albums-view__mock-card {
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+}
+
+.albums-view__mock-cover {
+  aspect-ratio: 1;
+  border-radius: var(--ds-radius-md, .75rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  i { font-size: 2rem; opacity: .5; }
+}
+
+.albums-view__mock-cover--0 { background: linear-gradient(135deg, #b45309, #7c2d12); }
+.albums-view__mock-cover--1 { background: linear-gradient(135deg, #1d4ed8, #172554); }
+.albums-view__mock-cover--2 { background: linear-gradient(135deg, #047857, #064e3b); }
+.albums-view__mock-cover--3 { background: linear-gradient(135deg, #6d28d9, #3b0764); }
+
+.albums-view__mock-line {
+  height: .55rem;
+  border-radius: .25rem;
+  background: color-mix(in srgb, var(--ds-color-on-surface-variant) 30%, transparent);
+}
+
+.albums-view__mock-line--short {
+  width: 60%;
 }
 
 .albums-view__alert {

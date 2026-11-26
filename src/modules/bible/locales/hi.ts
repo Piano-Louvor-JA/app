@@ -45,7 +45,6 @@ export default {
     "close": "बंद करें",
     "inAppProjection": "बाइबल पूर्वावलोकन",
     "projectionHotkeyHint": "ESC प्रोजेक्शन समाप्त · Ctrl+Alt+P संचालक स्क्रीन से टॉगल",
-    "emptyCatalog": "बाइबल सामग्री उपलब्ध नहीं। ऐप प्रारंभिक सेटअप पूरा करें।",
     "emptyChapter": "इस अध्याय में कोई पद नहीं मिला।",
     "loading": "बाइबल लोड हो रही है…",
     "noSelection": "प्रोजेक्ट करने हेतु पद चुनें",

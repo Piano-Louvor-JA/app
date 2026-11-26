@@ -61,7 +61,7 @@ describe('ensureCatalogForLocale (app#339)', () => {
     vi.mocked(fetchRemoteCatalogJson).mockClear()
   })
 
-  it.each(['fr', 'ru', 'uk', 'ja', 'ko', 'zh', 'tr', 'ar', 'hi'])('idioma %s sem catálogo publicado não baixa fallback pt', async (locale) => {
+  it.each(['fr', 'ru', 'uk', 'ja', 'ko', 'zh', 'tr', 'ar', 'hi', 'it', 'nl', 'pl'])('idioma %s sem catálogo publicado não baixa fallback pt', async (locale) => {
     currentPrefix = 'en'
     await ensureCatalogForLocale(locale)
     expect(fetchRemoteCatalogJson).not.toHaveBeenCalled()

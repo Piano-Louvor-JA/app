@@ -45,7 +45,6 @@ export default {
     "close": "إغلاق",
     "inAppProjection": "معاينة الكتاب المقدس",
     "projectionHotkeyHint": "ESC ينهي العرض  ·  Ctrl+Alt+P للتبديل مع شاشة المشغل",
-    "emptyCatalog": "لا يوجد محتوى للكتاب المقدس. أكمل إعداد التطبيق أولًا.",
     "emptyChapter": "لا توجد آيات في هذا الفصل.",
     "loading": "جارٍ تحميل الكتاب المقدس…",
     "noSelection": "اختر آية لعرضها",

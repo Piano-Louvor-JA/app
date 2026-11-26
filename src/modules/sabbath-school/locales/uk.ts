@@ -37,6 +37,22 @@ export default {
     "toneMinDurationWarning": "Тривалість менша за повну довжину аудіо ({min}). Оповіщення можуть накладатися.",
     "markerOffsetLabel": "Оповіщення за скільки хвилин до кінця",
     "markerPresetLabel": "Звук оповіщення",
+    "presetNone": "— Вимкнено —",
+
+    "presetAbertura": "Відкриття (офіційний LouvorJA)",
+
+    "preset5min": "5 хв (офіційний LouvorJA)",
+
+    "preset1min": "1 хв (офіційний LouvorJA)",
+
+    "presetBeep": "Сигнал (синтетичний)",
+
+    "presetChime": "Дзвін (синтетичний)",
+
+    "presetGong": "Гонг (синтетичний)",
+
+    "presetCustom": "Власний звук з пристрою",
+
     "markerGroupPresets": "Стандартні звуки",
     "markerGroupLibrary": "Мої звуки",
     "markerPreview": "Прослухати оповіщення",

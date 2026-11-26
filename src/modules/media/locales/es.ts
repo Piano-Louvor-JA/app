@@ -115,6 +115,16 @@ export default {
       "audioUploadFailed": "Fallo al subir el audio",
       "audioLinked": "Audio “{name}” vinculado",
       "audioRemoveFailed": "Fallo al eliminar el audio",
+      "collectionRenamedToast": "Colección renombrada",
+
+      "renameCollectionFailed": "Error al renombrar colección",
+
+      "singlesPrepareFailed": "Error al preparar colección Sencillos",
+
+      "singleCreateFailed": "Error al crear sencillo",
+
+      "singleCoverUpdated": "Portada del sencillo actualizada",
+
       "audioRemoved": "Audio eliminado",
       "showPanels": "Mostrar paneles",
       "hidePanels": "Ocultar paneles",
