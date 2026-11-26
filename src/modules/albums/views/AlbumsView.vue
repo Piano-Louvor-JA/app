@@ -315,9 +315,9 @@ function onImportFile(event: Event) {
     savePlaylists(current)
     playlists.value = listPlaylists()
     const parts = []
-    if (newLists > 0) parts.push(`${newLists} playlist(s) nova(s)`)
-    if (addedTracks > 0) parts.push(`${addedTracks} faixa(s) adicionada(s)`)
-    showImportFeedback(parts.length > 0 ? `Importado: ${parts.join(', ')}.` : 'Nada novo para importar.')
+    if (newLists > 0) parts.push(t('albums.playlists.importedNewPlaylists', { count: newLists }))
+    if (addedTracks > 0) parts.push(t('albums.playlists.importedAddedTracks', { count: addedTracks }))
+    showImportFeedback(parts.length > 0 ? t('albums.playlists.importedList', { parts: parts.join(', ') }) : t('albums.playlists.importedNothingNew'))
   })
 }
 
@@ -745,7 +745,7 @@ async function runAction(
                   </span>
                   <span class="albums-view__playlist-name">
                     <strong>{{ playlist.name }}</strong>
-                    <small>{{ playlist.items.length }} faixa(s)</small>
+                    <small>{{ t('albums.playlists.trackCount', { count: playlist.items.length }) }}</small>
                   </span>
                   <i
                     class="ti albums-view__playlist-chevron"

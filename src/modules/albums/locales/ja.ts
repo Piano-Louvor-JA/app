@@ -8,6 +8,18 @@ export default {
       "empty": "コレクションはまだありません。エディターで .slja ファイルを取り込んでください。",
       "emptyHint": "プレイリストはまだありません。",
       "createHint": "ライブラリの「プレイリスト」セクションで作成できます。",
+      "importedList": "インポートしました: {parts}。",
+
+      "importedNewPlaylists": "新しいプレイリスト {count} 件",
+
+
+      "importedAddedTracks": "追加されたトラック {count} 件",
+
+
+
+
+      "importedNothingNew": "インポートする新しい項目はありません。",
+
       "importInvalid": "無効なプレイリストファイルです。",
       "newPlaceholder": "新しいコレクション名…",
       "create": "作成",

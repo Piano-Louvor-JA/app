@@ -8,6 +8,18 @@ export default {
       "empty": "No collections yet. Import a .slja file in the editor.",
       "emptyHint": "You don't have any playlists yet.",
       "createHint": "Create one in the Playlists section of the Library.",
+      "importedList": "Imported: {parts}.",
+
+      "importedNewPlaylists": "{count} new playlist(s)",
+
+
+      "importedAddedTracks": "{count} track(s) added",
+
+
+
+
+      "importedNothingNew": "Nothing new to import.",
+
       "importInvalid": "Invalid playlists file.",
       "newPlaceholder": "New collection name...",
       "create": "Create",

@@ -898,7 +898,7 @@ describe('AlbumsView', () => {
     Object.defineProperty(input, 'files', { value: [file], configurable: true })
     input.dispatchEvent(new Event('change', { bubbles: true }))
     await flushPromises()
-    expect(body().querySelector('.albums-view__playlists-feedback')?.textContent).toContain('faixa(s) adicionada(s)')
+    expect(body().querySelector('.albums-view__playlists-feedback')?.textContent).toContain('albums.playlists.importedList')
     const culto = listPlaylists().find((p) => p.name === 'Culto')!
     expect(culto.items).toHaveLength(2)
     w.unmount()
@@ -917,7 +917,7 @@ describe('AlbumsView', () => {
     Object.defineProperty(input, 'files', { value: [file], configurable: true })
     input.dispatchEvent(new Event('change', { bubbles: true }))
     await flushPromises()
-    expect(body().querySelector('.albums-view__playlists-feedback')?.textContent).toContain('Nada novo')
+    expect(body().querySelector('.albums-view__playlists-feedback')?.textContent).toContain('albums.playlists.importedNothingNew')
     w.unmount()
   })
 

@@ -37,6 +37,22 @@ export default {
     "toneMinDurationWarning": "Süre, sesin toplam uzunluğundan kısa ({min}). Uyarılar üst üste binebilir.",
     "markerOffsetLabel": "Uyarının çalacağı kalan dakika",
     "markerPresetLabel": "Uyarı sesi",
+    "presetNone": "— Devre dışı —",
+
+    "presetAbertura": "Açılış (resmî LouvorJA)",
+
+    "preset5min": "5 dk (resmî LouvorJA)",
+
+    "preset1min": "1 dk (resmî LouvorJA)",
+
+    "presetBeep": "Bip (sentetik)",
+
+    "presetChime": "Çan (sentetik)",
+
+    "presetGong": "Gong (sentetik)",
+
+    "presetCustom": "Cihazın özel sesi",
+
     "markerGroupPresets": "Varsayılan sesler",
     "markerGroupLibrary": "Seslerim",
     "markerPreview": "Uyarıyı önizle",

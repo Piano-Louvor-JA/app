@@ -115,6 +115,16 @@ export default {
       "audioUploadFailed": "فشل رفع الصوت",
       "audioLinked": "رُبط الصوت «{name}»",
       "audioRemoveFailed": "فشل إزالة الصوت",
+      "collectionRenamedToast": "تمت إعادة تسمية المجموعة",
+
+      "renameCollectionFailed": "فشلت إعادة تسمية المجموعة",
+
+      "singlesPrepareFailed": "فشل تحضير مجموعة «المنفردات»",
+
+      "singleCreateFailed": "فشل إنشاء المنفردة",
+
+      "singleCoverUpdated": "تم تحديث غلاف المنفردة",
+
       "audioRemoved": "أُزيل الصوت",
       "showPanels": "إظهار اللوحات",
       "hidePanels": "إخفاء اللوحات",

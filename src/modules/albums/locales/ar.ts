@@ -8,6 +8,18 @@ export default {
       "empty": "لا مجموعات بعد. استورد ملف .slja في المحرر.",
       "emptyHint": "لا قوائم تشغيل لديك بعد.",
       "createHint": "أنشئ واحدة في قسم قوائم التشغيل بالمكتبة.",
+      "importedList": "تم الاستيراد: {parts}.",
+
+      "importedNewPlaylists": "{count} قائمة تشغيل جديدة",
+
+
+      "importedAddedTracks": "أُضيفت {count} مقطوعة",
+
+
+
+
+      "importedNothingNew": "لا يوجد جديد للاستيراد.",
+
       "importInvalid": "ملف قوائم تشغيل غير صالح.",
       "newPlaceholder": "اسم مجموعة جديدة…",
       "create": "إنشاء",

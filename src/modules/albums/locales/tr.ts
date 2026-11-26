@@ -8,6 +8,18 @@ export default {
       "empty": "Henüz koleksiyon yok. Editörde bir .slja dosyası içe aktarın.",
       "emptyHint": "Henüz çalma listeniz yok.",
       "createHint": "Kitaplığın Çalma Listeleri bölümünden bir tane oluşturun.",
+      "importedList": "İçe aktarıldı: {parts}.",
+
+      "importedNewPlaylists": "{count} yeni çalma listesi",
+
+
+      "importedAddedTracks": "{count} parça eklendi",
+
+
+
+
+      "importedNothingNew": "İçe aktarılacak yeni bir şey yok.",
+
       "importInvalid": "Geçersiz çalma listesi dosyası.",
       "newPlaceholder": "Yeni koleksiyon adı…",
       "create": "Oluştur",

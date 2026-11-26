@@ -115,6 +115,16 @@ export default {
       "audioUploadFailed": "音声のアップロードに失敗",
       "audioLinked": "音声「{name}」をリンクしました",
       "audioRemoveFailed": "音声の削除に失敗",
+      "collectionRenamedToast": "コレクション名を変更しました",
+
+      "renameCollectionFailed": "コレクション名の変更に失敗しました",
+
+      "singlesPrepareFailed": "シングルスコレクションの準備に失敗しました",
+
+      "singleCreateFailed": "シングルの作成に失敗しました",
+
+      "singleCoverUpdated": "シングルのカバーを更新しました",
+
       "audioRemoved": "音声を削除しました",
       "showPanels": "パネルを表示",
       "hidePanels": "パネルを隠す",

@@ -8,6 +8,18 @@ export default {
       "empty": "아직 컬렉션이 없습니다. 편집기에서 .slja 파일을 가져오세요.",
       "emptyHint": "아직 재생목록이 없습니다.",
       "createHint": "라이브러리의 재생목록 섹션에서 만들 수 있습니다.",
+      "importedList": "가져옴: {parts}.",
+
+      "importedNewPlaylists": "새 플레이리스트 {count}개",
+
+
+      "importedAddedTracks": "추가된 트랙 {count}개",
+
+
+
+
+      "importedNothingNew": "가져올 새 항목이 없습니다.",
+
       "importInvalid": "잘못된 재생목록 파일입니다.",
       "newPlaceholder": "새 컬렉션 이름…",
       "create": "만들기",

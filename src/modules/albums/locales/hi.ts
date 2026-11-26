@@ -8,6 +8,18 @@ export default {
       "empty": "अभी कोई संग्रह नहीं। संपादक में .slja फ़ाइल आयात करें।",
       "emptyHint": "आपकी अभी कोई प्लेलिस्ट नहीं है।",
       "createHint": "लाइब्रेरी के प्लेलिस्ट अनुभाग में बनाएँ।",
+      "importedList": "आयातित: {parts}।",
+
+      "importedNewPlaylists": "{count} नई प्लेलिस्ट",
+
+
+      "importedAddedTracks": "{count} ट्रैक जोड़े गए",
+
+
+
+
+      "importedNothingNew": "आयात करने के लिए कुछ नया नहीं है।",
+
       "importInvalid": "अमान्य प्लेलिस्ट फ़ाइल।",
       "newPlaceholder": "नया संग्रह नाम…",
       "create": "बनाएँ",

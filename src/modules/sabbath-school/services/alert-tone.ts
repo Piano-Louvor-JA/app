@@ -286,17 +286,18 @@ export function setLiveVolume(volume: number): void {
   }
 }
 
-// Exporta lista de presets para UI (sintéticos + oficiais + desabilitado)
+// Exporta lista de presets para UI (sintéticos + oficiais + desabilitado).
+// label = chave i18n em sabbathSchool.* (traduzida pelo caller).
 export function getAvailablePresets(): Array<{ key: string; label: string }> {
   return [
-    { key: 'none', label: '— Desabilitado —' },
-    { key: 'abertura_es', label: 'Abertura ES (oficial LouvorJA)' },
-    { key: '5min_es', label: '5 min ES (oficial LouvorJA)' },
-    { key: '1min_es', label: '1 min ES (oficial LouvorJA)' },
-    { key: 'beep', label: 'Beep (sintético)' },
-    { key: 'chime', label: 'Chime (sintético)' },
-    { key: 'gong', label: 'Gong (sintético)' },
-    { key: 'custom', label: 'Áudio personalizado do dispositivo' },
+    { key: 'none', label: 'sabbathSchool.presetNone' },
+    { key: 'abertura_es', label: 'sabbathSchool.presetAbertura' },
+    { key: '5min_es', label: 'sabbathSchool.preset5min' },
+    { key: '1min_es', label: 'sabbathSchool.preset1min' },
+    { key: 'beep', label: 'sabbathSchool.presetBeep' },
+    { key: 'chime', label: 'sabbathSchool.presetChime' },
+    { key: 'gong', label: 'sabbathSchool.presetGong' },
+    { key: 'custom', label: 'sabbathSchool.presetCustom' },
   ]
 }
 

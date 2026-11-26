@@ -8,6 +8,18 @@ export default {
       "empty": "还没有歌集。请在编辑器中导入 .slja 文件。",
       "emptyHint": "您还没有任何播放列表。",
       "createHint": "在媒体库的“播放列表”部分创建一个。",
+      "importedList": "已导入：{parts}。",
+
+      "importedNewPlaylists": "{count} 个新播放列表",
+
+
+      "importedAddedTracks": "添加了 {count} 首曲目",
+
+
+
+
+      "importedNothingNew": "没有可导入的新内容。",
+
       "importInvalid": "无效的播放列表文件。",
       "newPlaceholder": "新歌集名称…",
       "create": "创建",

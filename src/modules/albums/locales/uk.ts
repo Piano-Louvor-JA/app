@@ -8,6 +8,18 @@ export default {
       "empty": "Ще не створено жодної збірки. Імпортуйте файл .slja у редакторі.",
       "emptyHint": "У вас ще немає плейлистів.",
       "createHint": "Створіть його в розділі «Плейлисти» бібліотеки.",
+      "importedList": "Імпортовано: {parts}.",
+
+      "importedNewPlaylists": "{count} нов. плейлист(ів)",
+
+
+      "importedAddedTracks": "{count} додан. трек(ів)",
+
+
+
+
+      "importedNothingNew": "Нічого нового імпортувати.",
+
       "importInvalid": "Недійсний файл плейлистів.",
       "newPlaceholder": "Назва нової збірки...",
       "create": "Створити",

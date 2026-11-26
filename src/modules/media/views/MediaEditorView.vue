@@ -97,7 +97,7 @@ async function onPublishMusic(): Promise<void> {
     musicStatus.value = 'published'
     notify(`“${musicName.value}” publicada — disponível neste dispositivo`)
   } else {
-    notify('Falha ao publicar')
+    notify(t('media.editor.publishFailed'))
   }
 }
 const selectedMusicId = ref<number | null>(null)
@@ -160,7 +160,7 @@ async function loadOfficialForSuggestion(musicId: number): Promise<void> {
     const { resolveMediaTrack } = await import('@modules/media/services/custom-catalog')
     const track = await resolveMediaTrack(musicId)
     if (!track) {
-      notify('Música oficial não encontrada', true)
+      notify(t('media.editor.officialMusicNotFound'), true)
       editOfficialId.value = null
       return
     }
@@ -210,7 +210,7 @@ async function onSaveOfficialSuggestion(): Promise<void> {
     timing: null,
     status: 'draft',
   })
-  notify('Correção salva localmente — publique em Minhas Edições (Comunidade)')
+  notify(t('media.editor.editSavedLocal'))
 }
 
 /** statusMessage + snackbar juntos (toast). Mensagem vazia só limpa, sem abrir toast. */
@@ -303,12 +303,12 @@ async function onRenameCollection(): Promise<void> {
   try {
     const updated = await updateCustomCollection(id, { name })
     if (!updated) {
-      notify('Falha ao renomear coletânea', true)
+      notify(t('media.editor.renameCollectionFailed'), true)
       return
     }
     collections.value = collections.value.map((c) => (c.id === id ? updated : c))
     renamingId.value = null
-    notify('Coletânea renomeada')
+    notify(t('media.editor.collectionRenamedToast'))
   } finally {
     saving.value = false
   }
@@ -366,7 +366,7 @@ async function onCreateCollection(): Promise<void> {
       )
       newCollectionVisibility.value = 'private'
     } else {
-      notify('Falha ao criar coletânea (API indisponível?)', true)
+      notify(t('media.editor.createCollectionFailed'), true)
     }
   } finally {
     saving.value = false
@@ -385,9 +385,9 @@ async function onCreateMusic(): Promise<void> {
       selectedMusicId.value = result.id
       musicName.value = name
       lyrics.value = []
-      notify('Música criada')
+      notify(t('media.editor.musicCreated'))
     } else {
-      notify('Falha ao criar música')
+      notify(t('media.editor.createMusicFailed'))
     }
   } finally {
     saving.value = false
@@ -422,7 +422,7 @@ async function onCreateSingle(): Promise<void> {
   try {
     const collectionId = await resolveSinglesCollection()
     if (collectionId == null) {
-      notify('Falha ao preparar coletânea Singles', true)
+      notify(t('media.editor.singlesPrepareFailed'), true)
       return
     }
     const result = await createCustomMusic(collectionId, { name })
@@ -436,7 +436,7 @@ async function onCreateSingle(): Promise<void> {
       lyrics.value = []
       notify(`Single “${name}” criado${getAuthSession() ? '' : ' localmente'}`)
     } else {
-      notify('Falha ao criar single')
+      notify(t('media.editor.singleCreateFailed'))
     }
   } finally {
     saving.value = false
@@ -472,7 +472,7 @@ async function onAddOfficial(officialMusicId: number, name: string): Promise<voi
       await onCollectionChange()
       notify(`“${name}” adicionada à coletânea`)
     } else {
-      notify('Falha ao adicionar hino')
+      notify(t('media.editor.addHymnFailed'))
     }
   } finally {
     saving.value = false
@@ -540,9 +540,9 @@ async function onReuseMusic(music: ReusableMusic): Promise<void> {
       await onCollectionChange()
       selectedMusicId.value = result.id
       await onSelectMusic(result.id)
-      notify(`“${music.name}” copiada com letra e áudio`)
+      notify(t('media.editor.copiedWithMedia', { name: music.name }))
     } else {
-      notify('Falha ao copiar música')
+      notify(t('media.editor.copyMusicFailed'))
     }
   } finally {
     saving.value = false
@@ -584,19 +584,19 @@ async function onMusicCoverFile(event: Event): Promise<void> {
       const mediaId = `local-music-${musicId}-cover`
       await putMedia(mediaId, bytes)
       updateLocalMusic(musicId, { coverMediaId: mediaId })
-      notify('Capa do single atualizada')
+      notify(t('media.editor.singleCoverUpdated'))
     } else {
       const uploaded = await uploadCustomFile(bytes, file.name, 'imagens')
       if (!uploaded) {
-        notify('Falha no upload da capa', true)
+        notify(t('media.editor.coverUploadFailed'), true)
         return
       }
       const ok = await updateCustomMusic(musicId, { id_file_image: uploaded.idFile })
       if (!ok) {
-        notify('Falha ao salvar capa', true)
+        notify(t('media.editor.coverSaveFailed'), true)
         return
       }
-      notify('Capa do single atualizada')
+      notify(t('media.editor.singleCoverUpdated'))
     }
   } finally {
     saving.value = false
@@ -672,20 +672,20 @@ async function onCoverFile(event: Event): Promise<void> {
     const bytes = new Uint8Array(await file.arrayBuffer())
     const uploaded = await uploadCustomFile(bytes, file.name, 'imagens')
     if (!uploaded) {
-      notify('Falha no upload da capa')
+      notify(t('media.editor.coverUploadFailed'))
       return
     }
     const updated = await updateCustomCollection(selectedCollectionId.value, {
       cover_url: uploaded.url,
     })
     if (!updated) {
-      notify('Falha ao salvar capa')
+      notify(t('media.editor.coverSaveFailed'))
       return
     }
     collections.value = collections.value.map((c) =>
       c.id === selectedCollectionId.value ? updated : c,
     )
-    notify('Capa atualizada')
+    notify(t('media.editor.coverUpdated'))
   } finally {
     saving.value = false
   }
@@ -699,13 +699,13 @@ async function onRemoveCover(): Promise<void> {
       cover_url: null,
     })
     if (!updated) {
-      notify('Falha ao remover capa')
+      notify(t('media.editor.coverRemoveFailed'))
       return
     }
     collections.value = collections.value.map((c) =>
       c.id === selectedCollectionId.value ? updated : c,
     )
-    notify('Capa removida')
+    notify(t('media.editor.coverRemoved'))
   } finally {
     saving.value = false
   }
@@ -721,9 +721,9 @@ async function onAddStanza(): Promise<void> {
     })
     if (result) {
       lyrics.value.push({ id: result.id, lyric: 'Nova estrofe', time: '00:00', imageUrl: '' })
-      notify('Estrofe adicionada')
+      notify(t('media.editor.stanzaAdded'))
     } else {
-      notify('Falha ao adicionar estrofe')
+      notify(t('media.editor.addStanzaFailed'))
     }
   } finally {
     saving.value = false
@@ -754,7 +754,7 @@ async function onSelectMusic(id: number): Promise<void> {
     try {
       const local = getLocalMusicById(id)
       if (!local) {
-        notify('Esta música não existe mais')
+        notify(t('media.editor.musicMissing'))
         selectedMusicId.value = null
         musicName.value = ''
         lyrics.value = []
@@ -783,7 +783,7 @@ async function onSelectMusic(id: number): Promise<void> {
       }))
       loadAudioForMusic(local.audioBase64 || local.audioMediaId ? `local:${local.id}` : null)
       if (local.officialMusicId != null) {
-        notify('Hino oficial vinculado — a letra/áudio são gerenciados no catálogo oficial')
+        notify(t('media.editor.officialLinked'))
       }
     } finally {
       loading.value = false
@@ -806,7 +806,7 @@ async function onSelectMusic(id: number): Promise<void> {
       }
       // Link p/ hino oficial: editor mostra aviso (edição de letra fica no hinário oficial)
       if (typeof data.official_music_id === 'number' && data.official_music_id > 0) {
-        notify('Hino oficial vinculado — a letra/áudio são gerenciados no catálogo oficial')
+        notify(t('media.editor.officialLinked'))
       }
       musicName.value = data.name
       lyrics.value = (data.lyrics ?? []).map((row) => ({
@@ -819,17 +819,17 @@ async function onSelectMusic(id: number): Promise<void> {
     } else if (response.status === 404) {
       // Música não existe mais (apagada em outra sessão/coletânea):
       // limpa a seleção em vez de deixar a tela em estado quebrado.
-      notify('Esta música não existe mais')
+      notify(t('media.editor.musicMissing'))
       selectedMusicId.value = null
       musicName.value = ''
       lyrics.value = []
       loadAudioForMusic(null)
       await refreshCollections()
     } else {
-      notify('Falha ao carregar música')
+      notify(t('media.editor.loadMusicFailed'))
     }
   } catch {
-    notify('API indisponível')
+    notify(t('media.editor.apiUnavailable'))
   } finally {
     loading.value = false
   }
@@ -898,7 +898,7 @@ async function importSingleSlja(file: File): Promise<void> {
       // (invisível na UI — isSinglesView); modelo exige música→coletânea.
       collectionId = await resolveSinglesCollection()
       if (collectionId == null) {
-        notify('Falha ao preparar coletânea Singles', true)
+        notify(t('media.editor.singlesPrepareFailed'), true)
         return
       }
     } else if (importCollectionName !== importBaseName) {
@@ -912,7 +912,7 @@ async function importSingleSlja(file: File): Promise<void> {
       } else {
         const created = await createCustomCollection(importCollectionName)
         if (!created) {
-          notify('Falha ao criar coletânea de importação')
+          notify(t('media.editor.importCollectionFailed'))
           return
         }
         collectionId = created.id
@@ -923,7 +923,7 @@ async function importSingleSlja(file: File): Promise<void> {
 
     const createdMusic = await createCustomMusic(collectionId, { name })
     if (!createdMusic) {
-      notify('Falha ao criar música a partir do .slja — verifique conexão/login', true)
+      notify(t('media.editor.sljaMusicFailed'), true)
       return
     }
     selectedMusicId.value = createdMusic.id
@@ -988,7 +988,7 @@ async function importSingleSlja(file: File): Promise<void> {
       }
     }
     if (!isLocalMusic && !hasSession && (archive.audio?.bytes?.length || archive.assets?.length)) {
-      notify('Sem conta conectada: áudio e fundo não sobem — entre para incluí-los', true)
+      notify(t('media.editor.noAccountMedia'), true)
     }
 
     /** imageUrl → id_file (remoto) ou data: URL (local) */
@@ -1067,7 +1067,7 @@ async function importSingleSlja(file: File): Promise<void> {
     loadAudioForMusic(localAudioPath ?? uploadedAudio?.url ?? null)
   } catch (error) {
     console.error('Falha ao importar .slja', error)
-    notify('Arquivo .slja inválido')
+    notify(t('media.editor.invalidSlja'))
   } finally {
     loading.value = false
   }
@@ -1109,10 +1109,10 @@ async function onExportSlja(): Promise<void> {
     anchor.download = `${musicName.value || 'apresentacao'}.slja`
     anchor.click()
     URL.revokeObjectURL(url)
-    notify('Exportado com sucesso')
+    notify(t('media.editor.exportSuccess'))
   } catch (error) {
     console.error('Falha ao exportar .slja', error)
-    notify('Falha ao exportar .slja')
+    notify(t('media.editor.exportFailed'))
   } finally {
     saving.value = false
   }
@@ -1180,7 +1180,7 @@ async function doDeleteCollection(): Promise<void> {
       await refreshCollections()
       notify(`Coletânea "${current.name}" excluída`)
     } else {
-      notify('Falha ao excluir coletânea', true)
+      notify(t('media.editor.deleteCollectionFailed'), true)
     }
   } finally {
     saving.value = false
@@ -1200,9 +1200,9 @@ async function doDeleteMusic(): Promise<void> {
       if (selectedCollectionId.value != null) {
         musics.value = await listCustomMusics(selectedCollectionId.value)
       }
-      notify('Música excluída')
+      notify(t('media.editor.musicDeleted'))
     } else {
-      notify('Falha ao excluir música', true)
+      notify(t('media.editor.deleteMusicFailed'), true)
     }
   } finally {
     saving.value = false
@@ -1215,11 +1215,11 @@ async function doDeleteStanza(index: number): Promise<void> {
   saving.value = true
   try {
     if (stanza.id != null && !(await deleteCustomLyric(stanza.id))) {
-      notify('Falha ao excluir estrofe', true)
+      notify(t('media.editor.deleteStanzaFailed'), true)
       return
     }
     lyrics.value.splice(index, 1)
-    notify('Estrofe excluída')
+    notify(t('media.editor.stanzaDeleted'))
   } finally {
     saving.value = false
   }
@@ -1367,12 +1367,12 @@ async function onAudioFile(event: Event): Promise<void> {
 
     const uploaded = await uploadCustomFile(bytes, file.name, 'audio')
     if (!uploaded) {
-      notify('Falha no upload do áudio', true)
+      notify(t('media.editor.audioUploadFailed'), true)
       return
     }
     const ok = await updateCustomMusic(musicId, { id_file_audio: uploaded.idFile })
     if (!ok) {
-      notify('Falha ao vincular o áudio à música', true)
+      notify(t('media.editor.linkAudioFailed'), true)
       return
     }
     loadAudioForMusic(uploaded.url)
@@ -1393,12 +1393,12 @@ async function onRemoveAudio(): Promise<void> {
     } else {
       const ok = await updateCustomMusic(musicId, { id_file_audio: null })
       if (!ok) {
-        notify('Falha ao remover o áudio', true)
+        notify(t('media.editor.audioRemoveFailed'), true)
         return
       }
     }
     loadAudioForMusic(null)
-    notify('Áudio removido')
+    notify(t('media.editor.audioRemoved'))
   } finally {
     saving.value = false
   }

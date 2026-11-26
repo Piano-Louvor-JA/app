@@ -8,6 +8,18 @@ export default {
       "empty": "Aucune compilation créée pour l'instant. Importez un fichier .slja dans l'éditeur.",
       "emptyHint": "Vous n'avez pas encore de playlists.",
       "createHint": "Créez-en une dans la section Playlists de la Bibliothèque.",
+      "importedList": "Importé : {parts}.",
+
+      "importedNewPlaylists": "{count} nouvelle(s) playlist(s)",
+
+
+      "importedAddedTracks": "{count} piste(s) ajoutée(s)",
+
+
+
+
+      "importedNothingNew": "Rien de nouveau à importer.",
+
       "importInvalid": "Fichier de playlists invalide.",
       "newPlaceholder": "Nom de la nouvelle compilation...",
       "create": "Créer",
