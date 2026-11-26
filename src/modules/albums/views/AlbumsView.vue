@@ -924,29 +924,53 @@ async function runAction(
       v-else-if="!isLoadingCatalog && categories.length === 0 && !isHubSearching"
       class="albums-view__convite"
     >
-      <!-- Preview pt-BR (não interativo) desfocado atrás do convite. -->
-      <div v-if="(previewCategories?.length ?? 0) > 0" aria-hidden="true" class="albums-view__convite-backdrop">
-        <section
-          v-for="category in previewCategories"
-          :key="`preview-${String(category.id)}`"
-          class="albums-view__category"
-        >
+      <!-- Catálogo pt-BR real (não funcional) atrás do blur; fallback: mockup estático. -->
+      <div aria-hidden="true" class="albums-view__convite-backdrop">
+        <template v-if="(previewCategories?.length ?? 0) > 0">
+          <section
+            v-for="category in previewCategories"
+            :key="`preview-${String(category.id)}`"
+            class="albums-view__category"
+          >
+            <header class="albums-view__category-header">
+              <div>
+                <h2 class="albums-view__category-title">{{ categoryTitle(category) }}</h2>
+                <p class="albums-view__category-subtitle">{{ categorySubtitle(category) }}</p>
+              </div>
+            </header>
+            <GlassCard class="albums-view__grid-wrap" :padding="false" elevated>
+              <div class="albums-view__grid">
+                <AlbumCollectionCard
+                  v-for="collection in category.collections"
+                  :key="`preview-${String(collection.id)}`"
+                  :collection="collection"
+                  :library-album="undefined"
+                  :show-download-controls="false"
+                  tabindex="-1"
+                />
+              </div>
+            </GlassCard>
+          </section>
+        </template>
+        <section v-else class="albums-view__category">
           <header class="albums-view__category-header">
             <div>
-              <h2 class="albums-view__category-title">{{ categoryTitle(category) }}</h2>
-              <p class="albums-view__category-subtitle">{{ categorySubtitle(category) }}</p>
+              <h2 class="albums-view__category-title">Hinários</h2>
             </div>
           </header>
           <GlassCard class="albums-view__grid-wrap" :padding="false" elevated>
             <div class="albums-view__grid">
-              <AlbumCollectionCard
-                v-for="collection in category.collections"
-                :key="`preview-${String(collection.id)}`"
-                :collection="collection"
-                :library-album="undefined"
-                :show-download-controls="false"
-                tabindex="-1"
-              />
+              <div
+                v-for="n in 12"
+                :key="`mock-${n}`"
+                class="albums-view__mock-card"
+              >
+                <div class="albums-view__mock-cover" :class="`albums-view__mock-cover--${n % 4}`">
+                  <i class="ti ti-music" />
+                </div>
+                <div class="albums-view__mock-line" />
+                <div class="albums-view__mock-line albums-view__mock-line--short" />
+              </div>
             </div>
           </GlassCard>
         </section>
@@ -1702,6 +1726,37 @@ async function runAction(
   font-size: .8rem;
   color: var(--ds-color-on-surface-variant);
   opacity: .8;
+}
+
+/* Mockup de catálogo (fallback do preview pt-BR). */
+.albums-view__mock-card {
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+}
+
+.albums-view__mock-cover {
+  aspect-ratio: 1;
+  border-radius: var(--ds-radius-md, .75rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  i { font-size: 2rem; opacity: .5; }
+}
+
+.albums-view__mock-cover--0 { background: linear-gradient(135deg, #b45309, #7c2d12); }
+.albums-view__mock-cover--1 { background: linear-gradient(135deg, #1d4ed8, #172554); }
+.albums-view__mock-cover--2 { background: linear-gradient(135deg, #047857, #064e3b); }
+.albums-view__mock-cover--3 { background: linear-gradient(135deg, #6d28d9, #3b0764); }
+
+.albums-view__mock-line {
+  height: .55rem;
+  border-radius: .25rem;
+  background: color-mix(in srgb, var(--ds-color-on-surface-variant) 30%, transparent);
+}
+
+.albums-view__mock-line--short {
+  width: 60%;
 }
 
 .albums-view__alert {
