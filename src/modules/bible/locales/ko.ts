@@ -1,5 +1,6 @@
 export default {
   "bible": {
+    "convite_catalogo": "아직 이 언어로 된 성경 콘텐츠가 없습니다. LouvorJA 커뮤니티의 번역에 참여해 주세요.",
     "title": "성경",
     "version": "번역본",
     "selectVersion": "번역본 선택",
@@ -44,7 +45,6 @@ export default {
     "close": "닫기",
     "inAppProjection": "성경 미리보기",
     "projectionHotkeyHint": "ESC 투영 종료  ·  Ctrl+Alt+P 운영자 화면 전환",
-    "convite_catalogo": "이 언어의 성경 콘텐츠가 아직 없습니다. 커뮤니티 번역에 도움을 주세요: 자세한 내용은 LouvorJA에서 확인하세요.",
     "emptyChapter": "이 장에 절이 없습니다.",
     "loading": "성경 불러오는 중…",
     "noSelection": "투영할 절을 선택하세요",

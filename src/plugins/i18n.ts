@@ -296,11 +296,7 @@ export function detectInitialLocale(): SupportedLocale {
  * Converte um locale BCP-47 (ex: `pt-BR`, `en-US`, `es-ES`) para o
  * prefixo usado pela API do Louvor JA (`pt`, `en`, `es`).
  */
-export function localeToApiPrefix(locale: string): string {
-  const prefix = locale.slice(0, 2).toLowerCase()
-  if (prefix === 'en' || prefix === 'es') return prefix
-  return 'pt'
-}
+export { localeToApiPrefix } from '@modules/sync/services/api-prefix'
 
 const initialLocale = detectInitialLocale()
 

@@ -55,6 +55,6 @@ export default {
     "errors": {
       "loadCatalogFailed": "Could not load Bible books and versions.",
       "loadChapterFailed": "Could not load the selected chapter."
-    }
+    },
   }
 }

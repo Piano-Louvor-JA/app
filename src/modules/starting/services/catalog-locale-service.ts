@@ -1,3 +1,4 @@
+import { hasCatalogForPrefix, localeToApiPrefix } from '@modules/sync/services/api-prefix'
 import { getCurrentApiPrefix } from '@modules/sync/services/library-catalog'
 
 import { syncEssentialCatalogFromApi } from './bootstrap-service'
@@ -26,14 +27,7 @@ export function essentialFilesForPrefix(prefix: string): string[] {
   ]
 }
 
-export function localeToApiPrefix(locale: string): string {
-  const map: Record<string, string> = {
-    'pt-BR': 'pt',
-    en: 'en',
-    es: 'es',
-  }
-  return map[locale] ?? 'pt'
-}
+export { localeToApiPrefix } from '@modules/sync/services/api-prefix'
 
 /**
  * Garante os essenciais do idioma alvo. Idempotente; relança erros pra o
@@ -49,6 +43,7 @@ export async function ensureCatalogForLocale(
   // setUserPreference(language) — persistir antes = early-return aqui =
   // download nunca roda e o idioma alvo nunca chega ao disco.
   const targetPrefix = localeToApiPrefix(locale)
+  if (!hasCatalogForPrefix(targetPrefix)) return
   const currentPrefix = getCurrentApiPrefix()
   if (targetPrefix === currentPrefix) {
     // mesmo idioma corrente: o bootstrap normal já cuidou
