@@ -51,7 +51,7 @@ export function installClientPlatformHeader(): void {
       // Domínios de terceiros (Google/Firebase Auth etc.): header custom torna a request
       // non-simple → preflight OPTIONS → Google responde 403 → auth/network-request-failed.
       // X-Client-* é padrão da org para NOSSA API — nunca injetar em hosts de terceiros.
-      if (/(^|\.)googleapis\.com$|(^|\.)firebaseapp\.com$|(^|\.)firebaseio\.com$|(^|\.)google\.com$/i.test(
+      if (/(^|\.)googleapis\.com$|(^|\.)firebaseapp\.com$|(^|\.)firebaseio\.com$|(^|\.)google\.com$|(^|\.)vlibras\.gov\.br$/i.test(
         new URL(url).hostname,
       )) {
         return originalFetch(input as RequestInfo, init)

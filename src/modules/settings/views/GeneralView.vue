@@ -33,14 +33,13 @@ import MediaFolderCard from '../components/MediaFolderCard.vue'
 import AppBackupCard from '../components/AppBackupCard.vue'
 import DiagnosticsCard from '../components/DiagnosticsCard.vue'
 import { ensureCatalogForLocale } from '@modules/starting/services/catalog-locale-service'
-import { isLibrasEnabled, setLibrasEnabled } from '@modules/libras/services/libras-preferences'
+import { isLibrasEnabled, setLibrasEnabled, getLibrasAvatar, setLibrasAvatar, type LibrasAvatar, getLibrasRegionalism, setLibrasRegionalism, type LibrasRegionalism, isLibrasSubtitleEnabled, setLibrasSubtitleEnabled, getLibrasSpeed, setLibrasSpeed } from '@modules/libras/services/libras-preferences'
 
 const librasOn = ref(isLibrasEnabled())
-
-function toggleLibras() {
-  librasOn.value = !librasOn.value
-  setLibrasEnabled(librasOn.value)
-}
+const librasAvatar = ref<LibrasAvatar>(getLibrasAvatar())
+const librasSubtitle = ref(isLibrasSubtitleEnabled())
+const librasRegionalism = ref<LibrasRegionalism>(getLibrasRegionalism())
+const librasSpeed = ref(getLibrasSpeed())
 
 const { t, locale } = useI18n()
 const catalogSyncState = ref<'idle' | 'syncing' | 'done' | 'error'>('idle')
@@ -471,9 +470,80 @@ async function clearAllLocalData() {
           v-model="librasOn"
           type="checkbox"
           data-testid="libras-toggle"
-          @change="toggleLibras"
+          @change="setLibrasEnabled(librasOn)"
         >
         <span>{{ t('settings.general.librasToggleLabel') }}</span>
+      </label>
+
+      <label
+        v-if="librasOn"
+        class="general-settings__libras-row"
+        data-testid="libras-subtitle-row"
+      >
+        <input
+          v-model="librasSubtitle"
+          type="checkbox"
+          data-testid="libras-subtitle-toggle"
+          @change="setLibrasSubtitleEnabled(librasSubtitle)"
+        >
+        <span>Legendas do intérprete</span>
+      </label>
+
+      <label
+        v-if="librasOn"
+        class="general-settings__libras-row"
+        data-testid="libras-avatar-row"
+      >
+        <span>{{ t('settings.general.librasAvatarLabel') }}</span>
+        <select
+          v-model="librasAvatar"
+          data-testid="libras-avatar-select"
+          @change="setLibrasAvatar(librasAvatar)"
+        >
+          <option value="icaro">{{ t('settings.general.librasAvatarIcaro') }}</option>
+          <option value="hozana">{{ t('settings.general.librasAvatarHozana') }}</option>
+          <option value="guga">{{ t('settings.general.librasAvatarGuga') }}</option>
+        </select>
+      </label>
+
+      <label
+        v-if="librasOn"
+        class="general-settings__libras-row"
+        data-testid="libras-regionalism-row"
+      >
+        <span>Regionalismo Libras</span>
+        <select
+          v-model="librasRegionalism"
+          data-testid="libras-regionalism-select"
+          @change="setLibrasRegionalism(librasRegionalism)"
+        >
+          <option value="default">Padrão BR</option>
+          <option value="nordeste">Nordeste</option>
+          <option value="sul">Sul</option>
+          <option value="sudeste">Sudeste</option>
+          <option value="norte">Norte</option>
+          <option value="centro-oeste">Centro-Oeste</option>
+        </select>
+      </label>
+
+      <label
+        v-if="librasOn"
+        class="general-settings__libras-row"
+        data-testid="libras-speed-row"
+      >
+        <span>Velocidade do intérprete</span>
+        <select
+          v-model="librasSpeed"
+          data-testid="libras-speed-select"
+          @change="setLibrasSpeed(Number(librasSpeed))"
+        >
+          <option :value="0.5">Lenta (0.5×)</option>
+          <option :value="0.75">0.75×</option>
+          <option :value="1">Normal (1×)</option>
+          <option :value="1.25">1.25×</option>
+          <option :value="1.5">Rápida (1.5×)</option>
+          <option :value="2">Muito rápida (2×)</option>
+        </select>
       </label>
     </GlassCard>
 
@@ -804,6 +874,21 @@ async function clearAllLocalData() {
   height: 1.125rem;
   accent-color: var(--ds-color-primary);
   cursor: pointer;
+}
+
+/* Select de avatar: herda fundo escuro do tema (default UA = branco/letra branca) */
+.general-settings__libras-row select {
+  padding: 0.375rem 0.75rem;
+  color: var(--ds-color-on-surface);
+  background-color: var(--ds-color-surface-container, rgba(255, 255, 255, 0.08));
+  border: 1px solid var(--ds-color-outline, rgba(255, 255, 255, 0.25));
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.general-settings__libras-row select option {
+  color: #1a1a1a;
+  background-color: #ffffff;
 }
 
 .general-settings__lang-options {

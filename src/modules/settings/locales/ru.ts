@@ -190,6 +190,15 @@ export default {
       "librasTitle": "Libras (автоматический перевод)",
       "librasHint": "Показывает текст текущего гимна в Libras (текстовая глосса). Автоматический перевод; оригинал остаётся видимым.",
       "librasToggleLabel": "Включить Libras",
+
+      "librasAvatarLabel": "Аватар переводчика",
+
+      "librasAvatarIcaro": "Икаро",
+
+      "librasAvatarHozana": "Хозана",
+
+
+      "librasAvatarGuga": "Гуга",
       "languageHint": "Выберите язык интерфейса приложения.",
       "languagePortuguese": "Português (BR)",
       "languageEnglish": "English",

@@ -38,10 +38,10 @@ describe('libras-translate (P2 — RF Gloss)', () => {
         expect(cacheSave).not.toHaveBeenCalled();
     });
 
-    it('cache MISS + API OK: salva no cache e devolve gloss', async () => {
+    it('cache MISS + API OK: salva no cache e devolve gloss (texto puro)', async () => {
         const fetchSpy = vi.fn().mockResolvedValue({
             ok: true,
-            json: () => Promise.resolve({ gloss: 'GLOSS API' }),
+            text: () => Promise.resolve('GLOSS API\n'),
         });
         globalThis.fetch = fetchSpy as unknown as typeof fetch;
 
@@ -88,7 +88,7 @@ describe('libras-translate (P2 — RF Gloss)', () => {
     it('AbortSignal.timeout de 15s é usado na chamada', async () => {
         const fetchSpy = vi.fn().mockResolvedValue({
             ok: true,
-            json: () => Promise.resolve({ gloss: 'G' }),
+            text: () => Promise.resolve('G'),
         });
         globalThis.fetch = fetchSpy as unknown as typeof fetch;
 

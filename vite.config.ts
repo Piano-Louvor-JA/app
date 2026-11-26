@@ -52,10 +52,15 @@ export default defineConfig(({ command }) => ({
     // o Vite nega /@fs/ dele (403 em fontes tabler/fontsource). Autorizar o
     // caminho real resolvido mantém o bloqueio para todo o resto.
     fs: {
-      // Root do projeto + realpath do node_modules (symlink p/ outro worktree).
+      // Root do projeto + realpath do node_modules (symlink p/ outro worktree)
+      // + caminho local absoluto (fontes @fontsource/tabler via /@fs/).
       allow: [
         fileURLToPath(new URL('.', import.meta.url)),
         path.dirname(realpathSync('node_modules')),
+        path.resolve(__dirname, 'node_modules'),
+        // pnpm: pacote é symlink p/ .pnpm store fora do root (403 em woff2).
+        path.dirname(realpathSync('node_modules/@tabler/icons-webfont')),
+        path.dirname(realpathSync('node_modules/@fontsource-variable/plus-jakarta-sans')),
       ],
     },
     watch: {

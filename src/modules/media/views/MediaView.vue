@@ -10,6 +10,7 @@ import MediaPlayerPill from '../components/MediaPlayerPill.vue'
 import MediaSlideStage from '../components/MediaSlideStage.vue'
 import { useMediaPlayer } from '../composables/useMediaPlayer'
 import { revealItemInAside } from '../services/media-aside-scroll'
+import { isLibrasEnabled } from '@modules/libras/services/libras-preferences'
 import { stripHtmlBreaks } from '../services/media-slides'
 import type { MediaPlaybackMode } from '../types/media'
 
@@ -155,6 +156,7 @@ function queueItemKey(index: number) {
 }
 
 const playlistAsideEl = ref<HTMLElement | null>(null)
+const librasEnabled = isLibrasEnabled()
 let autoFullscreenAttempted = false
 
 // Mesmo critério da projeção interna: estendidos conectados mas desmarcados
@@ -542,6 +544,10 @@ async function onToggleFullscreen() {
         </template>
       </aside>
     </div>
+
+    <!-- Intérprete de sinais v2.1 (avatar 3D keyframes) — visível quando Libras ativo -->
+    <!-- F-B.2: demo Libras removido da tela de mídia (era painel de validação;
+         intérprete vive na projeção, config em Geral → Libras). -->
 
     <MediaCloseDialog
       :open="closeConfirmOpen"
