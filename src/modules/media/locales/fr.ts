@@ -180,6 +180,16 @@ export default {
       "audioUploadFailed": "Échec du téléversement de l’audio",
       "audioLinked": "Audio « {name} » lié",
       "audioRemoveFailed": "Échec de la suppression de l’audio",
+      "collectionRenamedToast": "Collection renommée",
+
+      "renameCollectionFailed": "Échec du renommage de la collection",
+
+      "singlesPrepareFailed": "Échec de la préparation de la collection Singles",
+
+      "singleCreateFailed": "Échec de la création du single",
+
+      "singleCoverUpdated": "Couverture du single mise à jour",
+
       "audioRemoved": "Audio supprimé",
       "showPanels": "Afficher les panneaux",
       "hidePanels": "Masquer les panneaux",

@@ -180,6 +180,16 @@ export default {
       "audioUploadFailed": "Не вдалося завантажити аудіо",
       "audioLinked": "Аудіо «{name}» прив’язано",
       "audioRemoveFailed": "Не вдалося видалити аудіо",
+      "collectionRenamedToast": "Збірка перейменована",
+
+      "renameCollectionFailed": "Не вдалося перейменувати збірку",
+
+      "singlesPrepareFailed": "Не вдалося підготувати збірку «Сингли»",
+
+      "singleCreateFailed": "Не вдалося створити сингл",
+
+      "singleCoverUpdated": "Обкладинку сингла оновлено",
+
       "audioRemoved": "Аудіо видалено",
       "showPanels": "Показати панелі",
       "hidePanels": "Сховати панелі",

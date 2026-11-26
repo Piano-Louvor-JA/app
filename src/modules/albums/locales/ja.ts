@@ -8,6 +8,18 @@ export default {
       "empty": "コレクションはまだありません。エディターで .slja ファイルを取り込んでください。",
       "emptyHint": "プレイリストはまだありません。",
       "createHint": "ライブラリの「プレイリスト」セクションで作成できます。",
+      "importedList": "インポートしました: {parts}。",
+
+      "importedNewPlaylists": "新しいプレイリスト {count} 件",
+
+
+      "importedAddedTracks": "追加されたトラック {count} 件",
+
+
+
+
+      "importedNothingNew": "インポートする新しい項目はありません。",
+
       "importInvalid": "無効なプレイリストファイルです。",
       "newPlaceholder": "新しいコレクション名…",
       "create": "作成",
@@ -77,6 +89,10 @@ export default {
       "close": "歌詞を閉じる"
     },
     "messages": {
+      convite_catalogo: '音楽カタログはまだあなたの言語では利用できません。コミュニティに参加して、あなたの言語のLouvorJAカタログ作りにご協力ください。',
+      convite_titulo: 'カタログ構築中',
+      convite_hint: '上のプレビューはポルトガル語のカタログです。あなたの助けで、もうすぐあなたの言語でも。',
+
       "catalogEmpty": "ローカルカタログにコレクションが見つかりません。",
       "catalogFailed": "アルバムカタログを読み込めませんでした。",
       "catalogSearchEmpty": "この検索に一致するコレクションはありません。",

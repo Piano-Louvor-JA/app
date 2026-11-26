@@ -8,6 +8,18 @@ export default {
       "empty": "아직 컬렉션이 없습니다. 편집기에서 .slja 파일을 가져오세요.",
       "emptyHint": "아직 재생목록이 없습니다.",
       "createHint": "라이브러리의 재생목록 섹션에서 만들 수 있습니다.",
+      "importedList": "가져옴: {parts}.",
+
+      "importedNewPlaylists": "새 플레이리스트 {count}개",
+
+
+      "importedAddedTracks": "추가된 트랙 {count}개",
+
+
+
+
+      "importedNothingNew": "가져올 새 항목이 없습니다.",
+
       "importInvalid": "잘못된 재생목록 파일입니다.",
       "newPlaceholder": "새 컬렉션 이름…",
       "create": "만들기",
@@ -77,6 +89,10 @@ export default {
       "close": "가사 닫기"
     },
     "messages": {
+      convite_catalogo: '음악 카탈로그가 아직 사용자의 언어로 제공되지 않습니다. 커뮤니티에 참여하여 이 언어로 LouvorJA 카탈로그를 만드는 데 도움을 주세요.',
+      convite_titulo: '카탈로그 준비 중',
+      convite_hint: '위 미리보기는 포르투갈어 카탈로그입니다. 도움으로 곧 당신의 언어로도.',
+
       "catalogEmpty": "로컬 카탈로그에서 컬렉션을 찾을 수 없습니다.",
       "catalogFailed": "앨범 카탈로그를 불러올 수 없습니다.",
       "catalogSearchEmpty": "이 검색에 해당하는 컬렉션이 없습니다.",

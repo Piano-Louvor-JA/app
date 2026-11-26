@@ -1,32 +1,32 @@
 export default {
   "albums": {
-    "disabledAlbums": {
-      "collectionNote": "Álbum desactivado: sus canciones aparecen atenuadas en la búsqueda y el selector las salta. Aquí dentro aún suenan al hacer clic.",
-      "title": "Álbumes activos",
-      "description": "Desactive los álbumes que no usa (por ejemplo, el himnario antiguo). Sus canciones aparecen atenuadas en la búsqueda y Enter y las flechas las saltan. También puede desactivar un álbum desde su tarjeta en la Central de Medios.",
-      "filter": "Filtrar álbumes",
-      "count": "{count} desactivado(s)",
-      "badge": "Álbum desactivado",
-      "disableConfirmTitle": "¿Desactivar “{name}”?",
-      "disableConfirmMessage": "Las canciones de este álbum aparecen atenuadas en la búsqueda y el selector las salta. Puede reactivarlo después con el ojo del card.",
-      "disableConfirmYes": "Desactivar",
-      "enable": "Activar álbum",
-      "disable": "Desactivar álbum"
-    },
     "custom": {
       "title": "Mis Colecciones",
       "openEditor": "Abrir editor de letras",
       "open": "Abrir colección {name}",
       "trackCount": "{count} pista(s)",
       "empty": "Aún no hay colecciones. Importa un .slja en el editor.",
+      "emptyHint": "Aún no tienes playlists.",
+      "createHint": "Crea una en la sección Playlists de la Biblioteca.",
+      "importedList": "Importado: {parts}.",
+
+      "importedNewPlaylists": "{count} playlist(s) nueva(s)",
+
+
+      "importedAddedTracks": "{count} pista(s) añadida(s)",
+
+
+
+
+      "importedNothingNew": "Nada nuevo para importar.",
+
+      "importInvalid": "Archivo de playlists inválido.",
       "newPlaceholder": "Nombre de la nueva colección...",
       "create": "Crear",
       "hide": "Ocultar Mis Colecciones",
-      "show": "Mostrar Mis Colecciones",
-      "emptyHint": "Aún no tienes playlists.",
-      "createHint": "Crea una en la sección Playlists de la Biblioteca.",
-      "importInvalid": "Archivo de playlists inválido."
+      "show": "Mostrar Mis Colecciones"
     },
+    "fallbackMusic": "Música",
     "playlists": {
       "removeTrackTitle": "¿Quitar de la playlist?",
       "removeTrackMessage": "“{title}” sale de “{name}”. La canción y los archivos descargados siguen en el acervo.",
@@ -45,10 +45,6 @@ export default {
       "deleteConfirm": "Eliminar playlist",
       "singlePlayHint": "Modo único: reproducir solo esta canción",
       "shuffleHint": "Reproducción aleatoria: reproducir todas las canciones en orden aleatorio",
-      "playInstrumental": "Tocar {name} con pista (instrumental)",
-      "playInstrumentalHint": "Pista: reproducir todas las canciones solo con el instrumental",
-      "playNoAudio": "Tocar {name} sin audio (solo las diapositivas)",
-      "playNoAudioHint": "Sin audio: pasar solo las diapositivas de las canciones, sin sonido",
       "playAllHint": "Reproducir playlist: reproducir todas las canciones en secuencia",
       "shuffle": "Reproducir aleatoriamente",
       "playTrack": "Reproducir {title} en el minirreproductor",
@@ -58,11 +54,15 @@ export default {
       "create": "Crear",
       "export": "Exportar playlists",
       "import": "Importar playlists",
-      "empty": "Aún no hay playlists creadas."
+      "empty": "Aún no hay playlists creadas.",
+      "playInstrumental": "Tocar {name} con pista (instrumental)",
+      "playInstrumentalHint": "Pista: reproducir todas las canciones solo con el instrumental",
+      "playNoAudio": "Tocar {name} sin audio (solo las diapositivas)",
+      "playNoAudioHint": "Sin audio: pasar solo las diapositivas de las canciones, sin sonido"
     },
     "title": "Centro de Medios",
     "subtitle": "Álbumes y Colecciones",
-    "collectionFallback": "Colección",
+    "collectionFallback": "Colecciones",
     "back": "Volver a álbumes",
     "searchPlaceholder": "Escriba el número o nombre del himno...",
     "hubSearchPlaceholder": "Busque aquí...",
@@ -89,6 +89,10 @@ export default {
       "close": "Cerrar letra"
     },
     "messages": {
+      convite_catalogo: 'El catálogo musical aún no está disponible en tu idioma. Únete a la comunidad y ayuda a formar el catálogo de LouvorJA en tu propio idioma.',
+      convite_titulo: 'Catálogo en construcción',
+      convite_hint: 'La vista previa muestra el catálogo en portugués — pronto en tu idioma, con tu ayuda.',
+
       "catalogEmpty": "No se encontró ninguna colección en el catálogo local.",
       "catalogFailed": "No se pudo cargar el catálogo de álbumes.",
       "catalogSearchEmpty": "No se encontró ninguna colección para esta búsqueda.",
@@ -102,6 +106,18 @@ export default {
       "deleteCollectionTitle": "¿Eliminar “{name}”?",
       "deleteCollectionText": "La copia local será eliminada. La original de la Comunidad no se ve afectada."
     },
-    "fallbackMusic": "Música"
+    "disabledAlbums": {
+      "collectionNote": "Álbum desactivado: sus canciones aparecen atenuadas en la búsqueda y el selector las salta. Aquí dentro aún suenan al hacer clic.",
+      "title": "Álbumes activos",
+      "description": "Desactive los álbumes que no usa (por ejemplo, el himnario antiguo). Sus canciones aparecen atenuadas en la búsqueda y Enter y las flechas las saltan. También puede desactivar un álbum desde su tarjeta en la Central de Medios.",
+      "filter": "Filtrar álbumes",
+      "count": "{count} desactivado(s)",
+      "badge": "Álbum desactivado",
+      "disableConfirmTitle": "¿Desactivar “{name}”?",
+      "disableConfirmMessage": "Las canciones de este álbum aparecen atenuadas en la búsqueda y el selector las salta. Puede reactivarlo después con el ojo del card.",
+      "disableConfirmYes": "Desactivar",
+      "enable": "Activar álbum",
+      "disable": "Desactivar álbum"
+    }
   }
 }

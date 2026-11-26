@@ -4,6 +4,7 @@
 // aside colapsável, import/export .slja e áudio (upload local/API).
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
+import { tPtBR } from '../../../../test/i18n-stub'
 
 const mocks = vi.hoisted(() => ({
   getSession: vi.fn(() => ({ token: 'tok' }) as null | { token: string }),
@@ -24,8 +25,8 @@ vi.mock('vue-router', () => ({
   onBeforeRouteLeave: vi.fn(),
 }))
 vi.mock('vue-i18n', () => ({
-  useI18n: () => ({ t: (k: string) => k, locale: { value: 'pt-BR' } }),
-  createI18n: () => ({ global: { locale: 'pt-BR', t: (k: string) => k } }),
+  useI18n: () => ({ t: tPtBR, locale: { value: 'pt-BR' } }),
+  createI18n: () => ({ global: { locale: 'pt-BR', t: tPtBR } }),
 }))
 
 vi.mock('../../components/MediaSlideStage.vue', () => ({ default: { template: '<div />' } }))
@@ -283,7 +284,7 @@ describe('MediaEditorView — busca de hino oficial e reuso de custom', () => {
   it('reuso: busca música de outra coletânea, copia com letra/áudio', async () => {
     seedCollection()
     const wrapper = await mountEditorWithMusic()
-    const search = wrapper.find('input[placeholder="media.editor.reuseMusic"]')
+    const search = wrapper.find('input[placeholder="Reutilizar música existente…"]')
     await search.setValue('santo')
     await search.trigger('input')
     await flushPromises()
@@ -300,7 +301,7 @@ describe('MediaEditorView — busca de hino oficial e reuso de custom', () => {
     seedCollection()
     copyCustomMusic.mockResolvedValue(null)
     const wrapper = await mountEditorWithMusic()
-    const search = wrapper.find('input[placeholder="media.editor.reuseMusic"]')
+    const search = wrapper.find('input[placeholder="Reutilizar música existente…"]')
     await search.setValue('santo')
     await search.trigger('input')
     await flushPromises()

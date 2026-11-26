@@ -115,6 +115,16 @@ export default {
       "audioUploadFailed": "音频上传失败",
       "audioLinked": "已链接音频「{name}」",
       "audioRemoveFailed": "音频移除失败",
+      "collectionRenamedToast": "合集已重命名",
+
+      "renameCollectionFailed": "重命名合集失败",
+
+      "singlesPrepareFailed": "准备 Singles 合集失败",
+
+      "singleCreateFailed": "创建单曲失败",
+
+      "singleCoverUpdated": "单曲封面已更新",
+
       "audioRemoved": "音频已移除",
       "showPanels": "显示面板",
       "hidePanels": "隐藏面板",

@@ -44,7 +44,7 @@ export default {
     "close": "关闭",
     "inAppProjection": "圣经预览",
     "projectionHotkeyHint": "ESC 结束投影 · Ctrl+Alt+P 与操作画面切换",
-    "emptyCatalog": "暂无圣经内容。请先完成应用初始化。",
+    "convite_catalogo": "该语言尚无圣经内容。欢迎帮助社区翻译：详情请见 LouvorJA。",
     "emptyChapter": "本章未找到经文。",
     "loading": "正在加载圣经…",
     "noSelection": "请选择要投影的经文",

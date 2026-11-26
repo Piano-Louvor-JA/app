@@ -12,6 +12,9 @@ import zh from '@locales/zh'
 import tr from '@locales/tr'
 import ar from '@locales/ar'
 import hi from '@locales/hi'
+import it from '@locales/it'
+import nl from '@locales/nl'
+import pl from '@locales/pl'
 
 import AuthPtBR from '@modules/auth/locales/pt-BR'
 import AuthEn from '@modules/auth/locales/en'
@@ -25,6 +28,9 @@ import AuthZh from '@modules/auth/locales/zh'
 import AuthTr from '@modules/auth/locales/tr'
 import AuthAr from '@modules/auth/locales/ar'
 import AuthHi from '@modules/auth/locales/hi'
+import AuthIt from '@modules/auth/locales/it'
+import AuthNl from '@modules/auth/locales/nl'
+import AuthPl from '@modules/auth/locales/pl'
 import AlbumsPtBR from '@modules/albums/locales/pt-BR'
 import AlbumsEn from '@modules/albums/locales/en'
 import AlbumsEs from '@modules/albums/locales/es'
@@ -37,6 +43,9 @@ import AlbumsZh from '@modules/albums/locales/zh'
 import AlbumsTr from '@modules/albums/locales/tr'
 import AlbumsAr from '@modules/albums/locales/ar'
 import AlbumsHi from '@modules/albums/locales/hi'
+import AlbumsIt from '@modules/albums/locales/it'
+import AlbumsNl from '@modules/albums/locales/nl'
+import AlbumsPl from '@modules/albums/locales/pl'
 import CommunityPtBR from '@modules/community/locales/pt-BR'
 import CommunityEn from '@modules/community/locales/en'
 import CommunityEs from '@modules/community/locales/es'
@@ -49,6 +58,9 @@ import CommunityZh from '@modules/community/locales/zh'
 import CommunityTr from '@modules/community/locales/tr'
 import CommunityAr from '@modules/community/locales/ar'
 import CommunityHi from '@modules/community/locales/hi'
+import CommunityIt from '@modules/community/locales/it'
+import CommunityNl from '@modules/community/locales/nl'
+import CommunityPl from '@modules/community/locales/pl'
 import BiblePtBR from '@modules/bible/locales/pt-BR'
 import BibleEn from '@modules/bible/locales/en'
 import BibleEs from '@modules/bible/locales/es'
@@ -61,6 +73,9 @@ import BibleZh from '@modules/bible/locales/zh'
 import BibleTr from '@modules/bible/locales/tr'
 import BibleAr from '@modules/bible/locales/ar'
 import BibleHi from '@modules/bible/locales/hi'
+import BibleIt from '@modules/bible/locales/it'
+import BibleNl from '@modules/bible/locales/nl'
+import BiblePl from '@modules/bible/locales/pl'
 import ClockPtBR from '@modules/clock/locales/pt-BR'
 import ClockEn from '@modules/clock/locales/en'
 import ClockEs from '@modules/clock/locales/es'
@@ -73,6 +88,9 @@ import ClockZh from '@modules/clock/locales/zh'
 import ClockTr from '@modules/clock/locales/tr'
 import ClockAr from '@modules/clock/locales/ar'
 import ClockHi from '@modules/clock/locales/hi'
+import ClockIt from '@modules/clock/locales/it'
+import ClockNl from '@modules/clock/locales/nl'
+import ClockPl from '@modules/clock/locales/pl'
 import CountdownPtBR from '@modules/countdown/locales/pt-BR'
 import CountdownEn from '@modules/countdown/locales/en'
 import CountdownEs from '@modules/countdown/locales/es'
@@ -85,6 +103,9 @@ import CountdownZh from '@modules/countdown/locales/zh'
 import CountdownTr from '@modules/countdown/locales/tr'
 import CountdownAr from '@modules/countdown/locales/ar'
 import CountdownHi from '@modules/countdown/locales/hi'
+import CountdownIt from '@modules/countdown/locales/it'
+import CountdownNl from '@modules/countdown/locales/nl'
+import CountdownPl from '@modules/countdown/locales/pl'
 import SabbathSchoolPtBR from '@modules/sabbath-school/locales/pt-BR'
 import SabbathSchoolEn from '@modules/sabbath-school/locales/en'
 import SabbathSchoolEs from '@modules/sabbath-school/locales/es'
@@ -97,6 +118,9 @@ import SabbathSchoolZh from '@modules/sabbath-school/locales/zh'
 import SabbathSchoolTr from '@modules/sabbath-school/locales/tr'
 import SabbathSchoolAr from '@modules/sabbath-school/locales/ar'
 import SabbathSchoolHi from '@modules/sabbath-school/locales/hi'
+import SabbathSchoolIt from '@modules/sabbath-school/locales/it'
+import SabbathSchoolNl from '@modules/sabbath-school/locales/nl'
+import SabbathSchoolPl from '@modules/sabbath-school/locales/pl'
 import AnnouncementsPtBR from '@modules/announcements/locales/pt-BR'
 import AnnouncementsEn from '@modules/announcements/locales/en'
 import AnnouncementsEs from '@modules/announcements/locales/es'
@@ -109,6 +133,9 @@ import AnnouncementsZh from '@modules/announcements/locales/zh'
 import AnnouncementsTr from '@modules/announcements/locales/tr'
 import AnnouncementsAr from '@modules/announcements/locales/ar'
 import AnnouncementsHi from '@modules/announcements/locales/hi'
+import AnnouncementsIt from '@modules/announcements/locales/it'
+import AnnouncementsNl from '@modules/announcements/locales/nl'
+import AnnouncementsPl from '@modules/announcements/locales/pl'
 import HomePtBR from '@modules/home/locales/pt-BR'
 import HomeEn from '@modules/home/locales/en'
 import HomeEs from '@modules/home/locales/es'
@@ -121,6 +148,9 @@ import HomeZh from '@modules/home/locales/zh'
 import HomeTr from '@modules/home/locales/tr'
 import HomeAr from '@modules/home/locales/ar'
 import HomeHi from '@modules/home/locales/hi'
+import HomeIt from '@modules/home/locales/it'
+import HomeNl from '@modules/home/locales/nl'
+import HomePl from '@modules/home/locales/pl'
 import LiturgyPtBR from '@modules/liturgy/locales/pt-BR'
 import LiturgyEn from '@modules/liturgy/locales/en'
 import LiturgyEs from '@modules/liturgy/locales/es'
@@ -133,6 +163,9 @@ import LiturgyZh from '@modules/liturgy/locales/zh'
 import LiturgyTr from '@modules/liturgy/locales/tr'
 import LiturgyAr from '@modules/liturgy/locales/ar'
 import LiturgyHi from '@modules/liturgy/locales/hi'
+import LiturgyIt from '@modules/liturgy/locales/it'
+import LiturgyNl from '@modules/liturgy/locales/nl'
+import LiturgyPl from '@modules/liturgy/locales/pl'
 import MediaPtBR from '@modules/media/locales/pt-BR'
 import MediaEn from '@modules/media/locales/en'
 import MediaEs from '@modules/media/locales/es'
@@ -145,6 +178,9 @@ import MediaZh from '@modules/media/locales/zh'
 import MediaTr from '@modules/media/locales/tr'
 import MediaAr from '@modules/media/locales/ar'
 import MediaHi from '@modules/media/locales/hi'
+import MediaIt from '@modules/media/locales/it'
+import MediaNl from '@modules/media/locales/nl'
+import MediaPl from '@modules/media/locales/pl'
 import RandomPtBR from '@modules/random/locales/pt-BR'
 import RandomEn from '@modules/random/locales/en'
 import RandomEs from '@modules/random/locales/es'
@@ -157,6 +193,9 @@ import RandomZh from '@modules/random/locales/zh'
 import RandomTr from '@modules/random/locales/tr'
 import RandomAr from '@modules/random/locales/ar'
 import RandomHi from '@modules/random/locales/hi'
+import RandomIt from '@modules/random/locales/it'
+import RandomNl from '@modules/random/locales/nl'
+import RandomPl from '@modules/random/locales/pl'
 import YoutubePtBR from '@modules/youtube/locales/pt-BR'
 import YoutubeEn from '@modules/youtube/locales/en'
 import YoutubeEs from '@modules/youtube/locales/es'
@@ -169,6 +208,9 @@ import YoutubeZh from '@modules/youtube/locales/zh'
 import YoutubeTr from '@modules/youtube/locales/tr'
 import YoutubeAr from '@modules/youtube/locales/ar'
 import YoutubeHi from '@modules/youtube/locales/hi'
+import YoutubeIt from '@modules/youtube/locales/it'
+import YoutubeNl from '@modules/youtube/locales/nl'
+import YoutubePl from '@modules/youtube/locales/pl'
 import SettingsPtBR from '@modules/settings/locales/pt-BR'
 import SettingsEn from '@modules/settings/locales/en'
 import SettingsEs from '@modules/settings/locales/es'
@@ -181,6 +223,9 @@ import SettingsZh from '@modules/settings/locales/zh'
 import SettingsTr from '@modules/settings/locales/tr'
 import SettingsAr from '@modules/settings/locales/ar'
 import SettingsHi from '@modules/settings/locales/hi'
+import SettingsIt from '@modules/settings/locales/it'
+import SettingsNl from '@modules/settings/locales/nl'
+import SettingsPl from '@modules/settings/locales/pl'
 import StartingPtBR from '@modules/starting/locales/pt-BR'
 import StartingEn from '@modules/starting/locales/en'
 import StartingEs from '@modules/starting/locales/es'
@@ -193,6 +238,9 @@ import StartingZh from '@modules/starting/locales/zh'
 import StartingTr from '@modules/starting/locales/tr'
 import StartingAr from '@modules/starting/locales/ar'
 import StartingHi from '@modules/starting/locales/hi'
+import StartingIt from '@modules/starting/locales/it'
+import StartingNl from '@modules/starting/locales/nl'
+import StartingPl from '@modules/starting/locales/pl'
 import SyncPtBR from '@modules/sync/locales/pt-BR'
 import SyncEn from '@modules/sync/locales/en'
 import SyncEs from '@modules/sync/locales/es'
@@ -205,6 +253,9 @@ import SyncZh from '@modules/sync/locales/zh'
 import SyncTr from '@modules/sync/locales/tr'
 import SyncAr from '@modules/sync/locales/ar'
 import SyncHi from '@modules/sync/locales/hi'
+import SyncIt from '@modules/sync/locales/it'
+import SyncNl from '@modules/sync/locales/nl'
+import SyncPl from '@modules/sync/locales/pl'
 import TimerPtBR from '@modules/timer/locales/pt-BR'
 import TimerEn from '@modules/timer/locales/en'
 import TimerEs from '@modules/timer/locales/es'
@@ -217,11 +268,14 @@ import TimerZh from '@modules/timer/locales/zh'
 import TimerTr from '@modules/timer/locales/tr'
 import TimerAr from '@modules/timer/locales/ar'
 import TimerHi from '@modules/timer/locales/hi'
+import TimerIt from '@modules/timer/locales/it'
+import TimerNl from '@modules/timer/locales/nl'
+import TimerPl from '@modules/timer/locales/pl'
 
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
 import { getUserPreference } from '@shared/services/user-preferences'
 
-export const SUPPORTED_LOCALES = ["pt-BR","en","es","ru","uk","fr","ja","ko","zh","tr","ar","hi"] as const
+export const SUPPORTED_LOCALES = ["pt-BR","en","es","ru","uk","fr","ja","ko","zh","tr","ar","hi","it","nl","pl"] as const
 export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number]
 
 export const DEFAULT_LOCALE: SupportedLocale = 'pt-BR'
@@ -494,6 +548,66 @@ export default createI18n({
       ...StartingHi,
       ...SyncHi,
       ...TimerHi,
+    },
+    pl: {
+      ...pl,
+      ...AuthPl,
+      ...AlbumsPl,
+      ...CommunityPl,
+      ...BiblePl,
+      ...ClockPl,
+      ...CountdownPl,
+      ...SabbathSchoolPl,
+      ...AnnouncementsPl,
+      ...HomePl,
+      ...LiturgyPl,
+      ...MediaPl,
+      ...RandomPl,
+      ...YoutubePl,
+      ...SettingsPl,
+      ...StartingPl,
+      ...SyncPl,
+      ...TimerPl,
+    },
+    nl: {
+      ...nl,
+      ...AuthNl,
+      ...AlbumsNl,
+      ...CommunityNl,
+      ...BibleNl,
+      ...ClockNl,
+      ...CountdownNl,
+      ...SabbathSchoolNl,
+      ...AnnouncementsNl,
+      ...HomeNl,
+      ...LiturgyNl,
+      ...MediaNl,
+      ...RandomNl,
+      ...YoutubeNl,
+      ...SettingsNl,
+      ...StartingNl,
+      ...SyncNl,
+      ...TimerNl,
+    },
+    it: {
+      ...it,
+      ...AuthIt,
+      ...AlbumsIt,
+      ...CommunityIt,
+      ...BibleIt,
+      ...ClockIt,
+      ...CountdownIt,
+      ...SabbathSchoolIt,
+      ...AnnouncementsIt,
+      ...HomeIt,
+      ...LiturgyIt,
+      ...MediaIt,
+      ...RandomIt,
+      ...YoutubeIt,
+      ...SettingsIt,
+      ...StartingIt,
+      ...SyncIt,
+      ...TimerIt,
     },
   },
 })

@@ -37,6 +37,22 @@ export default {
     "toneMinDurationWarning": "Длительность меньше полной длины аудио ({min}). Оповещения могут наложиться.",
     "markerOffsetLabel": "Оповещение за сколько минут до конца",
     "markerPresetLabel": "Звук оповещения",
+    "presetNone": "— Отключено —",
+
+    "presetAbertura": "Открытие (официальный LouvorJA)",
+
+    "preset5min": "5 мин (официальный LouvorJA)",
+
+    "preset1min": "1 мин (официальный LouvorJA)",
+
+    "presetBeep": "Сигнал (синтетический)",
+
+    "presetChime": "Перезвон (синтетический)",
+
+    "presetGong": "Гонг (синтетический)",
+
+    "presetCustom": "Свой звук с устройства",
+
     "markerGroupPresets": "Стандартные звуки",
     "markerGroupLibrary": "Мои звуки",
     "markerPreview": "Прослушать оповещение",

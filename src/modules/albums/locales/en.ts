@@ -1,32 +1,32 @@
 export default {
   "albums": {
-    "disabledAlbums": {
-      "collectionNote": "Album turned off: its songs show greyed out in search and the selector skips them. In here they still play when clicked.",
-      "title": "Active albums",
-      "description": "Turn off the albums you do not use (for example, the old hymnal). Their songs show greyed out in search, and Enter and the arrow keys skip them. You can also turn an album off from its card in the Media Center.",
-      "filter": "Filter albums",
-      "count": "{count} turned off",
-      "badge": "Album turned off",
-      "disableConfirmTitle": "Turn off “{name}”?",
-      "disableConfirmMessage": "Songs from this album show greyed out in search and the selector skips them. You can turn it back on later with the eye on the card.",
-      "disableConfirmYes": "Turn off",
-      "enable": "Turn album on",
-      "disable": "Turn album off"
-    },
     "custom": {
       "title": "My Collections",
       "openEditor": "Open lyrics editor",
       "open": "Open collection {name}",
       "trackCount": "{count} track(s)",
       "empty": "No collections yet. Import a .slja file in the editor.",
+      "emptyHint": "You don't have any playlists yet.",
+      "createHint": "Create one in the Playlists section of the Library.",
+      "importedList": "Imported: {parts}.",
+
+      "importedNewPlaylists": "{count} new playlist(s)",
+
+
+      "importedAddedTracks": "{count} track(s) added",
+
+
+
+
+      "importedNothingNew": "Nothing new to import.",
+
+      "importInvalid": "Invalid playlists file.",
       "newPlaceholder": "New collection name...",
       "create": "Create",
       "hide": "Hide My Collections",
-      "show": "Show My Collections",
-      "emptyHint": "You don't have any playlists yet.",
-      "createHint": "Create one in the Playlists section of the Library.",
-      "importInvalid": "Invalid playlists file."
+      "show": "Show My Collections"
     },
+    "fallbackMusic": "Music",
     "playlists": {
       "removeTrackTitle": "Remove from playlist?",
       "removeTrackMessage": "“{title}” leaves “{name}”. The song and downloaded files stay in the library.",
@@ -45,10 +45,6 @@ export default {
       "deleteConfirm": "Delete playlist",
       "singlePlayHint": "Single mode: play only this song",
       "shuffleHint": "Shuffle play: play all songs in random order",
-      "playInstrumental": "Play {name} with backing track (instrumental)",
-      "playInstrumentalHint": "Backing track: play all songs with the instrumental only",
-      "playNoAudio": "Play {name} without audio (slides only)",
-      "playNoAudioHint": "No audio: show only the song slides, without sound",
       "playAllHint": "Play playlist: play all songs in sequence",
       "shuffle": "Shuffle play",
       "playTrack": "Play {title} in mini player",
@@ -58,11 +54,15 @@ export default {
       "create": "Create",
       "export": "Export playlists",
       "import": "Import playlists",
-      "empty": "No playlists created yet."
+      "empty": "No playlists created yet.",
+      "playInstrumental": "Play {name} with backing track (instrumental)",
+      "playInstrumentalHint": "Backing track: play all songs with the instrumental only",
+      "playNoAudio": "Play {name} without audio (slides only)",
+      "playNoAudioHint": "No audio: show only the song slides, without sound"
     },
     "title": "Media Center",
     "subtitle": "Albums & Collections",
-    "collectionFallback": "Collection",
+    "collectionFallback": "Collections",
     "back": "Back to albums",
     "searchPlaceholder": "Type the hymn number or name...",
     "hubSearchPlaceholder": "Search here...",
@@ -89,6 +89,10 @@ export default {
       "close": "Close lyrics"
     },
     "messages": {
+      convite_catalogo: 'The music catalog is not yet available in your language. Join the community and help build the LouvorJA catalog in your own language.',
+      convite_titulo: 'Catalog under construction',
+      convite_hint: 'The preview above shows the Portuguese catalog — soon in your language, with your help.',
+
       "catalogEmpty": "No collection found in the local catalog.",
       "catalogFailed": "Could not load the album catalog.",
       "catalogSearchEmpty": "No collection found for this search.",
@@ -102,6 +106,18 @@ export default {
       "deleteCollectionTitle": "Delete “{name}”?",
       "deleteCollectionText": "The local copy will be deleted. The original in Community is not affected."
     },
-    "fallbackMusic": "Music"
+    "disabledAlbums": {
+      "collectionNote": "Album turned off: its songs show greyed out in search and the selector skips them. In here they still play when clicked.",
+      "title": "Active albums",
+      "description": "Turn off the albums you do not use (for example, the old hymnal). Their songs show greyed out in search, and Enter and the arrow keys skip them. You can also turn an album off from its card in the Media Center.",
+      "filter": "Filter albums",
+      "count": "{count} turned off",
+      "badge": "Album turned off",
+      "disableConfirmTitle": "Turn off “{name}”?",
+      "disableConfirmMessage": "Songs from this album show greyed out in search and the selector skips them. You can turn it back on later with the eye on the card.",
+      "disableConfirmYes": "Turn off",
+      "enable": "Turn album on",
+      "disable": "Turn album off"
+    }
   }
 }

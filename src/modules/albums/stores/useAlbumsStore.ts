@@ -30,6 +30,9 @@ import type {
 
 export const useAlbumsStore = defineStore('albums', () => {
   const categories = ref<AlbumCategory[]>([])
+  // Preview visual pt-BR (não clicável) exibido desfocado atrás do convite
+  // quando o idioma ativo não tem catálogo — dá a idéia de como ficará.
+  const previewCategories = ref<AlbumCategory[]>([])
   const activeCollection = ref<AlbumCollection | null>(null)
   const tracks = ref<AlbumTrack[]>([])
   const musicIndex = ref<AlbumSearchHit[]>([])
@@ -103,6 +106,12 @@ export const useAlbumsStore = defineStore('albums', () => {
       categories.value = await loadAlbumCategories()
       if (categories.value.length === 0) {
         lastErrorKey.value = 'albums.messages.catalogEmpty'
+        // Convite: carrega preview pt-BR (best-effort) pro fundo desfocado.
+        previewCategories.value = await loadAlbumCategories('pt').catch(
+          () => [],
+        )
+      } else {
+        previewCategories.value = []
       }
       if (
         activeCollection.value &&
@@ -265,6 +274,7 @@ export const useAlbumsStore = defineStore('albums', () => {
 
   return {
     categories,
+    previewCategories,
     activeCollection,
     tracks,
     musicIndex,

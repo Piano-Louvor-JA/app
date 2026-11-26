@@ -37,6 +37,22 @@ export default {
     "toneMinDurationWarning": "Duration shorter than the total audio length ({min}). Alerts may overlap.",
     "markerOffsetLabel": "Minutes remaining when the alert fires",
     "markerPresetLabel": "Alert sound",
+    "presetNone": "— Disabled —",
+
+    "presetAbertura": "Opening (official LouvorJA)",
+
+    "preset5min": "5 min (official LouvorJA)",
+
+    "preset1min": "1 min (official LouvorJA)",
+
+    "presetBeep": "Beep (synthetic)",
+
+    "presetChime": "Chime (synthetic)",
+
+    "presetGong": "Gong (synthetic)",
+
+    "presetCustom": "Custom device audio",
+
     "markerGroupPresets": "Default sounds",
     "markerGroupLibrary": "My sounds",
     "markerPreview": "Preview alert",
