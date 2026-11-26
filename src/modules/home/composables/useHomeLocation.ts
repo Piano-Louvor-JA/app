@@ -6,8 +6,15 @@ import {
 } from "../services/home-preferences";
 import type { HomeLocationProfile } from "../types/home";
 
+/**
+ * Estado único na janela: a Home e o assistente de primeira execução editam
+ * o mesmo perfil; o que um grava aparece no outro sem recarregar.
+ */
+const profile = ref<HomeLocationProfile>(loadHomeLocation());
+
 export function useHomeLocation() {
-	const profile = ref<HomeLocationProfile>(loadHomeLocation());
+	// Relê a cada uso: pega o que o sync ou outra janela gravou no storage.
+	profile.value = loadHomeLocation();
 
 	const hasDistrict = computed(() => profile.value.district.length > 0);
 	const hasChurch = computed(() => profile.value.church.length > 0);
@@ -29,11 +36,16 @@ export function useHomeLocation() {
 		persist({ ...profile.value, church: value });
 	}
 
+	function setLocation(next: HomeLocationProfile) {
+		persist(next);
+	}
+
 	return {
 		profile,
 		hasDistrict,
 		hasChurch,
 		setDistrict,
 		setChurch,
+		setLocation,
 	};
 }
