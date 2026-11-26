@@ -90,6 +90,21 @@ describe('identidade de plataforma nas requests', () => {
     }
   })
 
+  it('injeta X-Partner-Key só na API Piano quando a env STG está setada', async () => {
+    vi.stubEnv('VITE_PIANO_PROFILE', 'homologation')
+    vi.stubEnv('VITE_PARTNER_KEY_STG', 'plj_stgkeyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')
+    const fetch = vi.fn().mockResolvedValue(new Response())
+    vi.stubGlobal('fetch', fetch)
+    const { installClientPlatformHeader } = await client()
+    installClientPlatformHeader()
+    await globalThis.fetch('https://api-stg.pianolouvorja.com.br/json_db/album.json')
+    expect(new Headers(fetch.mock.calls[0]![1].headers).get('X-Partner-Key')).toBe(
+      'plj_stgkeyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+    )
+    await globalThis.fetch('https://api.louvorja.com.br/json_db/album.json')
+    expect(new Headers(fetch.mock.calls[1]![1].headers).has('X-Partner-Key')).toBe(false)
+  })
+
   it('mantém o fetch original utilizável se não conseguir ler a URL', async () => {
     const response = new Response('fallback')
     const fetch = vi.fn().mockResolvedValue(response)
