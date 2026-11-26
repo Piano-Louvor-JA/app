@@ -1,6 +1,6 @@
 import { resolveReportedHomeLocation } from '@modules/home/services/home-preferences'
 import { USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
-import { CLIENT_PLATFORM } from '@shared/lib/client-platform'
+import { CLIENT_PLATFORM, clientVersion } from '@shared/lib/client-platform'
 import { isPianoApiHost } from '@shared/lib/partner-key'
 import { apiCandidateBases } from '@shared/services/api-fallback'
 import { getDesktopBridge } from '@shared/services/desktop-bridge'
@@ -29,8 +29,8 @@ export interface HeartbeatBody {
 const HEARTBEAT_PATH = '/v1/telemetry/heartbeat'
 const TIMEOUT_MS = 8_000
 
-const APP_VERSION: string =
-  (import.meta.env as Record<string, string | undefined>).VITE_APP_VERSION ?? ''
+/** Mesma fonte do X-Client-Version (package.json), sem o "v". */
+const APP_VERSION = clientVersion()
 
 /** Só hosts da API Piano (a API PHP legada de fallback não tem o endpoint). */
 export function heartbeatUrls(): string[] {

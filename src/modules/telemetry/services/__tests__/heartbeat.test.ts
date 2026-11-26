@@ -53,6 +53,8 @@ describe('heartbeat (telemetria de dispositivos, Fase 3)', () => {
     const body = await buildHeartbeatBody()
     expect(body.install_id).toMatch(/^[0-9a-f-]{36}$/)
     expect(body.platform).toMatch(/^desktop-/)
+    // Versão do package.json (a mesma do "v1.37.2" do topo do app), sem o "v".
+    expect(body.app_version).toBe('0.0.0-test')
     expect(body.os).toEqual({ name: 'Ubuntu 26.04 LTS', release: '7.0.0', arch: 'x64' })
     expect(body.district).toBe('Bertioga')
     expect(body.church).toBe('Rio da Praia')
