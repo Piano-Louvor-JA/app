@@ -10,6 +10,8 @@ import {
   detectLegacyLanguage,
   analyzeLegacyMediaImport,
   resolveLegacyMediaConfigFromSelection,
+  importLegacyMediaItems,
+  createImportControl,
   IMAGE_EXTS,
   AUDIO_EXTS,
 } from '../legacy-media-import.mjs'
@@ -323,5 +325,189 @@ describe('legacy-media-import', () => {
     expect(listMediaFilesUnder('/musicas', IMAGE_EXTS, io).map((f) => f.relativePath)).toEqual([
       'no.jpg',
     ])
+  })
+})
+
+describe('legacy-media-import no Linux (pasta extraída do arquivo do site)', () => {
+  it('encontra e planeja as mídias da pasta escolhida, em disco de verdade', async () => {
+    const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const root = mkdtempSync(join(tmpdir(), 'midias-louvorja-'))
+    try {
+      const config = join(root, 'Louvor JA', 'config')
+      mkdirSync(join(config, 'capas'), { recursive: true })
+      mkdirSync(join(config, 'imagens'), { recursive: true })
+      mkdirSync(join(config, 'musicas', 'Hinario Adventista'), { recursive: true })
+      writeFileSync(join(config, 'capas', 'capa.jpg'), 'x')
+      writeFileSync(join(config, 'imagens', 'fundo.jpg'), 'xx')
+      writeFileSync(join(config, 'musicas', 'Hinario Adventista', '001.mp3'), 'xxx')
+
+      // O usuário escolhe a pasta extraída (a raiz do arquivo).
+      const resolved = resolveLegacyMediaConfigFromSelection(root)
+      expect(resolved).toBe(config)
+
+      const report = analyzeLegacyMediaImport({
+        platform: 'linux',
+        candidates: [resolved],
+        registryConfigProbe: () => null,
+        lang: 'pt',
+        planOpts: { exists: () => false, resolveDest: (type, rel) => `/destino/${type}/${rel}` },
+      })
+      expect(report.found).toBe(true)
+      expect(report.counts).toEqual({ covers: 1, music: 1, slides: 1 })
+      expect(report.itemsToImport.map((i) => i.relativePath).sort()).toEqual([
+        'capa.jpg',
+        'fundo.jpg',
+        'pt/Hinario Adventista/001.mp3',
+      ])
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('legacy-media-import: pasta do PIANO baixada do site (Media/covers|images|music)', () => {
+  async function makePianoDownload() {
+    const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const root = join(mkdtempSync(join(tmpdir(), 'piano-site-')), 'LouvorJA-PIANO')
+    // Muitas pastas do Electron antes da Media (cache, sessão…), com subpastas.
+    for (let i = 0; i < 40; i += 1) mkdirSync(join(root, `Cache${i}`, 'a', 'b'), { recursive: true })
+    const media = join(root, 'Media')
+    mkdirSync(join(media, 'covers'), { recursive: true })
+    mkdirSync(join(media, 'images'), { recursive: true })
+    mkdirSync(join(media, 'music', 'pt', '2006 - Sou de Jesus'), { recursive: true })
+    mkdirSync(join(media, 'fontes', 'roboto'), { recursive: true })
+    mkdirSync(join(media, 'modulos', 'sorteios'), { recursive: true })
+    writeFileSync(join(media, 'covers', '2024.bmp'), 'x')
+    writeFileSync(join(media, 'images', 'hasd_268B.jpg'), 'xx')
+    writeFileSync(join(media, 'music', 'pt', '90108i.mp3'), 'xxx')
+    writeFileSync(join(media, 'music', 'pt', '2006 - Sou de Jesus', '01.mp3'), 'xxxx')
+    writeFileSync(join(media, 'fontes', 'roboto', 'face-0.woff2'), 'f')
+    writeFileSync(join(media, 'modulos', 'sorteios', 'efeito.mp3'), 'm')
+    return { root, media }
+  }
+
+  const planOpts = { exists: () => false, resolveDest: (type, rel) => `/destino/${type}/${rel}` }
+
+  it('escolher a pasta baixada ou a própria Media acha as mídias', async () => {
+    const { root, media } = await makePianoDownload()
+    expect(resolveLegacyMediaConfigFromSelection(root)).toBe(media)
+    expect(resolveLegacyMediaConfigFromSelection(media)).toBe(media)
+    // Também escolhendo uma subpasta de mídia (ex.: Media/music).
+    const { join } = await import('node:path')
+    expect(resolveLegacyMediaConfigFromSelection(join(media, 'music'))).toBe(media)
+  })
+
+  it('importa capas, imagens e músicas no formato do PIANO (mantém pt/), sem fontes nem módulos', async () => {
+    const { root } = await makePianoDownload()
+    const report = analyzeLegacyMediaImport({
+      platform: 'linux',
+      candidates: [resolveLegacyMediaConfigFromSelection(root)],
+      registryConfigProbe: () => null,
+      lang: 'es',
+      planOpts,
+    })
+    expect(report.found).toBe(true)
+    expect(report.counts).toEqual({ covers: 1, music: 2, slides: 1 })
+    expect(report.itemsToImport.map((i) => `${i.mediaType}:${i.relativePath}`).sort()).toEqual([
+      'covers:2024.bmp',
+      'music:pt/2006 - Sou de Jesus/01.mp3',
+      'music:pt/90108i.mp3',
+      'slides:hasd_268B.jpg',
+    ])
+  })
+
+  it('música do PIANO sem pasta de idioma recebe o idioma', async () => {
+    const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const media = join(mkdtempSync(join(tmpdir(), 'piano-media-')), 'Media')
+    mkdirSync(join(media, 'covers'), { recursive: true })
+    mkdirSync(join(media, 'music', 'Album'), { recursive: true })
+    writeFileSync(join(media, 'covers', 'c.jpg'), 'x')
+    writeFileSync(join(media, 'music', 'Album', 'x.mp3'), 'x')
+    const report = analyzeLegacyMediaImport({ platform: 'linux', candidates: [media], lang: 'pt', planOpts })
+    expect(report.itemsToImport.find((i) => i.mediaType === 'music')?.relativePath).toBe('pt/Album/x.mp3')
+  })
+
+  it('uma pasta qualquer com só "images" não é confundida com mídia', async () => {
+    const { mkdtempSync, mkdirSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const dir = mkdtempSync(join(tmpdir(), 'qualquer-'))
+    mkdirSync(join(dir, 'images'))
+    expect(resolveLegacyMediaConfigFromSelection(dir)).toBeNull()
+  })
+})
+
+describe('importLegacyMediaItems: pausar, continuar e parar', () => {
+  const items = ['a', 'b', 'c', 'd'].map((name) => ({
+    mediaType: 'covers',
+    relativePath: `${name}.jpg`,
+    absolutePath: `/origem/${name}.jpg`,
+    bytes: 1,
+  }))
+
+  it('copia tudo sem travar o processo (assíncrono) e informa o progresso', async () => {
+    const copied = []
+    const copy = async (_type, rel) => {
+      copied.push(rel)
+      return { ok: true, skipped: false }
+    }
+    const progress = []
+    const result = await importLegacyMediaItems(items, (p) => progress.push(p.current), { copy })
+    expect(result).toEqual({ imported: 4, skipped: 0, failed: 0, total: 4, cancelled: false })
+    expect(copied).toEqual(['a.jpg', 'b.jpg', 'c.jpg', 'd.jpg'])
+    expect(progress).toEqual([1, 2, 3, 4])
+    const live = []
+    await importLegacyMediaItems(items, (p) => live.push([p.imported, p.skipped]), { copy })
+    // Contagem ao vivo (antes de cada arquivo).
+    expect(live).toEqual([[0, 0], [1, 0], [2, 0], [3, 0]])
+  })
+
+  it('pausado, espera entre um arquivo e outro; continuar retoma de onde parou', async () => {
+    const control = createImportControl()
+    const copied = []
+    const copy = async (_type, rel) => {
+      copied.push(rel)
+      if (rel === 'b.jpg') control.pause()
+      return { ok: true, skipped: false }
+    }
+    const running = importLegacyMediaItems(items, undefined, { copy, control })
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(control.state).toBe('paused')
+    expect(copied).toEqual(['a.jpg', 'b.jpg'])
+
+    control.resume()
+    const result = await running
+    expect(copied).toEqual(['a.jpg', 'b.jpg', 'c.jpg', 'd.jpg'])
+    expect(result.cancelled).toBe(false)
+  })
+
+  it('parar (mesmo pausado) encerra sem copiar o resto; o que já foi copiado fica', async () => {
+    const control = createImportControl()
+    const copied = []
+    const copy = async (_type, rel) => {
+      copied.push(rel)
+      if (rel === 'b.jpg') control.pause()
+      return { ok: true, skipped: false }
+    }
+    const running = importLegacyMediaItems(items, undefined, { copy, control })
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    control.cancel()
+    const result = await running
+    expect(copied).toEqual(['a.jpg', 'b.jpg'])
+    expect(result).toEqual({ imported: 2, skipped: 0, failed: 0, total: 4, cancelled: true })
+    expect(control.state).toBe('cancelled')
+  })
+
+  it('falha e já existente entram na contagem', async () => {
+    const copy = async (_type, rel) =>
+      rel === 'a.jpg' ? { ok: true, skipped: true } : rel === 'b.jpg' ? { ok: false, skipped: false } : { ok: true, skipped: false }
+    const result = await importLegacyMediaItems(items, undefined, { copy })
+    expect(result).toEqual({ imported: 2, skipped: 1, failed: 1, total: 4, cancelled: false })
   })
 })

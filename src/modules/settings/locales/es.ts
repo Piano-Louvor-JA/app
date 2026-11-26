@@ -352,9 +352,11 @@ export default {
       "languageTurkish": "Türkçe",
       "languageArabic": "العربية",
       "languageHindi": "हिन्दी",
-      languageIt: 'Italiano',
-      languageNl: 'Nederlands',
-      languagePl: 'Polski',
+      "languageIt": "Italiano",
+      "languageNl": "Nederlands",
+      "languagePl": "Polski",
+      "languageFrench": "Francés",
+      "languageRussian": "Ruso",
       "dataTitle": "Datos locales",
       "dataHint": "Elimina el catálogo, los medios descargados y las preferencias guardadas en la carpeta de datos de la app (Windows: C:\\ProgramData\\LouvorJA-PIANO; Linux: /var/lib/LouvorJA-PIANO; macOS: /Users/Shared/LouvorJA-PIANO — compartida entre usuarios). La app reiniciará la configuración inicial en el próximo inicio.",
       "clearData": "Borrar todos los datos",
@@ -450,8 +452,21 @@ export default {
       "mediaFolderError": "No se pudo mover la carpeta de medios. Inténtalo de nuevo.",
       "mediaFolderDestInside": "Elige una carpeta fuera de la carpeta de medios actual.",
       "mediaFolderPersistError": "Los medios se copiaron, pero no se pudo guardar la ruta compartida.",
-      "languageRussian": "Ruso",
-      "languageFrench": "Francés"
+      "legacyMediaHintLinux": "Elige el archivo descargado del sitio (.tar.gz): la app copia los medios directo de él, sin necesidad de extraer. Si prefieres, extráelo y elige la carpeta. Solo se copian los archivos (portadas, imágenes y músicas) que aún no existen.",
+      "legacyMediaPickFolderLinux": "Elegir carpeta de medios",
+      "legacyMediaPickHintLinux": "Elige la carpeta extraída del archivo (ej.: LouvorJA-PIANO) o la carpeta Media dentro de ella. La app encuentra las portadas, imágenes y músicas sola.",
+      "legacyMediaInvalidFolderLinux": "Esta carpeta no contiene los medios. Elige la carpeta extraída del archivo del sitio (ej.: LouvorJA-PIANO) o la carpeta Media dentro de ella.",
+      "legacyMediaPause": "Pausar",
+      "legacyMediaResume": "Continuar",
+      "legacyMediaStop": "Detener",
+      "legacyMediaPaused": "En pausa en {current} de {total}",
+      "legacyMediaCancelled": "Importación detenida: {imported} archivo(s) copiado(s). Elige el archivo o la carpeta de nuevo para continuar donde se detuvo.",
+      "legacyMediaPickArchive": "Elegir archivo descargado (.tar.gz)",
+      "legacyMediaArchiveSummary": "Archivo comprimido de {size}: los medios que aún no existen se copian directo de él, sin extraer.",
+      "legacyMediaProgressBytes": "Leyendo {current} de {total}",
+      "legacyMediaPausedBytes": "En pausa en {current} de {total}",
+      "legacyMediaInvalidArchive": "Este archivo no contiene los medios de Louvor JA (portadas, imágenes o músicas). Elige el archivo descargado del sitio.",
+      "legacyMediaLiveCounts": "{imported} guardada(s) ahora · {skipped} ya existían (ya aparecen en la Central de Medios)"
     },
     "remote": {
       "renewToken": "Renovar token",
@@ -813,7 +828,13 @@ export default {
       "transformNone": "Ninguna",
       "speedSlow": "Lenta",
       "speedNormal": "Normal",
-      "speedFast": "Rápida"
+      "speedFast": "Rápida",
+      "hymnalNameShow": "Nombre del himnario en la portada",
+      "hymnalNameSize": "Tamaño del nombre del himnario",
+      "hymnalNameColor": "Color del nombre del himnario",
+      "hymnalNameColorDefault": "Predeterminado (blanco)",
+      "hymnNumberShow": "Número del himno en la portada (himnario)",
+      "hymnNumberSize": "Tamaño del número del himno"
     }
   }
 }

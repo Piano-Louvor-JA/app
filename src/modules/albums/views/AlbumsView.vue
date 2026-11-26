@@ -5,6 +5,7 @@ import { usePlaylistPanelStore } from '../stores/usePlaylistPanelStore'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useMediaStore } from '@modules/media/stores/useMediaStore'
+import type { MediaPlaybackMode } from '@modules/media/types/media'
 
 import { GlassCard } from '@design-system/index'
 import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
@@ -12,6 +13,8 @@ import type { LibraryAlbum } from '@modules/sync/types/library'
 import AlbumCollectionCard from '../components/AlbumCollectionCard.vue'
 import AppConfirm from '@shared/components/AppConfirm.vue'
 import AlbumHymnalCard from '../components/AlbumHymnalCard.vue'
+import { isYoutubeSearchAvailable } from '@modules/youtube/services/youtube-player'
+import { cachedCpbLogo, refreshCpbLogo } from '@modules/youtube/services/youtube-cpb-logo'
 import AlbumLyricDialog from '../components/AlbumLyricDialog.vue'
 import AlbumPlaylistPickerDialog from '../components/AlbumPlaylistPickerDialog.vue'
 import AlbumSearchHitRow from '../components/AlbumSearchHitRow.vue'
@@ -105,6 +108,8 @@ const {
   playSlides,
   openLyric,
   closeLyric,
+  isAlbumDisabled,
+  setAlbumDisabled,
 } = useAlbums()
 
 const addingPlaylist = ref<Playlist | null>(null)
@@ -128,8 +133,23 @@ function addPlaylistSearchHit(hit: AlbumSearchHit) {
   addSearchTrackToPlaylist(addingPlaylist.value.id)
 }
 
-const selectedSearchIndex = ref(0)
-watch(hubSearchResults, () => { selectedSearchIndex.value = 0 })
+// Álbum desativado: a música aparece apagada e o seletor pula (paridade Classic).
+function isSearchHitEnabled(index: number): boolean {
+  const hit = hubSearchResults.value[index]
+  return Boolean(hit) && hit!.disabled !== true
+}
+function firstEnabledSearchIndex(): number {
+  const index = hubSearchResults.value.findIndex((hit) => hit.disabled !== true)
+  return index >= 0 ? index : 0
+}
+function stepEnabledSearchIndex(from: number, direction: 1 | -1): number {
+  for (let index = from + direction; index >= 0 && index < hubSearchResults.value.length; index += direction) {
+    if (isSearchHitEnabled(index)) return index
+  }
+  return from
+}
+const selectedSearchIndex = ref(firstEnabledSearchIndex())
+watch(hubSearchResults, () => { selectedSearchIndex.value = firstEnabledSearchIndex() })
 async function onSearchKeydown(event: KeyboardEvent) {
   if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
   if (!['ArrowDown', 'ArrowUp', 'Enter'].includes(event.key) || !hubSearchResults.value.length) return
@@ -139,11 +159,10 @@ async function onSearchKeydown(event: KeyboardEvent) {
   event.stopPropagation()
   if (event.key === 'Enter') {
     const hit = hubSearchResults.value[selectedSearchIndex.value]
-    if (hit) await runAction(hit.musicId, () => playSung(hit.musicId))
+    if (hit && hit.disabled !== true) await runAction(hit.musicId, () => playSung(hit.musicId))
     return
   }
-  selectedSearchIndex.value = Math.max(0, Math.min(hubSearchResults.value.length - 1,
-    selectedSearchIndex.value + (event.key === 'ArrowDown' ? 1 : -1)))
+  selectedSearchIndex.value = stepEnabledSearchIndex(selectedSearchIndex.value, event.key === 'ArrowDown' ? 1 : -1)
   await nextTick()
   document.getElementById(`album-search-result-${hubSearchResults.value[selectedSearchIndex.value]?.musicId}`)?.scrollIntoView?.({ block: 'nearest' })
 }
@@ -152,6 +171,8 @@ const busyMusicId = ref<number | null>(null)
 const playlistItem = ref<PlaylistItem | null>(null)
 const playlistFeedback = ref('')
 const albumPendingRemoval = ref<LibraryAlbum | null>(null)
+/** Confirmação ao desativar álbum/coletânea pelo olho do card. */
+const albumPendingDisable = ref<AlbumCollection | null>(null)
 
 let playlistFeedbackTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -182,6 +203,35 @@ function addToPlaylist(id: string) {
 }
 
 const showDownloadControls = computed(() => isDesktop)
+
+/**
+ * Hinário Adventista da Casa Publicadora Brasileira no YouTube: fica na linha
+ * dos hinários e abre a lista unificada dos hinos no módulo YouTube (canal
+ * CPB). Logo = foto oficial do canal (guardada; atualizada ao abrir).
+ */
+const cpbLogo = ref(cachedCpbLogo())
+const youtubeHymnal = computed<AlbumCollection | null>(() =>
+  isYoutubeSearchAvailable()
+    ? {
+        id: 'youtube_cpb',
+        kind: 'hymnal',
+        name: t('sync.hymnal.cpbYoutubeName'),
+        subtitle: t('sync.hymnal.cpbYoutubeSubtitle'),
+        coverUrl: cpbLogo.value || null,
+        trackCount: null,
+        catalogKey: 'youtube_cpb',
+      }
+    : null,
+)
+if (youtubeHymnal.value) {
+  void refreshCpbLogo().then((logo) => {
+    if (logo) cpbLogo.value = logo
+  })
+}
+
+function openCpbYoutube() {
+  void router.push({ name: 'albums-youtube', query: { channel: 'cpb' } })
+}
 
 function isHymnalsCategory(category: AlbumCategory) {
   return String(category.id) === 'hymnals'
@@ -320,9 +370,10 @@ function onImportFile(event: Event) {
   })
 }
 
-async function playPlaylist(playlist: Playlist) {
+/** Toca a playlist: com áudio, playback (instrumental) ou sem áudio (só os slides). */
+async function playPlaylist(playlist: Playlist, mode: MediaPlaybackMode = 'audio') {
   if (playlist.items.length === 0) return
-  await mediaStore.playQueue(playlist.items, 0, undefined, playlist.name)
+  await mediaStore.playQueue(playlist.items, 0, mode, playlist.name)
   await router.push({ name: 'media' })
 }
 
@@ -481,6 +532,27 @@ async function confirmRemove() {
   if (!album) return
   albumPendingRemoval.value = null
   await removeCollection(album.id)
+}
+
+function albumDisableLabel(collection: AlbumCollection): string {
+  if (collection.id === 'hymnal_1996') return t('sync.hymnal.edition1996Name')
+  return collection.name
+}
+
+/** Desativar pede confirmação; reativar é direto. */
+function requestToggleDisabled(collection: AlbumCollection) {
+  if (isAlbumDisabled(collection.id)) {
+    setAlbumDisabled(collection.id, false)
+    return
+  }
+  albumPendingDisable.value = collection
+}
+
+function confirmDisableAlbum() {
+  const collection = albumPendingDisable.value
+  albumPendingDisable.value = null
+  if (!collection) return
+  setAlbumDisabled(collection.id, true)
 }
 
 async function runAction(
@@ -673,7 +745,7 @@ async function runAction(
           aria-hidden="true"
           @click="minimizePlaylists"
         />
-        <GlassCard class="albums-view__modal-panel">
+        <GlassCard class="albums-view__modal-panel albums-view__modal-panel--playlists">
           <header class="albums-view__playlists-header">
             <div class="albums-view__playlists-heading">
               <i class="ti ti-playlist" aria-hidden="true" />
@@ -792,6 +864,34 @@ async function runAction(
                     @click="playPlaylist(playlist)"
                   >
                     <i class="ti ti-player-play" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    class="albums-view__playlist-play"
+                    data-test="playlist-play-instrumental"
+                    :disabled="playlist.items.length === 0"
+                    :aria-label="t('albums.playlists.playInstrumental', { name: playlist.name })"
+                    @mouseenter="playlistHint = { playlistId: playlist.id, key: 'albums.playlists.playInstrumentalHint' }"
+                    @mouseleave="playlistHint = null"
+                    @focus="playlistHint = { playlistId: playlist.id, key: 'albums.playlists.playInstrumentalHint' }"
+                    @blur="playlistHint = null"
+                    @click="playPlaylist(playlist, 'instrumental')"
+                  >
+                    <i class="ti ti-piano" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    class="albums-view__playlist-play"
+                    data-test="playlist-play-no-audio"
+                    :disabled="playlist.items.length === 0"
+                    :aria-label="t('albums.playlists.playNoAudio', { name: playlist.name })"
+                    @mouseenter="playlistHint = { playlistId: playlist.id, key: 'albums.playlists.playNoAudioHint' }"
+                    @mouseleave="playlistHint = null"
+                    @focus="playlistHint = { playlistId: playlist.id, key: 'albums.playlists.playNoAudioHint' }"
+                    @blur="playlistHint = null"
+                    @click="playPlaylist(playlist, 'no_audio')"
+                  >
+                    <i class="ti ti-volume-off" aria-hidden="true" />
                   </button>
 
                   <button type="button"
@@ -964,10 +1064,20 @@ async function runAction(
             :collection="collection"
             :library-album="findLibraryAlbum(collection.id)"
             :show-download-controls="showDownloadControls"
+            :disabled="isAlbumDisabled(collection.id)"
+            can-disable
             @open="openCollection(collection.id)"
             @download="downloadCollection(collection.id)"
             @cancel="cancelCollection(collection.id)"
             @remove="requestRemove(collection)"
+            @toggle-disabled="requestToggleDisabled(collection)"
+          />
+          <AlbumHymnalCard
+            v-if="youtubeHymnal"
+            :key="'youtube_cpb'"
+            :collection="youtubeHymnal"
+            :show-download-controls="false"
+            @open="openCpbYoutube"
           />
         </div>
 
@@ -984,10 +1094,13 @@ async function runAction(
               :collection="collection"
               :library-album="findLibraryAlbum(collection.id)"
               :show-download-controls="showDownloadControls"
+              :disabled="!collection.isCustom && isAlbumDisabled(collection.id)"
+              :can-disable="!collection.isCustom"
               @open="openCollection(collection.id)"
               @download="downloadCollection(collection.id)"
               @cancel="cancelCollection(collection.id)"
               @remove="requestRemove(collection)"
+              @toggle-disabled="requestToggleDisabled(collection)"
             />
           </div>
         </GlassCard>
@@ -1110,6 +1223,17 @@ async function runAction(
       :message="t('albums.playlists.removeTrackMessage', { title: pendingTrackRemoval?.title ?? '', name: pendingTrackRemoval?.name ?? '' })"
       :confirm-label="t('albums.playlists.removeTrackConfirm')" :cancel-label="t('common.cancel')"
       @cancel="pendingTrackRemoval = null" @confirm="confirmTrackRemoval" />
+    <AppConfirm
+      :open="albumPendingDisable !== null"
+      :z-index="150"
+      danger
+      :title="t('albums.disabledAlbums.disableConfirmTitle', { name: albumPendingDisable ? albumDisableLabel(albumPendingDisable) : '' })"
+      :message="t('albums.disabledAlbums.disableConfirmMessage')"
+      :confirm-label="t('albums.disabledAlbums.disableConfirmYes')"
+      :cancel-label="t('common.cancel')"
+      @cancel="albumPendingDisable = null"
+      @confirm="confirmDisableAlbum"
+    />
   </section>
 </template>
 
@@ -1442,6 +1566,11 @@ async function runAction(
   padding: 1.5rem;
 }
 
+/* Playlists: mais largo (botões de modo de reprodução em cada linha). */
+.albums-view__modal-panel.albums-view__modal-panel--playlists {
+  width: min(68rem, 92vw);
+}
+
 .albums-view__modal-backdrop {
   position: absolute;
   inset: 0;
@@ -1529,10 +1658,16 @@ async function runAction(
 .albums-view__hymnal-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 1.25rem;
+  gap: 0.75rem;
+  align-items: stretch;
 
   @media (min-width: 768px) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Três hinários na mesma linha (o 3º é o da CPB no YouTube). */
+  @media (min-width: 1200px) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

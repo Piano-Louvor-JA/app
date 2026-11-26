@@ -73,6 +73,9 @@
   #text.shadow-off{text-shadow:none}
   /* Capa da música (isCover): título destaque amarelo, sem caixinha/borda —
      paridade com media-projection__title--cover via cabo. */
+  /* Hinário: número do hino acima do título (capa). */
+  #text .hymnal-name{display:block;margin:0 0 .5em;color:#fff;font-weight:700;letter-spacing:.34em;line-height:1.2;text-transform:uppercase;text-shadow:0 .08em .22em rgba(0,0,0,.85)}
+  #text .hymn-no{display:block;line-height:1;margin:0 0 .08em;letter-spacing:.02em;font-variant-numeric:tabular-nums}
   #text.cover-on{font-weight:900;letter-spacing:.03em;
     color:#f6c32a;background:none;padding:0;border:none;box-shadow:none;
     backdrop-filter:none;-webkit-backdrop-filter:none;
@@ -94,15 +97,118 @@
      width FIXO restaura o véu largo — o fit-content do .box-on é só
      para MÍDIA (música), Bíblia NÃO (14/10 Rafael). */
   #text.bible-box{padding:2vh 3.8vh;width:min(86vw,1600px);max-height:72vh}
-  /* Entrada do versículo novo. translate/scale individuais somam ao transform
+  /* Entrada do slide/versículo. translate/scale individuais somam ao transform
      que posiciona o #text; motores antigos ignoram e ficam só com o fade. */
   @keyframes rxEnterFade{from{opacity:0}}
   @keyframes rxEnterSlide{from{opacity:0;translate:0 4vh}}
   @keyframes rxEnterZoom{from{opacity:0;scale:.94}}
-  .rx-enter-fade{animation:rxEnterFade var(--rx-ms,250ms) ease-out both}
-  .rx-enter-slide{animation:rxEnterSlide var(--rx-ms,250ms) ease-out both}
-  .rx-enter-zoom{animation:rxEnterZoom var(--rx-ms,250ms) ease-out both}
-  @media (prefers-reduced-motion:reduce){.rx-enter-slide,.rx-enter-zoom{animation-name:rxEnterFade}}
+  @keyframes rxGhostOutFade{to{opacity:0}}
+  @keyframes rxGhostOutSlide{to{opacity:0;translate:0 -2vh}}
+  @keyframes rxGhostOutZoom{to{opacity:0;scale:1.03}}
+  .rx-enter-fade{animation:rxEnterFade var(--rx-ms,250ms) ease-out var(--rx-delay,0ms) both}
+  .rx-enter-slide{animation:rxEnterSlide var(--rx-ms,250ms) ease-out var(--rx-delay,0ms) both}
+  .rx-enter-zoom{animation:rxEnterZoom var(--rx-ms,250ms) ease-out var(--rx-delay,0ms) both}
+  .rx-ghost{position:fixed;margin:0;transform:none;pointer-events:none;z-index:6}
+  .rx-ghost-leave-fade{animation:rxGhostOutFade var(--rx-ms,250ms) ease-in both}
+  .rx-ghost-leave-slide{animation:rxGhostOutSlide var(--rx-ms,250ms) ease-in both}
+  .rx-ghost-leave-zoom{animation:rxGhostOutZoom var(--rx-ms,250ms) ease-in both}
+  /* Catálogo completo (paridade screen-transitions.css dos monitores).
+     translate/scale/rotate individuais somam ao transform que posiciona o
+     #text; 3D usa --rx-base (o transform atual do elemento). Entrada com
+     fill backwards: ao terminar, o elemento volta ao estilo normal. */
+  @keyframes rxInSlideDown{from{opacity:0;translate:0 -4vh}}
+  @keyframes rxOutSlideDown{to{opacity:0;translate:0 2vh}}
+  .rx-enter-slide-down{animation:rxInSlideDown var(--rx-ms,250ms) ease var(--rx-delay,0ms) backwards}
+  .rx-ghost-leave-slide-down{animation:rxOutSlideDown var(--rx-ms,250ms) ease both}
+  @keyframes rxInSlideLeft{from{opacity:0;translate:8vw 0}}
+  @keyframes rxOutSlideLeft{to{opacity:0;translate:-8vw 0}}
+  .rx-enter-slide-left{animation:rxInSlideLeft var(--rx-ms,250ms) ease var(--rx-delay,0ms) backwards}
+  .rx-ghost-leave-slide-left{animation:rxOutSlideLeft var(--rx-ms,250ms) ease both}
+  @keyframes rxInSlideRight{from{opacity:0;translate:-8vw 0}}
+  @keyframes rxOutSlideRight{to{opacity:0;translate:8vw 0}}
+  .rx-enter-slide-right{animation:rxInSlideRight var(--rx-ms,250ms) ease var(--rx-delay,0ms) backwards}
+  .rx-ghost-leave-slide-right{animation:rxOutSlideRight var(--rx-ms,250ms) ease both}
+  @keyframes rxInZoomOut{from{opacity:0;scale:1.12}}
+  @keyframes rxOutZoomOut{to{opacity:0;scale:.9}}
+  .rx-enter-zoom-out{animation:rxInZoomOut var(--rx-ms,250ms) ease var(--rx-delay,0ms) backwards}
+  .rx-ghost-leave-zoom-out{animation:rxOutZoomOut var(--rx-ms,250ms) ease both}
+  @keyframes rxInBlur{from{opacity:0;filter:blur(14px)}}
+  @keyframes rxOutBlur{to{opacity:0;filter:blur(14px)}}
+  .rx-enter-blur{animation:rxInBlur var(--rx-ms,250ms) ease var(--rx-delay,0ms) backwards}
+  .rx-ghost-leave-blur{animation:rxOutBlur var(--rx-ms,250ms) ease both}
+  @keyframes rxInWipe{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+  @keyframes rxOutWipe{from{clip-path:inset(0 0 0 0)}to{clip-path:inset(0 0 0 100%)}}
+  .rx-enter-wipe{animation:rxInWipe var(--rx-ms,250ms) cubic-bezier(.65,0,.35,1) var(--rx-delay,0ms) backwards}
+  .rx-ghost-leave-wipe{animation:rxOutWipe var(--rx-ms,250ms) cubic-bezier(.65,0,.35,1) both}
+  @keyframes rxInIris{from{clip-path:circle(0% at 50% 50%)}to{clip-path:circle(75% at 50% 50%)}}
+  @keyframes rxOutIris{from{clip-path:circle(75% at 50% 50%)}to{clip-path:circle(0% at 50% 50%)}}
+  .rx-enter-iris{animation:rxInIris var(--rx-ms,250ms) ease var(--rx-delay,0ms) backwards}
+  .rx-ghost-leave-iris{animation:rxOutIris var(--rx-ms,250ms) ease both}
+  @keyframes rxInCurtain{from{clip-path:inset(0 50% 0 50%)}to{clip-path:inset(0 0 0 0)}}
+  @keyframes rxOutCurtain{from{clip-path:inset(0 0 0 0)}to{clip-path:inset(0 50% 0 50%)}}
+  .rx-enter-curtain{animation:rxInCurtain var(--rx-ms,250ms) ease var(--rx-delay,0ms) backwards}
+  .rx-ghost-leave-curtain{animation:rxOutCurtain var(--rx-ms,250ms) ease both}
+  @keyframes rxInFlip{from{opacity:0;transform:var(--rx-base) perspective(1200px) rotateX(-75deg)}to{transform:var(--rx-base) perspective(1200px) rotateX(0deg)}}
+  @keyframes rxOutFlip{from{transform:var(--rx-base) perspective(1200px) rotateX(0deg)}to{opacity:0;transform:var(--rx-base) perspective(1200px) rotateX(75deg)}}
+  .rx-enter-flip{animation:rxInFlip var(--rx-ms,250ms) ease var(--rx-delay,0ms) backwards}
+  .rx-ghost-leave-flip{animation:rxOutFlip var(--rx-ms,250ms) ease both}
+  @keyframes rxInDrop{from{opacity:0;translate:0 -8vh}}
+  @keyframes rxOutDrop{to{opacity:0;translate:0 3vh}}
+  .rx-enter-drop{animation:rxInDrop var(--rx-ms,250ms) cubic-bezier(.34,1.56,.64,1) var(--rx-delay,0ms) backwards}
+  .rx-ghost-leave-drop{animation:rxOutDrop var(--rx-ms,250ms) ease both}
+  @keyframes rxInRotate{from{opacity:0;rotate:-8deg;scale:.9}}
+  @keyframes rxOutRotate{to{opacity:0;rotate:8deg;scale:.9}}
+  .rx-enter-rotate{animation:rxInRotate var(--rx-ms,250ms) ease var(--rx-delay,0ms) backwards}
+  .rx-ghost-leave-rotate{animation:rxOutRotate var(--rx-ms,250ms) ease both}
+  @keyframes rxInSwing{from{opacity:0;transform:var(--rx-base) perspective(1200px) rotateY(-70deg)}to{transform:var(--rx-base) perspective(1200px) rotateY(0deg)}}
+  @keyframes rxOutSwing{from{transform:var(--rx-base) perspective(1200px) rotateY(0deg)}to{opacity:0;transform:var(--rx-base) perspective(1200px) rotateY(70deg)}}
+  .rx-enter-swing{animation:rxInSwing var(--rx-ms,250ms) ease var(--rx-delay,0ms) backwards}
+  .rx-ghost-leave-swing{animation:rxOutSwing var(--rx-ms,250ms) ease both}
+  @keyframes rxInFlipH{from{opacity:0;transform:var(--rx-base) perspective(1200px) rotateY(-80deg)}to{transform:var(--rx-base) perspective(1200px) rotateY(0deg)}}
+  @keyframes rxOutFlipH{from{transform:var(--rx-base) perspective(1200px) rotateY(0deg)}to{opacity:0;transform:var(--rx-base) perspective(1200px) rotateY(80deg)}}
+  .rx-enter-flip-h{animation:rxInFlipH var(--rx-ms,250ms) ease var(--rx-delay,0ms) backwards}
+  .rx-ghost-leave-flip-h{animation:rxOutFlipH var(--rx-ms,250ms) ease both}
+  @keyframes rxInPop{from{opacity:0;scale:.6}}
+  @keyframes rxOutPop{to{opacity:0;scale:.85}}
+  .rx-enter-pop{animation:rxInPop var(--rx-ms,250ms) cubic-bezier(.34,1.56,.64,1) var(--rx-delay,0ms) backwards}
+  .rx-ghost-leave-pop{animation:rxOutPop var(--rx-ms,250ms) ease both}
+  @keyframes rxInStretch{from{opacity:0;scale:.1 1}}
+  @keyframes rxOutStretch{to{opacity:0;scale:.1 1}}
+  .rx-enter-stretch{animation:rxInStretch var(--rx-ms,250ms) ease var(--rx-delay,0ms) backwards}
+  .rx-ghost-leave-stretch{animation:rxOutStretch var(--rx-ms,250ms) ease both}
+  @keyframes rxInCinema{from{clip-path:inset(50% 0 50% 0)}to{clip-path:inset(0 0 0 0)}}
+  @keyframes rxOutCinema{from{clip-path:inset(0 0 0 0)}to{clip-path:inset(50% 0 50% 0)}}
+  .rx-enter-cinema{animation:rxInCinema var(--rx-ms,250ms) ease var(--rx-delay,0ms) backwards}
+  .rx-ghost-leave-cinema{animation:rxOutCinema var(--rx-ms,250ms) ease both}
+  @keyframes rxInWipeUp{from{clip-path:inset(100% 0 0 0)}to{clip-path:inset(0 0 0 0)}}
+  @keyframes rxOutWipeUp{from{clip-path:inset(0 0 0 0)}to{clip-path:inset(0 0 100% 0)}}
+  .rx-enter-wipe-up{animation:rxInWipeUp var(--rx-ms,250ms) cubic-bezier(.65,0,.35,1) var(--rx-delay,0ms) backwards}
+  .rx-ghost-leave-wipe-up{animation:rxOutWipeUp var(--rx-ms,250ms) cubic-bezier(.65,0,.35,1) both}
+  @keyframes rxInWipeDown{from{clip-path:inset(0 0 100% 0)}to{clip-path:inset(0 0 0 0)}}
+  @keyframes rxOutWipeDown{from{clip-path:inset(0 0 0 0)}to{clip-path:inset(100% 0 0 0)}}
+  .rx-enter-wipe-down{animation:rxInWipeDown var(--rx-ms,250ms) cubic-bezier(.65,0,.35,1) var(--rx-delay,0ms) backwards}
+  .rx-ghost-leave-wipe-down{animation:rxOutWipeDown var(--rx-ms,250ms) cubic-bezier(.65,0,.35,1) both}
+  @keyframes rxInDiagonal{from{clip-path:polygon(0 0,0 0,0 0)}to{clip-path:polygon(0 0,200% 0,0 200%)}}
+  @keyframes rxOutDiagonal{from{clip-path:polygon(0 0,200% 0,0 200%)}to{clip-path:polygon(0 0,0 0,0 0)}}
+  .rx-enter-diagonal{animation:rxInDiagonal var(--rx-ms,250ms) cubic-bezier(.65,0,.35,1) var(--rx-delay,0ms) backwards}
+  .rx-ghost-leave-diagonal{animation:rxOutDiagonal var(--rx-ms,250ms) cubic-bezier(.65,0,.35,1) both}
+  @keyframes rxInGlow{from{opacity:0;filter:brightness(3) blur(6px)}}
+  @keyframes rxOutGlow{to{opacity:0;filter:brightness(3) blur(6px)}}
+  .rx-enter-glow{animation:rxInGlow var(--rx-ms,250ms) ease var(--rx-delay,0ms) backwards}
+  .rx-ghost-leave-glow{animation:rxOutGlow var(--rx-ms,250ms) ease both}
+  @keyframes rxInFloat{from{opacity:0;filter:blur(6px);translate:0 3vh}}
+  @keyframes rxOutFloat{to{opacity:0;filter:blur(6px);translate:0 -3vh}}
+  .rx-enter-float{animation:rxInFloat var(--rx-ms,250ms) ease var(--rx-delay,0ms) backwards}
+  .rx-ghost-leave-float{animation:rxOutFloat var(--rx-ms,250ms) ease both}
+  @keyframes rxInZoomBlur{from{opacity:0;filter:blur(10px);scale:1.25}}
+  @keyframes rxOutZoomBlur{to{opacity:0;filter:blur(10px);scale:.8}}
+  .rx-enter-zoom-blur{animation:rxInZoomBlur var(--rx-ms,250ms) ease var(--rx-delay,0ms) backwards}
+  .rx-ghost-leave-zoom-blur{animation:rxOutZoomBlur var(--rx-ms,250ms) ease both}
+  .rx-enter-swing,.rx-ghost-leave-swing{transform-origin:left center}
+  @media (prefers-reduced-motion:reduce){
+    [class*="rx-enter-"]{animation-name:rxEnterFade!important}
+    [class*="rx-ghost-leave-"]{animation-name:rxGhostOutFade!important}
+  }
 
   #footer{position:fixed;bottom:4vh;left:0;right:0;text-align:center;
     font-size:2.6vh;font-weight:300;opacity:1;letter-spacing:.02em}
@@ -2779,11 +2885,25 @@ function applyStageReturn(m){
   const slide=Number(m.slideIndex),ratio=Math.min(1,Math.max(0,Number(m.progress)||0));
   const canPromote=sr.active&&slide===sr.slide+1&&current.length>0&&current===sr.next&&!cover&&!sr.cover;
   const slideChanged=!sr.active||slide!==sr.slide;
+  const configured=rxTransitionOf(m);
+  const contentChanged=current!==sr.current||String(m.next||'')!==sr.next||cover!==sr.cover||(m.nextIsCover===true)!==sr.nextCover;
   sr.active=true;sr.slide=slide;
   srSyncBar(ratio,slideChanged);
-  if(canPromote)void srPromote(m);
+  // Transições de slides ligadas: snap + rx-enter-*; desligadas: flyer srPromote.
+  if(configured){
+    // Slide novo (mesmo com a mesma letra) anima, como nos monitores.
+    if(canPromote||contentChanged||slideChanged||sr.busy)srSnap(m);
+    if(canPromote||contentChanged||slideChanged){
+      const ms=Number(m.transitionMs);
+      const lyric=srLyric(),title=q('.stage-return__title'),nextLyric=q('.stage-return__next-lyric');
+      [lyric,title,nextLyric].forEach(function(el){
+        if(!el||el.hidden)return;
+        rxEnter(el,configured,Number.isFinite(ms)&&ms>=0&&ms<=2000?ms:250,0);
+      });
+    }
+  }else if(canPromote)void srPromote(m);
   else if(sr.busy){if(current!==sr.flyerText||cover)srSnap(m)}
-  else if(current!==sr.current||String(m.next||'')!==sr.next||cover!==sr.cover||(m.nextIsCover===true)!==sr.nextCover)srSnap(m);
+  else if(contentChanged)srSnap(m);
   q('.stage-return__bar-fill').style.backgroundColor=stageReturnColor(s.barColor);
   root.style.backgroundColor=stageReturnColor(s.backgroundColor);
   const bg=typeof m.background==='string'&&/^https?:\/\//i.test(m.background)?m.background:'';
@@ -2808,6 +2928,35 @@ let bgPalco='';  // BG personalizado do palco (idle) — persiste entre músicas
 
 // Received projection text is untrusted HTML. Rebuild only basic formatting;
 // never copy attributes, executable elements, links, or resource URLs.
+/* Hinário: número do hino grande acima do título na capa. Tamanho chega
+   px@1080 (app desktop) ou px@1920 (fontRef 1920, celular) → vw. */
+function applyHymnNumber(t, m){
+  t.querySelectorAll('.hymn-no').forEach(function(old){old.remove()});
+  if(!m||m.isCover!==true||typeof m.hymnNumber!=='number'||!(m.hymnNumber>0))return;
+  const n=document.createElement('div');
+  n.className='hymn-no';
+  n.textContent=String(m.hymnNumber);
+  if(typeof m.hymnNumberSize==='number'){
+    const vw=m.fontRef===1920?m.hymnNumberSize/19.2:m.hymnNumberSize*16/9/19.2;
+    n.style.fontSize=(Math.round(vw*10000)/10000)+'vw';
+  }
+  t.prepend(n);
+}
+/* Capa: nome do hinário/álbum (ex.: HINÁRIO ADVENTISTA) acima do número.
+   Tamanho px@1080 (desktop) ou px@1920 (fontRef 1920) → vw. */
+function applyHymnalName(t, m){
+  t.querySelectorAll('.hymnal-name').forEach(function(old){old.remove()});
+  if(!m||m.isCover!==true||typeof m.hymnalName!=='string'||!m.hymnalName.trim())return;
+  const k=document.createElement('div');
+  k.className='hymnal-name';
+  k.textContent=m.hymnalName.trim();
+  if(typeof m.hymnalNameSize==='number'){
+    const vw=m.fontRef===1920?m.hymnalNameSize/19.2:m.hymnalNameSize*16/9/19.2;
+    k.style.fontSize=(Math.round(vw*10000)/10000)+'vw';
+  }
+  if(typeof m.hymnalNameColor==='string'&&m.hymnalNameColor)k.style.color=m.hymnalNameColor;
+  t.prepend(k);
+}
 function renderProjectionText(target, value){
   const text=String(value||'');
   if(!window.DOMPurify||!window.DOMPurify.isSupported){target.textContent=text;return}
@@ -2849,22 +2998,88 @@ function footerPosition(m){
   const p=m&&m.footerPosition;
   return p==='below-left'||p==='below-center'||p==='below-right'||p==='corner'?p:null;
 }
-// Transição do versículo: só anima quando o texto muda; sem o campo (APK), troca seca.
+// Transição Bíblia/hinos (espelho/OBS/TV): só anima quando o texto muda;
+// sem o campo (APK ou transições desligadas), troca seca.
+// Transições que este receiver anima (catálogo do app, sem 'none').
+const RX_TRANSITIONS=['fade','slide','zoom','slide-down','slide-left','slide-right','zoom-out','blur','wipe','iris','curtain','flip','drop','rotate','swing','flip-h','pop','stretch','cinema','wipe-up','wipe-down','diagonal','glow','float','zoom-blur'];
+const RX_ENTER_CLASSES=RX_TRANSITIONS.map(function(n){return 'rx-enter-'+n});
+const RX_GHOST_CLASSES=RX_TRANSITIONS.map(function(n){return 'rx-ghost-leave-'+n});
+/** Nome real (transitionName) se conhecido; senão o aproximado (transition). */
+function rxTransitionOf(m){
+  if(RX_TRANSITIONS.indexOf(m.transitionName)>=0)return m.transitionName;
+  return m.transition==='fade'||m.transition==='slide'||m.transition==='zoom'?m.transition:null;
+}
+/** Reinicia a entrada no elemento (base = transform atual, p/ as 3D). */
+function rxEnter(el,kind,dur,delay){
+  el.classList.remove.apply(el.classList,RX_ENTER_CLASSES);
+  if(!kind)return;
+  el.style.setProperty('--rx-ms',dur+'ms');
+  el.style.setProperty('--rx-delay',delay+'ms');
+  el.style.setProperty('--rx-base',el.style.transform||'translate(0,0)');
+  void el.offsetWidth;
+  el.classList.add('rx-enter-'+kind);
+}
 let lastBibleVerse='';
-function bibleEnter(m){
-  const kind=m.scope==='bible'&&(m.transition==='fade'||m.transition==='slide'||m.transition==='zoom')?m.transition:null;
-  const verse=m.scope==='bible'?String(m.text||'')+'|'+String(m.footerRef||''):'';
+function projectionEnterKind(m){
+  const scoped=m.scope==='bible'||m.scope==='hymns'||m.scope==='media'||m.scope==='hymn';
+  if(!scoped)return null;
+  return rxTransitionOf(m);
+}
+function projectionEnterKey(m){
+  const scoped=m.scope==='bible'||m.scope==='hymns'||m.scope==='media'||m.scope==='hymn';
+  return scoped
+    ? String(m.scope||'')+'|'+String(m.text||'')+'|'+String(m.footerRef||'')+'|'+(m.isCover===true?'1':'0')+'|'+(Number.isFinite(Number(m.slideIndex))?Number(m.slideIndex):'')
+    : '';
+}
+/** Clona o texto atual num fantasma fixo p/ saída (paridade out-in do Vue). */
+function snapshotProjectionGhost(el){
+  if(!el||!el.innerHTML||el.style.display==='none')return null;
+  const r=el.getBoundingClientRect();
+  if(!(r.width>2&&r.height>2))return null;
+  const g=el.cloneNode(true);
+  g.removeAttribute('id');
+  g.classList.add('rx-ghost');
+  Object.assign(g.style,{
+    position:'fixed',left:r.left+'px',top:r.top+'px',width:r.width+'px',
+    margin:'0',transform:'none',zIndex:'6',pointerEvents:'none',
+  });
+  (el.parentNode||document.body).appendChild(g);
+  return g;
+}
+function dismissProjectionGhost(ghost,kind,ms){
+  if(!ghost)return;
+  const dur=Number.isFinite(ms)&&ms>=0&&ms<=2000?ms:250;
+  ghost.style.setProperty('--rx-ms',dur+'ms');
+  ghost.classList.remove.apply(ghost.classList,RX_GHOST_CLASSES.concat(RX_ENTER_CLASSES));
+  ghost.style.setProperty('--rx-base','translate(0,0)');
+  void ghost.offsetWidth;
+  ghost.classList.add('rx-ghost-leave-'+(kind||'fade'));
+  const done=function(){try{ghost.remove()}catch(e){}};
+  ghost.addEventListener('animationend',done,{once:true});
+  setTimeout(done,dur+80);
+}
+function bibleEnter(m,ghost){
+  const kind=projectionEnterKind(m);
+  const verse=projectionEnterKey(m);
   const changed=verse!==lastBibleVerse;
+  // Out-in (igual aos monitores): havendo slide anterior, o novo só entra
+  // depois que o antigo sai; o primeiro slide entra direto.
+  const hadPrevious=lastBibleVerse!=='';
   lastBibleVerse=verse;
-  if(kind&&!changed)return;
+  if(kind&&!changed){if(ghost)try{ghost.remove()}catch(e){}return;}
   const ms=Number(m.transitionMs);
+  const dur=Number.isFinite(ms)&&ms>=0&&ms<=2000?ms:250;
+  if(kind&&changed)dismissProjectionGhost(ghost,kind,dur);
+  else if(ghost)try{ghost.remove()}catch(e){}
   ['text','footer'].forEach(function(id){
     const el=$(id);if(!el)return;
-    el.classList.remove('rx-enter-fade','rx-enter-slide','rx-enter-zoom');
-    if(!kind)return;
-    el.style.setProperty('--rx-ms',(Number.isFinite(ms)&&ms>=0&&ms<=2000?ms:250)+'ms');
-    void el.offsetWidth;
-    el.classList.add('rx-enter-'+kind);
+    if(!kind){rxEnter(el,null);return;}
+    const delay=hadPrevious?dur:0;
+    rxEnter(el,kind,dur,delay);
+    // WAAPI (só opacity): reforço p/ OBS/CEF que às vezes não disparam a classe.
+    try{
+      if(kind==='fade'&&typeof el.animate==='function')el.animate([{opacity:0},{opacity:1}],{duration:dur,delay:delay,easing:'ease-out',fill:'backwards'});
+    }catch(e){}
   });
 }
 // Conexões diretas: somente IPv4 de LAN/loopback e localhost, nunca DNS público.
@@ -3097,7 +3312,7 @@ function doConnect(){
     // Avisa que aplica o zoom de imagem/PDF sozinho (frameView): o app manda
     // só zoom + posição, em vez de reenviar o quadro recortado.
     // e qual página é esta aba (Aparelhos conectados mostra espelho/retorno)
-    try{ws.send(JSON.stringify({v:2,type:'caps',caps:['frameView','heartbeat'],page:stageReturnMode?'retorno':'espelho'}))}catch(e){}
+    try{ws.send(JSON.stringify({v:2,type:'caps',caps:['frameView','heartbeat'],page:stageReturnMode?'retorno':'espelho',rxBuild:window.__PALCO_RX_BUILD__||''}))}catch(e){}
     if(window.__hideSplash)window.__hideSplash(); // F3.3j: splash sai no connect
     localStorage.setItem('palcoHost',host);
     localStorage.setItem('palcoPort',port)};
@@ -3798,7 +4013,7 @@ function handle(m){
   if(youtubeId&&['projection','timer','clock','audio','idle','bgPalco','stop-all'].includes(m.type))stopYoutube();
   switch(m.type){
     case 'projection':
-      document.documentElement.classList.toggle('obs-music',m.scope==='media'||m.scope==='hymns');
+      document.documentElement.classList.toggle('obs-music',m.scope==='media'||m.scope==='hymns'||m.scope==='hymn');
       hideIdle();
       hideCloudPair();
       hideNp();
@@ -3825,11 +4040,17 @@ function handle(m){
       // Slide/PDF/PPT (text vazio) é mídia visual pura: sem véu de leitura,
       // preserva a tonalidade original do canvas do operador.
       $('veil').style.display=m.text?'':'none';
-      const compactLyrics=(m.scope==='hymns'||m.scope==='media')&&m.isCover!==true;
+      const compactLyrics=(m.scope==='hymns'||m.scope==='media'||m.scope==='hymn')&&m.isCover!==true;
       const displayText=compactLyrics?String(m.text||'').replace(/(?:<br\s*\/?>|\r?\n)(?:[\t ]*(?:<br\s*\/?>|\r?\n))*/gi,'<br>'):m.text;
+      // Fantasma do texto atual ANTES de trocar — saída + entrada (out-in).
+      const enterKind=projectionEnterKind(m);
+      const enterChanged=projectionEnterKey(m)!==lastBibleVerse;
+      const projectionGhost=enterKind&&enterChanged?snapshotProjectionGhost($('text')):null;
       renderProjectionText($('text'),displayText);
-      $('text').classList.toggle('music-lyrics',(m.scope==='hymns'||m.scope==='media')&&m.isCover!==true);
+      $('text').classList.toggle('music-lyrics',(m.scope==='hymns'||m.scope==='media'||m.scope==='hymn')&&m.isCover!==true);
       $('text').classList.toggle('cover-on',m.isCover===true);
+      applyHymnNumber($('text'),m);
+      applyHymnalName($('text'),m);
       $('text').classList.toggle('title-box-on',m.titleTextBox===true);
       // F3.3o: fontSize/fontWeight dinâmicos (settings do operador).
       // Estrofes (lyric*) vencem quando presentes; capa (isCover) mantém o
@@ -3996,7 +4217,7 @@ function handle(m){
       // Label de versão some durante projection com referência (colidia no
       // canto inferior direito — print 02/09 Rafael).
       {const iv=$('idleVer');if(iv)iv.style.display=m.footerRef?'none':''}
-      bibleEnter(m);
+      bibleEnter(m,projectionGhost);
       break;
     case 'bgPalco':
       // BG permanente do palco (idle) — personalização, não da música

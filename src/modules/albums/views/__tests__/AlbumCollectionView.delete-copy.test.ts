@@ -67,6 +67,7 @@ vi.mock("../../composables/useAlbums", () => ({
 		lyricDoc: ref(null),
 		isLoadingLyric: ref(false),
 		openCollection: vi.fn(async () => true),
+		isAlbumDisabled: () => false,
 		clearCollection: vi.fn(),
 		clearError: vi.fn(),
 		clearActionMessage: vi.fn(),

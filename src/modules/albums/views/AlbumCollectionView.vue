@@ -52,7 +52,13 @@ const {
   appendActiveCollectionToQueue,
   openLyric,
   closeLyric,
+  isAlbumDisabled,
 } = useAlbums()
+
+/** Álbum desativado: aviso no topo e linhas marcadas (tocam no clique). */
+const collectionDisabled = computed(() =>
+  Boolean(activeCollection.value && !activeCollection.value.isCustom && isAlbumDisabled(activeCollection.value.id)),
+)
 
 const selectedSearchIndex = ref(0)
 watch(filteredTracks, () => { selectedSearchIndex.value = 0 })
@@ -358,6 +364,11 @@ async function runAction(
       </button>
     </div>
 
+    <p v-if="collectionDisabled" class="album-collection-view__disabled-note" role="note">
+      <i class="ti ti-eye-off" aria-hidden="true" />
+      {{ t('albums.disabledAlbums.collectionNote') }}
+    </p>
+
     <p v-if="activeCollection?.kind === 'hymnal'" class="album-collection-view__search-explanation">
       {{ t('albums.searchExplanation') }}
     </p>
@@ -392,6 +403,7 @@ async function runAction(
         :collection-name="title"
         :artwork-url="activeCollection?.coverUrl"
         :busy="busyMusicId === track.musicId"
+        :album-disabled="collectionDisabled"
         @sung="runAction(track.musicId, () => playSung(track.musicId))"
         @instrumental="
           runAction(track.musicId, () => playInstrumental(track.musicId))
@@ -429,6 +441,19 @@ async function runAction(
 </template>
 
 <style scoped lang="scss">
+.album-collection-view__disabled-note {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: fit-content;
+  margin: 0 0 0.75rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--ds-color-outline-strong);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
 .album-collection-view__search-explanation {
   margin: 0;
   color: var(--ds-color-on-surface-variant);

@@ -31,18 +31,30 @@ function onDownloadProgress(progress: number | null) {
   downloadProgress.value = progress
 }
 
+/** Álbum desativado: a linha não toca nada (nem clique, nem teclado). */
+const isDisabled = computed(() => props.hit.disabled === true)
+
 function playSungFromRow() {
-  if (props.prominentPlaylist || props.busy || isDownloading.value) return
+  if (isDisabled.value || props.prominentPlaylist || props.busy || isDownloading.value) return
   emit('sung')
+}
+
+function emitAction(action: 'sung' | 'instrumental' | 'slides' | 'lyric') {
+  if (isDisabled.value) return
+  if (action === 'sung') emit('sung')
+  else if (action === 'instrumental') emit('instrumental')
+  else if (action === 'slides') emit('slides')
+  else emit('lyric')
 }
 </script>
 
 <template>
   <div
     class="album-search-hit"
-    :class="{ 'album-search-hit--downloading': isDownloading, 'album-search-hit--playlist-picker': prominentPlaylist, 'album-search-hit--added': alreadyAdded, 'album-search-hit--selected': selected }"
+    :class="{ 'album-search-hit--downloading': isDownloading, 'album-search-hit--playlist-picker': prominentPlaylist, 'album-search-hit--added': alreadyAdded, 'album-search-hit--selected': selected, 'album-search-hit--disabled': isDisabled }"
     :role="prominentPlaylist ? undefined : 'button'"
-    :tabindex="prominentPlaylist ? undefined : 0"
+    :tabindex="prominentPlaylist ? undefined : isDisabled ? -1 : 0"
+    :aria-disabled="isDisabled ? 'true' : undefined"
     :aria-label="prominentPlaylist ? undefined : t('media.actions.sung')"
     @mouseenter="rowHovered = true"
     @mouseleave="rowHovered = false"
@@ -77,6 +89,10 @@ function playSungFromRow() {
       <span class="album-search-hit__text">
         <span class="album-search-hit__title">{{ hit.name }}</span>
         <span class="album-search-hit__subtitle">{{ hit.albumNames }}</span>
+        <span v-if="isDisabled" class="album-search-hit__disabled-badge">
+          <i class="ti ti-eye-off" aria-hidden="true" />
+          {{ t('albums.disabledAlbums.badge') }}
+        </span>
       </span>
     </span>
 
@@ -92,7 +108,7 @@ function playSungFromRow() {
     </span>
 
     <div class="album-search-hit__actions">
-      <button v-if="!prominentPlaylist" type="button" class="album-search-hit__playlist" :disabled="busy || isDownloading"
+      <button v-if="!prominentPlaylist" type="button" class="album-search-hit__playlist" :disabled="busy || isDownloading || isDisabled"
         :title="t('common.addToPlaylist')" :aria-label="t('common.addToPlaylist')"
         @click.stop="emit('playlist')" @keydown.enter.stop @keydown.space.stop>
         <i class="ti ti-playlist-add" aria-hidden="true" />
@@ -104,10 +120,10 @@ function playSungFromRow() {
         :busy="busy"
         :row-hovered="rowHovered"
         variant="contained"
-        @sung="emit('sung')"
-        @instrumental="emit('instrumental')"
-        @slides="emit('slides')"
-        @lyric="emit('lyric')"
+        @sung="emitAction('sung')"
+        @instrumental="emitAction('instrumental')"
+        @slides="emitAction('slides')"
+        @lyric="emitAction('lyric')"
         @download-progress="onDownloadProgress"
       />
     </div>
@@ -115,6 +131,30 @@ function playSungFromRow() {
 </template>
 
 <style scoped lang="scss">
+.album-search-hit--disabled {
+  opacity: 0.45;
+  filter: grayscale(0.8);
+  cursor: not-allowed;
+}
+
+/* Nada clicável na linha desativada (o cursor continua mostrando o bloqueio). */
+.album-search-hit--disabled > * {
+  pointer-events: none;
+}
+
+.album-search-hit__disabled-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  width: fit-content;
+  margin-top: 0.2rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--ds-color-outline-strong);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
 .album-search-hit {
   position: relative;
   width: 100%;

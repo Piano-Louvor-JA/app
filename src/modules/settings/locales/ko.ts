@@ -451,7 +451,22 @@ export default {
       "mediaFolderMoved": "미디어를 {path}(으)로 이동했습니다",
       "mediaFolderError": "미디어 폴더를 이동하지 못했습니다. 다시 시도하세요.",
       "mediaFolderDestInside": "현재 미디어 폴더 밖의 폴더를 선택하세요.",
-      "mediaFolderPersistError": "미디어가 복사되었지만 공유 경로를 저장하지 못했습니다."
+      "mediaFolderPersistError": "미디어가 복사되었지만 공유 경로를 저장하지 못했습니다.",
+      "legacyMediaArchiveSummary": "{size} 압축 파일: 여기에 없는 미디어를 압축을 풀지 않고 바로 복사합니다.",
+      "legacyMediaCancelled": "가져오기를 멈췄습니다: 파일 {imported}개 복사됨. 멈춘 곳에서 이어가려면 파일이나 폴더를 다시 선택하세요.",
+      "legacyMediaHintLinux": "사이트에서 내려받은 파일(.tar.gz)을 선택하세요. 앱이 압축을 풀지 않고 바로 미디어를 복사합니다. 원하면 압축을 풀고 폴더를 선택해도 됩니다. 여기에 없는 파일(커버, 이미지, 곡)만 복사합니다.",
+      "legacyMediaInvalidArchive": "이 파일에는 Louvor JA 미디어(커버, 이미지, 곡)가 없습니다. 사이트에서 내려받은 파일을 선택하세요.",
+      "legacyMediaInvalidFolderLinux": "이 폴더에는 미디어가 없습니다. 사이트 파일에서 압축을 푼 폴더(예: LouvorJA-PIANO)나 그 안의 Media 폴더를 선택하세요.",
+      "legacyMediaLiveCounts": "지금 {imported}개 저장 · {skipped}개는 이미 있음(미디어 센터에 이미 표시됨)",
+      "legacyMediaPause": "일시정지",
+      "legacyMediaPaused": "{total}개 중 {current}개에서 일시정지",
+      "legacyMediaPausedBytes": "{total} 중 {current}에서 일시정지",
+      "legacyMediaPickArchive": "내려받은 파일 선택(.tar.gz)",
+      "legacyMediaPickFolderLinux": "미디어 폴더 선택",
+      "legacyMediaPickHintLinux": "파일에서 압축을 푼 폴더(예: LouvorJA-PIANO)나 그 안의 Media 폴더를 선택하세요. 커버, 이미지, 곡은 앱이 알아서 찾습니다.",
+      "legacyMediaProgressBytes": "{total} 중 {current} 읽는 중",
+      "legacyMediaResume": "다시 시작",
+      "legacyMediaStop": "중지"
     },
     "remote": {
       "renewToken": "토큰 갱신",
@@ -813,7 +828,13 @@ export default {
       "transformNone": "없음",
       "speedSlow": "느리게",
       "speedNormal": "보통",
-      "speedFast": "빠르게"
+      "speedFast": "빠르게",
+      "hymnNumberShow": "표지에 찬송가 번호(찬송가)",
+      "hymnNumberSize": "찬송가 번호 크기",
+      "hymnalNameColor": "찬송가 이름 색",
+      "hymnalNameColorDefault": "기본값(흰색)",
+      "hymnalNameShow": "표지에 찬송가 이름",
+      "hymnalNameSize": "찬송가 이름 크기"
     }
   }
 }

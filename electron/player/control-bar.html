@@ -198,6 +198,41 @@
         accent-color: #E0895A;
         cursor: pointer;
       }
+      /* Projetar: botão de destaque, laranja e pulsando (igual à seta do APK). */
+      #project {
+        width: 2.6rem;
+        height: 2.6rem;
+        margin-left: 0.35rem;
+        flex-shrink: 0;
+        background: #E0895A;
+        color: #2a1406;
+        border: 2px solid rgba(255, 214, 190, 0.55);
+        animation: project-pulse 1.8s ease-out infinite;
+      }
+      #project svg {
+        width: 1.35rem;
+        height: 1.35rem;
+      }
+      #project:hover:not(:disabled) {
+        background: #f0a072;
+      }
+      #project.is-active {
+        background: rgba(234, 88, 12, 0.28);
+        color: #fb923c;
+        border-color: #fb923c;
+        animation: none;
+      }
+      #project:disabled {
+        animation: none;
+      }
+      @keyframes project-pulse {
+        0% { box-shadow: 0 0 0 0 rgba(224, 137, 90, 0.65); }
+        70% { box-shadow: 0 0 0 12px rgba(224, 137, 90, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(224, 137, 90, 0); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #project { animation: none; }
+      }
       .time {
         min-width: 5.5rem;
         text-align: right;
@@ -271,21 +306,6 @@
           <option value="connections">Som: só conexões</option>
           <option value="both">Som: ambos</option>
         </select>
-        <button
-          id="project"
-          type="button"
-          title="Projetar nas telas"
-          aria-label="Projetar nas telas"
-          aria-pressed="false"
-        >
-          <svg
-            id="projectIcon"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path d="M5 17.59 15.59 7H9V5h10v10h-2V8.41L6.41 19 5 17.59z" />
-          </svg>
-        </button>
         <span class="monitor-wrap">
           <button
             id="monitorSelect"
@@ -326,6 +346,22 @@
           class="time"
           >0:00 / 0:00</span
         >
+        <!-- Projetar: depois da barra, em destaque (igual à seta do APK). -->
+        <button
+          id="project"
+          type="button"
+          title="Projetar em telas e transmitir para conexões remotas"
+          aria-label="Projetar em telas e transmitir para conexões remotas"
+          aria-pressed="false"
+        >
+          <svg
+            id="projectIcon"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path d="M5 17.59 15.59 7H9V5h10v10h-2V8.41L6.41 19 5 17.59z" />
+          </svg>
+        </button>
       </div>
     </div>
     </div>
@@ -422,7 +458,7 @@
           } else {
             projectBtn.classList.remove('is-active')
             var label = canProject
-              ? 'Projetar nas telas'
+              ? 'Projetar em telas e transmitir para conexões remotas'
               : 'Nenhuma tela disponível para projeção'
             projectBtn.title = label
             projectBtn.setAttribute('aria-label', label)

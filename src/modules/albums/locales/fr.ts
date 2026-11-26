@@ -1,5 +1,18 @@
 export default {
   "albums": {
+    "disabledAlbums": {
+      "collectionNote": "Album désactivé : ses chants apparaissent grisés dans la recherche et le sélecteur les ignore. Ici, ils jouent toujours au clic.",
+      "title": "Albums actifs",
+      "description": "Désactivez les albums que vous n'utilisez pas (par exemple, l'ancien recueil). Leurs chants apparaissent grisés dans la recherche, et Entrée et les flèches les ignorent. Vous pouvez aussi désactiver un album depuis sa carte dans la Médiathèque.",
+      "filter": "Filtrer les albums",
+      "count": "{count} désactivé(s)",
+      "badge": "Album désactivé",
+      "disableConfirmTitle": "Désactiver « {name} » ?",
+      "disableConfirmMessage": "Les chants de cet album apparaissent grisés dans la recherche et le sélecteur les ignore. Vous pourrez le réactiver plus tard via l’œil sur la carte.",
+      "disableConfirmYes": "Désactiver",
+      "enable": "Activer l'album",
+      "disable": "Désactiver l'album"
+    },
     "custom": {
       "title": "Mes Compilations",
       "openEditor": "Ouvrir l'éditeur de paroles",
@@ -46,7 +59,11 @@ export default {
       "playAllHint": "Lire la playlist : lire tous les chants en séquence",
       "shuffle": "Lecture aléatoire",
       "playTrack": "Lire {title} dans le mini-lecteur",
-      "reorder": "Glisser pour réordonner (ou utiliser les flèches vers le haut et vers le bas)"
+      "reorder": "Glisser pour réordonner (ou utiliser les flèches vers le haut et vers le bas)",
+      "playInstrumental": "Lire {name} avec accompagnement (instrumental)",
+      "playInstrumentalHint": "Accompagnement : lit tous les chants avec l'instrumental seulement",
+      "playNoAudio": "Lire {name} sans audio (diapositives seulement)",
+      "playNoAudioHint": "Sans audio : affiche seulement les diapositives des chants, sans son"
     },
     "title": "Centre multimédia",
     "subtitle": "Albums & Compilations",

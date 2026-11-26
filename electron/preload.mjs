@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, webFrame } from 'electron'
+import { contextBridge, ipcRenderer, webFrame, webUtils } from 'electron'
 
 /**
  * @template T
@@ -281,6 +281,9 @@ contextBridge.exposeInMainWorld('louvorja', {
     query: (text) => ipcRenderer.invoke('youtube-search:query', text),
     more: (continuation) => ipcRenderer.invoke('youtube-search:more', continuation),
     playlist: (text) => ipcRenderer.invoke('youtube-search:playlist', text),
+    channel: (text) => ipcRenderer.invoke('youtube-search:channel', text),
+    channels: (query) => ipcRenderer.invoke('youtube-search:channels', query),
+    channelLogo: (text) => ipcRenderer.invoke('youtube-search:channel-logo', text),
   },
 
   siteInfo: {
@@ -294,6 +297,10 @@ contextBridge.exposeInMainWorld('louvorja', {
     import: (selectedPath) =>
       ipcRenderer.invoke('legacy-media:import', selectedPath ?? ''),
     pickFolder: () => ipcRenderer.invoke('legacy-media:pick-folder'),
+    pickArchive: () => ipcRenderer.invoke('legacy-media:pick-archive'),
+    pause: () => ipcRenderer.invoke('legacy-media:pause'),
+    resume: () => ipcRenderer.invoke('legacy-media:resume'),
+    cancel: () => ipcRenderer.invoke('legacy-media:cancel'),
     onImportProgress: (callback) => subscribe('legacy-media:import-progress', callback),
   },
 
@@ -338,6 +345,15 @@ contextBridge.exposeInMainWorld('louvorja', {
 
   dialog: {
     openFile: (options) => ipcRenderer.invoke('dialog:open-file', options ?? {}),
+    /** Path absoluto de File solto no renderer (drag-and-drop na liturgia). */
+    getPathForFile: (file) => {
+      try {
+        const path = webUtils.getPathForFile(file)
+        return typeof path === 'string' && path.trim() ? path : null
+      } catch {
+        return null
+      }
+    },
   },
 
   presentation: {

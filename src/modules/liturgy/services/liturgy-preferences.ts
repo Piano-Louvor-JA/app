@@ -93,6 +93,10 @@ function normalizeItem(raw: unknown): LiturgyItem | null {
       type === 'scheduled'
         ? asString(source.scheduledRotationId).trim() || null
         : null,
+    playlistId:
+      type === 'playlist'
+        ? asString(source.playlistId).trim() || null
+        : null,
     startTime:
       type === 'category'
         ? normalizeLiturgyTimeHHmm(source.startTime)

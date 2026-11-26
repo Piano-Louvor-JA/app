@@ -93,7 +93,7 @@ import { ref as vueRef } from 'vue'
 function useAlbumsMockFactory() {
   const s = ((globalThis as AnyObj).__albumsState ?? {}) as AnyObj
   const r = <T>(v: T) => vueRef<T>(v)
-  return {
+  const api = {
       categories: r(s.categories ?? []),
       activeCollection: r(null),
       tracks: r([]),
@@ -138,7 +138,11 @@ function useAlbumsMockFactory() {
       playAllInActiveCollection: vi.fn(async () => true),
       playAllInCategory: vi.fn(async () => true),
       openCollection: vi.fn(async () => true),
+      isAlbumDisabled: vi.fn((key: unknown) => ((s.disabledAlbums as unknown[]) ?? []).includes(String(key))),
+      setAlbumDisabled: vi.fn(),
     }
+  ;(globalThis as AnyObj).__albumsApi = api
+  return api
 }
 
 vi.mock('../../composables/useAlbums', () => ({
@@ -158,12 +162,22 @@ vi.mock('../../components/AlbumLyricDialog.vue', () => ({
   default: { props: ['open', 'loading', 'document'], template: '<div class="lyric-stub" />' },
 }))
 
+const youtubeMock = vi.hoisted(() => ({ available: true }))
+vi.mock('@modules/youtube/services/youtube-player', async (original) => ({
+  ...(await original<typeof import('@modules/youtube/services/youtube-player')>()),
+  isYoutubeSearchAvailable: () => youtubeMock.available,
+}))
+vi.mock('@modules/youtube/services/youtube-cpb-logo', () => ({
+  cachedCpbLogo: () => 'https://yt3.ggpht.com/cpb-logo',
+  refreshCpbLogo: vi.fn(async () => 'https://yt3.ggpht.com/cpb-logo'),
+}))
+
 vi.mock('../../components/AlbumHymnalCard.vue', () => ({
   default: {
     name: 'AlbumHymnalCard',
     props: ['collection', 'libraryAlbum', 'showDownloadControls'],
     emits: ['open', 'download', 'cancel', 'remove'],
-    template: `<div class="hymnal-card-stub" :data-id="collection.id">
+    template: `<div class="hymnal-card-stub" :data-id="collection.id" :data-cover="collection.coverUrl" :data-name="collection.name" :data-controls="String(showDownloadControls)">
       <button class="hc-open" @click="$emit('open')" />
       <button class="hc-download" @click="$emit('download')" />
       <button class="hc-cancel" @click="$emit('cancel')" />
@@ -175,9 +189,10 @@ vi.mock('../../components/AlbumHymnalCard.vue', () => ({
 vi.mock('../../components/AlbumCollectionCard.vue', () => ({
   default: {
     name: 'AlbumCollectionCard',
-    props: ['collection', 'libraryAlbum', 'showDownloadControls'],
-    emits: ['open', 'download', 'cancel', 'remove'],
-    template: `<div class="collection-card-stub" :data-id="collection.id">
+    props: ['collection', 'libraryAlbum', 'showDownloadControls', 'disabled'],
+    emits: ['open', 'download', 'cancel', 'remove', 'toggle-disabled'],
+    template: `<div class="collection-card-stub" :data-id="collection.id" :data-disabled="String(disabled)">
+      <button class="cc-toggle-disabled" @click="$emit('toggle-disabled')" />
       <button class="cc-open" @click="$emit('open')" />
       <button class="cc-download" @click="$emit('download')" />
       <button class="cc-remove" @click="$emit('remove')" />
@@ -315,6 +330,61 @@ describe('AlbumsView', () => {
     expect(input.attributes('aria-activedescendant')).toBe('album-search-result-41')
     await input.trigger('keydown', { key: 'Enter' })
     await flushPromises()
+  })
+
+  it('seletor pula músicas de álbum desativado (setas e Enter)', async () => {
+    setState({ isHubSearching: true, hubResults: [
+      { musicId: 41, name: 'Antigo 1', albumNames: 'Hinário 1996', disabled: true },
+      { musicId: 42, name: 'Atual 1', albumNames: 'Hinário' },
+      { musicId: 43, name: 'Antigo 2', albumNames: 'Hinário 1996', disabled: true },
+      { musicId: 44, name: 'Atual 2', albumNames: 'Hinário' },
+    ] })
+    const wrapper = await mountView()
+    const input = wrapper.get('input[type="search"]')
+    expect(input.attributes('aria-activedescendant')).toBe('album-search-result-42')
+    await input.trigger('keydown', { key: 'ArrowDown' })
+    expect(input.attributes('aria-activedescendant')).toBe('album-search-result-44')
+    await input.trigger('keydown', { key: 'ArrowDown' })
+    expect(input.attributes('aria-activedescendant')).toBe('album-search-result-44')
+    await input.trigger('keydown', { key: 'ArrowUp' })
+    expect(input.attributes('aria-activedescendant')).toBe('album-search-result-42')
+    await input.trigger('keydown', { key: 'Enter' })
+    await flushPromises()
+    expect((globalThis as AnyObj).__albumsApi.playSung).toHaveBeenCalledWith(42)
+  })
+
+  it('só resultados desativados: Enter não toca nada', async () => {
+    setState({ isHubSearching: true, hubResults: [
+      { musicId: 41, name: 'Antigo', albumNames: 'Hinário 1996', disabled: true },
+    ] })
+    const wrapper = await mountView()
+    const input = wrapper.get('input[type="search"]')
+    await input.trigger('keydown', { key: 'Enter' })
+    await flushPromises()
+    expect((globalThis as AnyObj).__albumsApi.playSung).not.toHaveBeenCalled()
+  })
+
+  it('card do álbum liga e desliga o álbum', async () => {
+    setState({ categories, disabledAlbums: ['10'] })
+    const wrapper = await mountView()
+    const disabledCard = wrapper.findAll('.collection-card-stub').find((card) => card.attributes('data-disabled') === 'true')!
+    expect(disabledCard).toBeTruthy()
+    // Reativar: direto, sem popup
+    await disabledCard.get('.cc-toggle-disabled').trigger('click')
+    expect((globalThis as AnyObj).__albumsApi.setAlbumDisabled).toHaveBeenCalledWith(disabledCard.attributes('data-id'), false)
+    wrapper.unmount()
+
+    // Desativar: pede confirmação (AppConfirm) antes de persistir
+    setState({ categories, disabledAlbums: [] })
+    const enabledWrapper = await mountView()
+    const enabledCard = enabledWrapper.get('.collection-card-stub')
+    ;(globalThis as AnyObj).__albumsApi.setAlbumDisabled.mockClear()
+    await enabledCard.get('.cc-toggle-disabled').trigger('click')
+    expect((globalThis as AnyObj).__albumsApi.setAlbumDisabled).not.toHaveBeenCalled()
+    expect(body().querySelector('.app-confirm')).not.toBeNull()
+    ;(body().querySelector('.app-confirm__btn--danger') as HTMLElement).click()
+    await flushPromises()
+    expect((globalThis as AnyObj).__albumsApi.setAlbumDisabled).toHaveBeenCalledWith(enabledCard.attributes('data-id'), true)
   })
 
   it('adds a search result to a saved playlist through the shared album picker', async () => {
@@ -674,3 +744,34 @@ describe('AlbumsView — minimizar a janela de Playlists', () => {
     expect(replaceMock).not.toHaveBeenCalled()
   })
 })
+
+describe('AlbumsView — Hinário Adventista - CPB (YouTube) na linha dos hinários', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    pushMock.mockClear()
+    setState()
+    youtubeMock.available = true
+  })
+
+  it('aparece ao lado dos hinários, com o logo da CPB e sem controles de baixar; abre a lista unificada', async () => {
+    const wrapper = await mountView()
+    const grid = wrapper.get('.albums-view__hymnal-grid')
+    const cards = grid.findAll('.hymnal-card-stub')
+    expect(cards.map((c) => c.attributes('data-id'))).toEqual(['pt_hymnal', 'youtube_cpb'])
+    const cpb = cards[1]
+    expect(cpb.attributes('data-name')).toBe('sync.hymnal.cpbYoutubeName')
+    expect(cpb.attributes('data-cover')).toBe('https://yt3.ggpht.com/cpb-logo')
+    expect(cpb.attributes('data-controls')).toBe('false')
+
+    await cpb.get('.hc-open').trigger('click')
+    expect(pushMock).toHaveBeenCalledWith({ name: 'albums-youtube', query: { channel: 'cpb' } })
+  })
+
+  it('sem o YouTube no app (web/build antigo), o card não aparece', async () => {
+    youtubeMock.available = false
+    const wrapper = await mountView()
+    const ids = wrapper.get('.albums-view__hymnal-grid').findAll('.hymnal-card-stub').map((c) => c.attributes('data-id'))
+    expect(ids).toEqual(['pt_hymnal'])
+  })
+})
+

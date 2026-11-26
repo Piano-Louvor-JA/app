@@ -201,9 +201,11 @@ export default {
       "languageTurkish": "Türkçe",
       "languageArabic": "العربية",
       "languageHindi": "हिन्दी",
-      languageIt: 'Italiano',
-      languageNl: 'Nederlands',
-      languagePl: 'Polski',
+      "languageIt": "Italiano",
+      "languageNl": "Nederlands",
+      "languagePl": "Polski",
+      "languageFrench": "Французька",
+      "languageRussian": "Російська",
       "dataTitle": "Локальні дані",
       "dataHint": "Видаляє каталог, завантажені медіа та налаштування з папки даних застосунку (Windows: C:\\ProgramData\\LouvorJA-PIANO; Linux: /var/lib/LouvorJA-PIANO; macOS: /Users/Shared/LouvorJA-PIANO — спільна для всіх користувачів). Застосунок запустить початкове налаштування при наступному запуску.",
       "clearData": "Видалити всі дані",
@@ -302,8 +304,21 @@ export default {
       "backupYoutubeMessage": "Завантажених відео YouTube: {count} ({size}). Типово вони не включаються до копії, бо їх можна завантажити знову. Історія, обране та добірки включаються завжди.",
       "backupYoutubeInclude": "Включити відео ({size})",
       "backupYoutubeSkip": "Без відео",
-      "languageRussian": "Російська",
-      "languageFrench": "Французька"
+      "legacyMediaArchiveSummary": "Стиснений файл розміром {size}: медіа, яких тут ще немає, копіюються прямо з нього, без розпакування.",
+      "legacyMediaCancelled": "Імпорт зупинено: скопійовано файлів: {imported}. Виберіть файл або папку знову, щоб продовжити з того ж місця.",
+      "legacyMediaHintLinux": "Виберіть файл, завантажений із сайту (.tar.gz): застосунок копіює медіа прямо з нього, розпаковувати не потрібно. Якщо хочете, розпакуйте його й виберіть папку. Копіюються лише файли (обкладинки, зображення й пісні), яких тут ще немає.",
+      "legacyMediaInvalidArchive": "Цей файл не містить медіа Louvor JA (обкладинки, зображення чи пісні). Виберіть файл, завантажений із сайту.",
+      "legacyMediaInvalidFolderLinux": "У цій папці немає медіа. Виберіть папку, розпаковану з файлу із сайту (наприклад, LouvorJA-PIANO), або папку Media всередині неї.",
+      "legacyMediaLiveCounts": "{imported} збережено зараз · {skipped} уже було (уже видно в Медіацентрі)",
+      "legacyMediaPause": "Пауза",
+      "legacyMediaPaused": "Пауза на {current} з {total}",
+      "legacyMediaPausedBytes": "Пауза на {current} з {total}",
+      "legacyMediaPickArchive": "Вибрати завантажений файл (.tar.gz)",
+      "legacyMediaPickFolderLinux": "Вибрати папку з медіа",
+      "legacyMediaPickHintLinux": "Виберіть папку, розпаковану з файлу (наприклад, LouvorJA-PIANO), або папку Media всередині неї. Застосунок сам знайде обкладинки, зображення й пісні.",
+      "legacyMediaProgressBytes": "Читання {current} з {total}",
+      "legacyMediaResume": "Продовжити",
+      "legacyMediaStop": "Зупинити"
     },
     "remote": {
       "p2pTitle": "P2P-керування (QR)",
@@ -550,7 +565,13 @@ export default {
         "glow": "Сяйво",
         "float": "Паріння",
         "zoomBlur": "Розмиття зі зумом"
-      }
+      },
+      "hymnNumberShow": "Номер гімну на обкладинці (збірник)",
+      "hymnNumberSize": "Розмір номера гімну",
+      "hymnalNameColor": "Колір назви збірника",
+      "hymnalNameColorDefault": "За замовчуванням (білий)",
+      "hymnalNameShow": "Назва збірника на обкладинці",
+      "hymnalNameSize": "Розмір назви збірника"
     },
     "fonts": {
       "projectionOnly": "Для проєкції",

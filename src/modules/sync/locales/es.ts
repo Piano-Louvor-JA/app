@@ -21,8 +21,10 @@ export default {
       "defaultSubtitle": "Álbumes y producciones para uso sin conexión."
     },
     "hymnal": {
+      "cpbYoutubeName": "Himnario Adventista - CPB",
+      "cpbYoutubeSubtitle": "Nuevo Himnario Adventista en video\nCasa Publicadora Brasileira",
       "edition1996Name": "Himnario Adventista - Edición 1996",
-      "officialSubtitle": "{count} himnos con partituras y letras",
+      "officialSubtitle": "{count} himnos con letras",
       "edition1996Subtitle": "Histórico - {count} himnos tradicionales"
     },
     "progress": {

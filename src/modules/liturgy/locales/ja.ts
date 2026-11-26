@@ -114,7 +114,8 @@ export default {
       "other_files": "その他",
       "online_video": "YouTube/Vimeo など",
       "site": "サイト／SNS",
-      "verse": "聖句"
+      "verse": "聖句",
+      "playlist": "プレイリスト"
     },
     "typeDescriptions": {
       "category": "区分は礼拝順序の各部分を視覚的に分ける区切りです。",
@@ -131,7 +132,8 @@ export default {
       "other_files": "その他のローカルファイル",
       "online_video": "オンライン動画（YouTube、Vimeo など）",
       "site": "ウェブサイト・SNS",
-      "verse": "聖書の聖句"
+      "verse": "聖書の聖句",
+      "playlist": "メディアセンターの曲の再生リスト"
     },
     "dialog": {
       "title": "新しい項目",
@@ -240,7 +242,11 @@ export default {
       "searchMusic": "賛美を検索…",
       "musicMode": "モード",
       "musicModeAudio": "オーディオ",
-      "musicModeInstrumental": "インストゥルメンタル"
+      "musicModeInstrumental": "インストゥルメンタル",
+      "albumDisabled": "無効のアルバム",
+      "playlistPlaceholder": "プレイリストを選択",
+      "playlistRequired": "プレイリストを選んでください。",
+      "selectPlaylist": "プレイリストを選ぶ"
     },
     "namePlaceholders": {
       "category": "例：開会の司会、礼拝の開始、挨拶、安息日学校、安息日礼拝…",
@@ -256,7 +262,8 @@ export default {
       "other_files": "例：補助ファイル",
       "online_video": "例：YouTube の讃美歌",
       "site": "例：教会のページ",
-      "verse": "出典またはタイトル"
+      "verse": "出典またはタイトル",
+      "playlist": "例：開会の賛美"
     },
     "actions": {
       "save": "保存",
@@ -301,7 +308,12 @@ export default {
       "collapseCategory": "区分を折りたたむ",
       "expandCategory": "区分を展開",
       "addSubItem": "サブ項目を追加",
-      "reorder": "ドラッグで並べ替え"
+      "reorder": "ドラッグで並べ替え",
+      "playlistControls": "プレイリストの操作",
+      "playlistInstrumental": "伴奏で再生",
+      "playlistNoAudio": "音声なしで再生（スライドのみ）",
+      "playlistPlay": "プレイリストを再生",
+      "playlistShuffle": "シャッフル再生"
     },
     "messages": {
       "removeItemTitle": "礼拝順序から項目を削除",
@@ -358,7 +370,16 @@ export default {
       "urlInvalid": "この URL は投影に使用できません。",
       "projectionFailed": "設定された画面で投影を開けませんでした。",
       "fileMissingOnMachine": "ファイルがこの PC で見つかりません — 別の PC のパスです（同期された礼拝順序）。この端末で再度ファイルを選択してください。",
-      "presentationOfficeMissing": "PPT/PPTX の投影には LibreOffice をインストールするか、LIBREOFFICE_PATH を設定してください。"
+      "presentationOfficeMissing": "PPT/PPTX の投影には LibreOffice をインストールするか、LIBREOFFICE_PATH を設定してください。",
+      "dropDesktopOnly": "礼拝順序へのファイルのドラッグはデスクトップアプリでのみ使えます。",
+      "dropHint": "ここにファイルをドロップして礼拝順序に追加",
+      "dropMoreFilesPending": "最初のファイルをダイアログで開きました。必要なら保存後に残りをもう一度ドロップしてください。",
+      "dropPathFailed": "ドロップしたファイルの場所を読み取れませんでした。「追加」からファイルを選んでください。",
+      "playlistCatalogEmpty": "まだプレイリストがありません。メディアセンター（プレイリスト）で作成してください。",
+      "playlistEmpty": "このプレイリストは空です。メディアセンターで曲を追加してください。",
+      "playlistMissing": "プレイリストが見つかりません。メディアセンターで別のものを選んでください。",
+      "playlistTrackCount": "{count} 曲",
+      "playlistTrackCountOne": "1 曲"
     },
     "slja": {
       "importButton": ".slja を読み込む",
@@ -374,6 +395,45 @@ export default {
       "new": "新しいカスタム礼拝順序",
       "namePlaceholder": "礼拝順序名（例：青年礼拝 12/07）",
       "empty": "カスタム礼拝順序はありません。最初の 1 つを作成しましょう。"
+    },
+    "appearance": {
+      "align": "タイトルの配置",
+      "align_center": "中央",
+      "align_left": "左",
+      "background": "行の背景",
+      "bold": "太字",
+      "button": "礼拝順序をカスタマイズ",
+      "categorySection": "カテゴリーの行",
+      "default": "標準",
+      "openStage": "投影をカスタマイズ（ステージ）",
+      "reset": "標準に戻す",
+      "showSubtitle": "サブタイトルを表示",
+      "showTime": "時刻を表示",
+      "size": "タイトルのサイズ",
+      "size_lg": "大",
+      "size_md": "中",
+      "size_sm": "小",
+      "size_xl": "特大",
+      "title": "礼拝順序をカスタマイズ",
+      "titleColor": "タイトルの色",
+      "typesHint": "この画面の礼拝順序リストに適用されます。",
+      "typesSection": "項目の種類ごとの色",
+      "uppercase": "大文字"
+    },
+    "transfer": {
+      "append": "追加",
+      "confirmMessage": "この週にはすでに項目があります。ファイルの礼拝順序で置き換えますか？それとも各日の最後に追加しますか？",
+      "confirmTitle": "礼拝順序を読み込む",
+      "export": "礼拝順序を書き出す",
+      "exportHint": "週の礼拝順序（日〜土と単発）を .json ファイルに保存します",
+      "exported": "週の礼拝順序を書き出しました。",
+      "group": "礼拝順序の書き出しと読み込み",
+      "import": "礼拝順序を読み込む",
+      "importHint": "書き出した礼拝順序ファイル（.json）を開きます",
+      "imported": "礼拝順序を読み込みました。",
+      "invalid": "このファイルは Louvor JA で書き出した礼拝順序ではありません。",
+      "replace": "置き換える",
+      "version": "この礼拝順序は新しいバージョンのアプリで書き出されています。読み込むにはアプリを更新してください。"
     }
   }
 }

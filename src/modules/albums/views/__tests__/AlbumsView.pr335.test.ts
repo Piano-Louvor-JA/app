@@ -138,6 +138,8 @@ function useAlbumsMockFactory() {
       playAllInActiveCollection: vi.fn(async () => true),
       playAllInCategory: vi.fn(async () => true),
       openCollection: vi.fn(async () => true),
+      isAlbumDisabled: vi.fn(() => false),
+      setAlbumDisabled: vi.fn(),
     }
 }
 
@@ -664,7 +666,8 @@ describe('AlbumsView', () => {
     await flushPromises()
     expect(pushMock).toHaveBeenCalledWith({ name: 'media' })
     // o nome da playlist vai para o título do player
-    expect(playQueueMock).toHaveBeenCalledWith(expect.any(Array), 0, undefined, 'Com faixas')
+    // Play = com áudio (explícito: não herda o modo da música anterior).
+    expect(playQueueMock).toHaveBeenCalledWith(expect.any(Array), 0, 'audio', 'Com faixas')
     // remover faixa: o X pede confirmação; só sai depois de confirmar
     ;((body().querySelector('.albums-view__playlist') as HTMLElement).querySelector('.albums-view__playlist-track-remove') as HTMLElement).click()
     await flushPromises()
@@ -676,6 +679,26 @@ describe('AlbumsView', () => {
     ;((body().querySelector('.albums-view__playlist') as HTMLElement).querySelector('.albums-view__playlist-toggle') as HTMLElement).click()
     await flushPromises()
     expect(body().querySelector('.albums-view__playlist-tracks')).toBeNull()
+    w.unmount()
+  })
+
+  it('playlist: tocar com playback (instrumental) e sem áudio (só os slides)', async () => {
+    savePlaylists([
+      { id: 'pl-m', name: 'Culto', createdAt: '2026-01-01', items: [{ musicId: 7, title: 'Santo', track: 1 }] },
+    ])
+    const w = await mountView()
+    const btn = w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.playlists.title')!
+    await btn.trigger('click')
+    await flushPromises()
+    const row = body().querySelector('.albums-view__playlist') as HTMLElement
+    playQueueMock.mockClear()
+    ;(row.querySelector('[data-test="playlist-play-instrumental"]') as HTMLElement).click()
+    await flushPromises()
+    expect(playQueueMock).toHaveBeenLastCalledWith(expect.any(Array), 0, 'instrumental', 'Culto')
+    ;(row.querySelector('[data-test="playlist-play-no-audio"]') as HTMLElement).click()
+    await flushPromises()
+    expect(playQueueMock).toHaveBeenLastCalledWith(expect.any(Array), 0, 'no_audio', 'Culto')
+    expect(pushMock).toHaveBeenCalledWith({ name: 'media' })
     w.unmount()
   })
 

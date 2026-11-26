@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import type { LiturgyAppearance } from '../services/liturgy-appearance'
 import type { LiturgyItem } from '../types/liturgy'
 import type { OnlineVideoItemStatus } from '@/shared/types/desktop-bridge'
 import { getCategoryBlockEnd } from '../services/liturgy-item-helpers'
@@ -27,6 +28,8 @@ const props = defineProps<{
   >
   /** Item → cópia baixada do vídeo do YouTube. */
   offlineStatusByItemId?: Record<string, OnlineVideoItemStatus>
+  /** Aparência da lista (personalização da liturgia). */
+  appearance?: LiturgyAppearance
 }>()
 
 const emit = defineEmits<{
@@ -43,6 +46,10 @@ const emit = defineEmits<{
   musicInstrumental: [index: number]
   musicSlides: [index: number]
   musicLyric: [index: number]
+  playlistPlay: [index: number]
+  playlistInstrumental: [index: number]
+  playlistNoAudio: [index: number]
+  playlistShuffle: [index: number]
   setPlayer: [index: number, playerId: string]
 }>()
 
@@ -266,6 +273,7 @@ function isCategorySectionInProgress(categoryId: string): boolean {
         <LiturgyTimelineItem
           v-if="segment.kind === 'item'"
           :item="segment.entry.item"
+          :appearance="appearance"
           :index="segment.entry.index"
           :selected="selectedIndex === segment.entry.index"
           :site-projecting="siteProjectionItemId === segment.entry.item.id"
@@ -323,6 +331,10 @@ function isCategorySectionInProgress(categoryId: string): boolean {
           @music-instrumental="emit('musicInstrumental', segment.entry.index)"
           @music-slides="emit('musicSlides', segment.entry.index)"
           @music-lyric="emit('musicLyric', segment.entry.index)"
+          @playlist-play="emit('playlistPlay', segment.entry.index)"
+          @playlist-instrumental="emit('playlistInstrumental', segment.entry.index)"
+          @playlist-no-audio="emit('playlistNoAudio', segment.entry.index)"
+          @playlist-shuffle="emit('playlistShuffle', segment.entry.index)"
           @set-player="emit('setPlayer', segment.entry.index, $event)"
           @drag-start="onDragStart"
           @drag-end="onDragEnd"
@@ -341,6 +353,7 @@ function isCategorySectionInProgress(categoryId: string): boolean {
             v-for="child in segment.children"
             :key="child.item.id"
             :item="child.item"
+            :appearance="appearance"
             :index="child.index"
             :selected="selectedIndex === child.index"
             :site-projecting="siteProjectionItemId === child.item.id"
@@ -364,6 +377,10 @@ function isCategorySectionInProgress(categoryId: string): boolean {
             @music-instrumental="emit('musicInstrumental', child.index)"
             @music-slides="emit('musicSlides', child.index)"
             @music-lyric="emit('musicLyric', child.index)"
+            @playlist-play="emit('playlistPlay', child.index)"
+            @playlist-instrumental="emit('playlistInstrumental', child.index)"
+            @playlist-no-audio="emit('playlistNoAudio', child.index)"
+            @playlist-shuffle="emit('playlistShuffle', child.index)"
             @set-player="emit('setPlayer', child.index, $event)"
             @drag-start="onDragStart"
             @drag-end="onDragEnd"
@@ -475,7 +492,8 @@ function isCategorySectionInProgress(categoryId: string): boolean {
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
-  padding-left: 0.15rem;
+  /* Espaço para o botão de recolher da categoria (mais largo que a caixinha). */
+  padding-left: 0.6rem;
   padding-right: 0.35rem;
   padding-bottom: 0.5rem;
   width: 100%;
@@ -490,7 +508,7 @@ function isCategorySectionInProgress(categoryId: string): boolean {
 
 .liturgy-timeline__line {
   position: absolute;
-  left: 0.55rem;
+  left: 1rem;
   top: 1rem;
   bottom: 0.4rem;
   width: 2px;

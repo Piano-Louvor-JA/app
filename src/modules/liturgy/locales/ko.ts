@@ -114,7 +114,8 @@ export default {
       "other_files": "기타",
       "online_video": "YouTube/Vimeo 등",
       "site": "사이트/SNS",
-      "verse": "성경 구절"
+      "verse": "성경 구절",
+      "playlist": "재생목록"
     },
     "typeDescriptions": {
       "category": "항목은 예배 순서의 각 부분을 시각적으로 나누는 구분입니다.",
@@ -131,7 +132,8 @@ export default {
       "other_files": "기타 로컬 파일",
       "online_video": "온라인 동영상(YouTube, Vimeo 등)",
       "site": "웹사이트 및 SNS",
-      "verse": "성경 구절"
+      "verse": "성경 구절",
+      "playlist": "미디어 센터의 곡 대기열"
     },
     "dialog": {
       "title": "새 순서",
@@ -240,7 +242,11 @@ export default {
       "searchMusic": "성가 검색…",
       "musicMode": "모드",
       "musicModeAudio": "오디오",
-      "musicModeInstrumental": "반주"
+      "musicModeInstrumental": "반주",
+      "albumDisabled": "비활성 앨범",
+      "playlistPlaceholder": "재생목록 선택",
+      "playlistRequired": "재생목록을 선택하세요.",
+      "selectPlaylist": "재생목록 선택"
     },
     "namePlaceholders": {
       "category": "예: 개회 사회, 예배 시작, 환영, 안식일 학교, 안식일 예배…",
@@ -256,7 +262,8 @@ export default {
       "other_files": "예: 보조 파일",
       "online_video": "예: YouTube의 찬송가",
       "site": "예: 교회 페이지",
-      "verse": "출처 또는 제목"
+      "verse": "출처 또는 제목",
+      "playlist": "예: 여는 찬양"
     },
     "actions": {
       "save": "저장",
@@ -301,7 +308,12 @@ export default {
       "collapseCategory": "항목 접기",
       "expandCategory": "항목 펼치기",
       "addSubItem": "하위 항목 추가",
-      "reorder": "드래그하여 순서 변경"
+      "reorder": "드래그하여 순서 변경",
+      "playlistControls": "재생목록 제어",
+      "playlistInstrumental": "반주로 재생",
+      "playlistNoAudio": "소리 없이 재생(슬라이드만)",
+      "playlistPlay": "재생목록 재생",
+      "playlistShuffle": "무작위 재생"
     },
     "messages": {
       "removeItemTitle": "순서에서 항목 삭제",
@@ -358,7 +370,16 @@ export default {
       "urlInvalid": "이 URL은 투영에 사용할 수 없습니다.",
       "projectionFailed": "설정된 화면에서 투영을 열지 못했습니다.",
       "fileMissingOnMachine": "이 컴퓨터에서 파일을 찾을 수 없습니다 — 다른 컴퓨터의 경로입니다(동기화된 순서). 이 기기에서 다시 선택하세요.",
-      "presentationOfficeMissing": "PPT/PPTX 투영에는 LibreOffice를 설치하거나 LIBREOFFICE_PATH를 설정하세요."
+      "presentationOfficeMissing": "PPT/PPTX 투영에는 LibreOffice를 설치하거나 LIBREOFFICE_PATH를 설정하세요.",
+      "dropDesktopOnly": "예배 순서로 파일 끌어다 놓기는 데스크톱 앱에서만 됩니다.",
+      "dropHint": "여기에 파일을 놓아 예배 순서에 추가",
+      "dropMoreFilesPending": "첫 번째 파일을 창에서 열었습니다. 필요하면 저장한 뒤 나머지를 다시 놓으세요.",
+      "dropPathFailed": "놓은 파일의 경로를 읽지 못했습니다. ‘추가’를 눌러 파일을 선택하세요.",
+      "playlistCatalogEmpty": "아직 재생목록이 없습니다. 미디어 센터(재생목록)에서 만드세요.",
+      "playlistEmpty": "이 재생목록은 비어 있습니다. 미디어 센터에서 곡을 추가하세요.",
+      "playlistMissing": "재생목록을 찾을 수 없습니다. 미디어 센터에서 다른 것을 고르세요.",
+      "playlistTrackCount": "{count}곡",
+      "playlistTrackCountOne": "1곡"
     },
     "slja": {
       "importButton": ".slja 가져오기",
@@ -374,6 +395,45 @@ export default {
       "new": "새 사용자 지정 순서",
       "namePlaceholder": "순서 이름(예: 청년 예배 12/07)",
       "empty": "사용자 지정 순서가 없습니다. 첫 번째를 만들어 보세요."
+    },
+    "appearance": {
+      "align": "제목 정렬",
+      "align_center": "가운데",
+      "align_left": "왼쪽",
+      "background": "행 배경",
+      "bold": "굵게",
+      "button": "예배 순서 꾸미기",
+      "categorySection": "분류 행",
+      "default": "기본값",
+      "openStage": "프로젝션 꾸미기(무대)",
+      "reset": "기본값 복원",
+      "showSubtitle": "부제목 표시",
+      "showTime": "시간 표시",
+      "size": "제목 크기",
+      "size_lg": "크게",
+      "size_md": "보통",
+      "size_sm": "작게",
+      "size_xl": "아주 크게",
+      "title": "예배 순서 꾸미기",
+      "titleColor": "제목 색",
+      "typesHint": "이 화면의 예배 순서 목록에 적용됩니다.",
+      "typesSection": "항목 종류별 색",
+      "uppercase": "대문자"
+    },
+    "transfer": {
+      "append": "추가",
+      "confirmMessage": "이번 주에 이미 항목이 있습니다. 파일의 예배 순서로 바꿀까요, 아니면 각 요일 끝에 추가할까요?",
+      "confirmTitle": "예배 순서 가져오기",
+      "export": "예배 순서 내보내기",
+      "exportHint": "한 주의 예배 순서(일~토와 단독)를 .json 파일로 저장합니다",
+      "exported": "이번 주 예배 순서를 내보냈습니다.",
+      "group": "예배 순서 내보내기와 가져오기",
+      "import": "예배 순서 가져오기",
+      "importHint": "내보낸 예배 순서 파일(.json)을 엽니다",
+      "imported": "예배 순서를 가져왔습니다.",
+      "invalid": "이 파일은 Louvor JA에서 내보낸 예배 순서가 아닙니다.",
+      "replace": "바꾸기",
+      "version": "이 예배 순서는 더 새로운 앱 버전에서 내보낸 것입니다. 가져오려면 앱을 업데이트하세요."
     }
   }
 }

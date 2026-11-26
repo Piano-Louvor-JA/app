@@ -2759,6 +2759,8 @@ export async function getSourcePlaybackState() {
     if (!state || typeof state !== 'object') return null
     return {
       ...state,
+      // Título do vídeo aberto (liturgia ou módulo YouTube) para o controle remoto.
+      title: currentSourceTitle,
       audioOnly: currentSourceAudioOnly,
       audioOutput: currentSourceAudioOnly ? 'player' : getAudioOutputMode(),
       canControlCaptions: currentSourceHasCaptions,

@@ -114,7 +114,8 @@ export default {
       "other_files": "Others",
       "online_video": "YouTube/Vimeo/Others",
       "site": "Websites/Social Media",
-      "verse": "Verse"
+      "verse": "Verse",
+      "playlist": "قائمة تشغيل"
     },
     "typeDescriptions": {
       "category": "Categories serve as visual dividers between liturgy sections.",
@@ -131,7 +132,8 @@ export default {
       "other_files": "Other local files",
       "online_video": "Online video (YouTube, Vimeo and others)",
       "site": "Websites and social media",
-      "verse": "Bible verse"
+      "verse": "Bible verse",
+      "playlist": "قائمة ترانيم من مركز الوسائط"
     },
     "dialog": {
       "title": "New Moment",
@@ -240,7 +242,11 @@ export default {
       "searchMusic": "Search song…",
       "musicMode": "Mode",
       "musicModeAudio": "Audio",
-      "musicModeInstrumental": "Instrumental"
+      "musicModeInstrumental": "Instrumental",
+      "albumDisabled": "ألبوم معطّل",
+      "playlistPlaceholder": "اختر قائمة تشغيل",
+      "playlistRequired": "اختر قائمة تشغيل.",
+      "selectPlaylist": "اختيار قائمة التشغيل"
     },
     "namePlaceholders": {
       "category": "e.g.: Opening Leading, Service Start, Welcome, Sabbath School, Divine Service, etc...",
@@ -256,7 +262,8 @@ export default {
       "other_files": "e.g.: Auxiliary file",
       "online_video": "e.g.: Hymn on YouTube",
       "site": "e.g.: Church page",
-      "verse": "Reference or title"
+      "verse": "Reference or title",
+      "playlist": "مثال: تسبيح الافتتاح"
     },
     "actions": {
       "save": "Save",
@@ -301,7 +308,12 @@ export default {
       "collapseCategory": "Collapse category",
       "expandCategory": "Expand category",
       "addSubItem": "Add sub-item",
-      "reorder": "Drag to reorder"
+      "reorder": "Drag to reorder",
+      "playlistControls": "عناصر التحكم في قائمة التشغيل",
+      "playlistInstrumental": "تشغيل بالموسيقى المرافقة",
+      "playlistNoAudio": "تشغيل بدون صوت (الشرائح فقط)",
+      "playlistPlay": "تشغيل قائمة التشغيل",
+      "playlistShuffle": "تشغيل عشوائي"
     },
     "messages": {
       "removeItemTitle": "Remove item from liturgy",
@@ -358,7 +370,16 @@ export default {
       "urlInvalid": "The provided link is not valid for projection.",
       "projectionFailed": "Could not open projection on the configured screens.",
       "fileMissingOnMachine": "File not found on this machine — the path came from another computer (synced liturgy). Select the file again on this device.",
-      "presentationOfficeMissing": "To project PPT/PPTX, install LibreOffice (or set LIBREOFFICE_PATH)."
+      "presentationOfficeMissing": "To project PPT/PPTX, install LibreOffice (or set LIBREOFFICE_PATH).",
+      "dropDesktopOnly": "سحب الملفات إلى الليتورجيا يعمل فقط في تطبيق سطح المكتب.",
+      "dropHint": "أفلت الملفات هنا لإضافتها إلى الليتورجيا",
+      "dropMoreFilesPending": "تم فتح الملف الأول في النافذة. أفلت الباقي مرة أخرى بعد الحفظ إذا لزم.",
+      "dropPathFailed": "تعذّرت قراءة مسارات الملفات المُفلتة. استخدم «إضافة» واختر الملف.",
+      "playlistCatalogEmpty": "لا توجد قوائم تشغيل بعد. أنشئ واحدة في مركز الوسائط (قوائم التشغيل).",
+      "playlistEmpty": "قائمة التشغيل هذه فارغة. أضف ترانيم في مركز الوسائط.",
+      "playlistMissing": "لم يتم العثور على قائمة التشغيل. اختر أخرى في مركز الوسائط.",
+      "playlistTrackCount": "{count} ترانيم",
+      "playlistTrackCountOne": "ترنيمة واحدة"
     },
     "slja": {
       "importButton": "Import .slja",
@@ -374,6 +395,45 @@ export default {
       "new": "New custom liturgy",
       "namePlaceholder": "Liturgy name (e.g.: Youth Service 12/07)",
       "empty": "No custom liturgy. Create one to get started."
+    },
+    "appearance": {
+      "align": "محاذاة العنوان",
+      "align_center": "في الوسط",
+      "align_left": "إلى اليسار",
+      "background": "خلفية الصف",
+      "bold": "عريض",
+      "button": "تخصيص الليتورجيا",
+      "categorySection": "صفوف الفئات",
+      "default": "الافتراضي",
+      "openStage": "تخصيص العرض (المسرح)",
+      "reset": "استعادة الافتراضي",
+      "showSubtitle": "إظهار العنوان الفرعي",
+      "showTime": "إظهار الوقت",
+      "size": "حجم العنوان",
+      "size_lg": "كبير",
+      "size_md": "متوسط",
+      "size_sm": "صغير",
+      "size_xl": "كبير جدًا",
+      "title": "تخصيص الليتورجيا",
+      "titleColor": "لون العنوان",
+      "typesHint": "يُطبَّق على قائمة الليتورجيا في هذه الشاشة.",
+      "typesSection": "لون كل نوع من العناصر",
+      "uppercase": "أحرف كبيرة"
+    },
+    "transfer": {
+      "append": "إضافة",
+      "confirmMessage": "يحتوي الأسبوع على عناصر بالفعل. هل تريد استبدالها بليتورجيا الملف أم إضافة عناصره في نهاية كل يوم؟",
+      "confirmTitle": "استيراد الليتورجيا",
+      "export": "تصدير الليتورجيا",
+      "exportHint": "يحفظ ليتورجيا الأسبوع (من الأحد إلى السبت والمنفردة) في ملف .json",
+      "exported": "تم تصدير ليتورجيا الأسبوع.",
+      "group": "تصدير الليتورجيا واستيرادها",
+      "import": "استيراد الليتورجيا",
+      "importHint": "يفتح ملف ليتورجيا مُصدَّرًا (.json)",
+      "imported": "تم استيراد الليتورجيا.",
+      "invalid": "هذا الملف ليس ليتورجيا مُصدَّرة من Louvor JA.",
+      "replace": "استبدال",
+      "version": "صُدِّرت هذه الليتورجيا من إصدار أحدث للتطبيق. حدّث التطبيق لاستيرادها."
     }
   }
 }

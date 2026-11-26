@@ -338,6 +338,35 @@ describe('buildLiturgyItemFromDraft', () => {
     presentationEngine: 'auto',
   }
 
+  it('anotação automática (nome do arquivo/link) não volta como anotação ao editar', () => {
+    const video = buildLiturgyItemFromDraft(
+      { ...baseDraft, type: 'video', name: 'Santo Terço', subtitle: '', filePath: '/v/Santo Terco_tNnlPekA04k.mp4' },
+      ctx,
+    )
+    // Vídeo sem anotação: nada de nome do arquivo (nem na linha, nem ao editar).
+    expect(video.subtitle).toBe('')
+    expect(draftFromLiturgyItem(video).subtitle).toBe('')
+    // Vídeo salvo antes (com o nome do arquivo no subtítulo): editar vem vazio.
+    expect(draftFromLiturgyItem({ ...video, subtitle: 'Santo Terco_tNnlPekA04k.mp4' }).subtitle).toBe('')
+
+    const images = buildLiturgyItemFromDraft({ ...baseDraft, type: 'images', subtitle: '', filePaths: ['/a.png', '/b.png'] }, ctx)
+    expect(draftFromLiturgyItem(images).subtitle).toBe('')
+    expect(images.subtitle).toBe('')
+    const yt = buildLiturgyItemFromDraft({ ...baseDraft, type: 'online_video', subtitle: '', url: 'https://youtu.be/B4kXnads4eU' }, ctx)
+    expect(yt.subtitle).toBe('')
+    const site = buildLiturgyItemFromDraft({ ...baseDraft, type: 'site', subtitle: '', url: 'https://example.com' }, ctx)
+    expect(site.subtitle).toBe('')
+    expect(draftFromLiturgyItem(site).subtitle).toBe('')
+  })
+
+  it('anotação escrita pelo operador continua ao editar', () => {
+    const video = buildLiturgyItemFromDraft(
+      { ...baseDraft, type: 'video', subtitle: 'Passar só até 10:00', filePath: '/v/a.mp4' },
+      ctx,
+    )
+    expect(draftFromLiturgyItem(video).subtitle).toBe('Passar só até 10:00')
+  })
+
   it('sem tipo: throw', () => {
     expect(() => buildLiturgyItemFromDraft({ ...baseDraft, type: null }, ctx)).toThrow()
   })
@@ -437,7 +466,7 @@ describe('buildLiturgyItemFromDraft', () => {
       ctx,
     )
     expect(built.filePaths).toEqual(['/img/a.png', '/img/b.png'])
-    expect(built.subtitle).toBe('2 imagens')
+    expect(built.subtitle).toBe('')
   })
 
   it('images 1 path: subtitle = filename', () => {
@@ -445,7 +474,7 @@ describe('buildLiturgyItemFromDraft', () => {
       { ...baseDraft, type: 'images', filePaths: ['/img/foto.png'] },
       ctx,
     )
-    expect(built.subtitle).toBe('foto.png')
+    expect(built.subtitle).toBe('')
   })
 
   it('video: playerId default não persiste', () => {
@@ -487,7 +516,7 @@ describe('buildLiturgyItemFromDraft', () => {
       ctx,
     )
     expect(built.url).toBe('https://exemplo.com')
-    expect(built.subtitle).toBe('https://exemplo.com')
+    expect(built.subtitle).toBe('')
   })
 })
 
@@ -832,7 +861,7 @@ describe('mutação round 3 — buildLiturgyItemFromDraft branch最深', () => {
       { ...base, type: 'images', filePaths: ['/x/um.jpg', '/x/dois.jpg'] } as LiturgyItemDraft,
       ctx,
     )
-    expect(built.subtitle).toBe('2 imagens')
+    expect(built.subtitle).toBe('')
   })
 
   it('video playerId default: NÃO persiste', () => {
@@ -856,16 +885,16 @@ describe('mutação round 3 — buildLiturgyItemFromDraft branch最深', () => {
       { ...base, type: 'pdf', filePath: '/docs/manual.pdf' } as unknown as LiturgyItemDraft,
       ctx,
     )
-    expect(built.subtitle).toBe('manual.pdf')
+    expect(built.subtitle).toBe('')
   })
 
-  it('online_video com url sem details: subtitle = url', () => {
+  it('online_video com url sem details: sem subtítulo (a URL não aparece)', () => {
     const built = buildLiturgyItemFromDraft(
       { ...base, type: 'online_video', url: ' https://v.com/x ' } as LiturgyItemDraft,
       ctx,
     )
     expect(built.url).toBe('https://v.com/x')
-    expect(built.subtitle).toBe('https://v.com/x')
+    expect(built.subtitle).toBe('')
   })
 })
 

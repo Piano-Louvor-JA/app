@@ -1,3 +1,4 @@
+import { albumDisableKey } from '@modules/albums/services/disabled-albums'
 import { fetchRemoteCatalogJson } from '@shared/services/remote-catalog'
 import { readCatalogRecord } from '@shared/services/workspace-api'
 import { getCurrentApiPrefix } from '@modules/sync/services/library-catalog'
@@ -56,6 +57,24 @@ type CatalogBibleBookRow = {
   id_bible_book?: number | string
   name?: string
   chapters?: number | string
+}
+
+function mergeAlbumKeys(...lists: Array<string[] | undefined>): string[] {
+  return [...new Set(lists.flatMap((list) => list ?? []))]
+}
+
+/** Chaves dos álbuns de uma linha do índice (ids dos álbuns + hinários pelo nome). */
+function indexAlbumKeys(row: CatalogMusicIndexRow): string[] {
+  const keys: string[] = []
+  for (const album of Array.isArray(row.albums) ? row.albums : []) {
+    const key = albumDisableKey(album)
+    if (key) keys.push(key)
+  }
+  for (const name of String(row.albums_names ?? '').split(/\s*[·,]\s*/)) {
+    const key = name ? albumDisableKey({ name }) : null
+    if (key) keys.push(key)
+  }
+  return mergeAlbumKeys(keys)
 }
 
 function hymnalSources(prefix: string): Array<{ file: string; albumName: string }> {
@@ -119,16 +138,22 @@ function parseTrack(raw: unknown): number | null {
   return Number.isFinite(trackRaw) ? trackRaw : null
 }
 
+/** Chave sem acento e sem maiúsculas: "Hinario" e "Hinário" são o mesmo álbum. */
+function albumKey(name: string): string {
+  return name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+}
+
+/** Junta os nomes dos álbuns sem repetir (mantém a 1ª forma que aparecer). */
 function joinAlbumNames(...parts: Array<string | null | undefined>): string {
-  const names = new Set<string>()
+  const names = new Map<string, string>()
   for (const part of parts) {
     if (!part) continue
     for (const name of part.split(/\s*[·|,]\s*/)) {
       const trimmed = name.trim()
-      if (trimmed) names.add(trimmed)
+      if (trimmed && !names.has(albumKey(trimmed))) names.set(albumKey(trimmed), trimmed)
     }
   }
-  return [...names].join(' · ')
+  return [...names.values()].join(' · ')
 }
 
 function buildDisplayLabel(name: string, hymnalTrack: number | null): string {
@@ -161,13 +186,14 @@ function upsertMusicOption(
     displayLabel: buildDisplayLabel(existing.name, hymnalTrack),
     durationMs: existing.durationMs ?? option.durationMs,
     hasInstrumental: existing.hasInstrumental || option.hasInstrumental,
+    albumKeys: mergeAlbumKeys(existing.albumKeys, option.albumKeys),
   })
 }
 
 function mapMusicOption(
   row: CatalogHymnalRow,
   albumName: string,
-  options?: { useTrackInLabel?: boolean },
+  options?: { useTrackInLabel?: boolean; albumKey?: string | null },
 ): LiturgyMusicOption | null {
   const id = Number(row.id_music)
   if (!Number.isFinite(id)) return null
@@ -185,6 +211,7 @@ function mapMusicOption(
     displayLabel: buildDisplayLabel(name, hymnalTrack),
     durationMs: parseCatalogDurationMs(row.duration),
     hasInstrumental: hasInstrumentalFlag(row),
+    albumKeys: options?.albumKey ? [options.albumKey] : [],
   }
 }
 
@@ -204,9 +231,8 @@ function mapMusicIndexRow(row: CatalogMusicIndexRow): LiturgyMusicOption | null 
     ) || i18n.global.t('liturgy.fallback.music')
 
   const hymnalTrack = parseTrack(row.track)
-  const isHymnalAlbum =
-    albumNames.includes('Hinário Adventista') ||
-    albumNames.includes('Hinário Adventista 1996')
+  // Sem acento: o nome pode vir "Hinario Adventista" (sem o á).
+  const isHymnalAlbum = albumKey(albumNames).includes('hinario adventista')
 
   // Issue #348: letra já vem no índice `${prefix}_musics` — propaga
   // normalizada (fold diacrítico) p/ a busca casar "nao temas" com "não temas".
@@ -226,6 +252,7 @@ function mapMusicIndexRow(row: CatalogMusicIndexRow): LiturgyMusicOption | null 
     durationMs: parseCatalogDurationMs(row.duration),
     hasInstrumental: hasInstrumentalFlag(row),
     lyricsText,
+    albumKeys: indexAlbumKeys(row),
   }
 }
 
@@ -254,6 +281,7 @@ async function loadHymnalOptions(
     for (const row of rows) {
       const mapped = mapMusicOption(row, source.albumName, {
         useTrackInLabel: true,
+        albumKey: albumDisableKey({ name: source.albumName }),
       })
       if (mapped) upsertMusicOption(byId, mapped)
     }
@@ -295,6 +323,7 @@ async function loadCollectionOptions(
         for (const row of record.musics) {
           const mapped = mapMusicOption(row, resolvedName, {
             useTrackInLabel: false,
+            albumKey: String(albumId),
           })
           if (mapped) upsertMusicOption(byId, mapped)
         }
@@ -434,6 +463,7 @@ export function filterLiturgyMusicOptions(
   options: Array<LiturgyMusicOption | MusicSearchEntry>,
   query: string,
   selectedId: number | null,
+  disabledAlbums: ReadonlySet<string> = new Set(),
 ): MusicSearchEntry[] {
   const selected =
     options.find((entry) => entry.id === selectedId) ?? null
@@ -442,5 +472,5 @@ export function filterLiturgyMusicOptions(
     return selected ? [selected as MusicSearchEntry] : []
   }
 
-  return searchLiturgyMusic(options, query)
+  return searchLiturgyMusic(options, query, disabledAlbums)
 }

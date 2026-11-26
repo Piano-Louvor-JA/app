@@ -225,6 +225,9 @@ function ownerInput(): ProjectionInput | { timer: TimerOpts } | null {
         footerRef: '',
         background: bgOrResolved(r.imageUrl),
         isCover: r.isCover === true,
+        slideIndex: r.slideIndex,
+        hymnNumber: r.isCover === true ? r.hymnNumber ?? undefined : undefined,
+        hymnalName: r.isCover === true ? coverName(r.title, r.subtitle) : undefined,
       }
     }
     case 'bible': {
@@ -289,6 +292,9 @@ async function renderModuleTo(m: 'bible' | 'media', slotId: string): Promise<voi
     footerRef: '',
     background: bgOrResolved(r.imageUrl),
     isCover: r.isCover === true,
+    slideIndex: r.slideIndex,
+    hymnNumber: r.isCover === true ? r.hymnNumber ?? undefined : undefined,
+    hymnalName: r.isCover === true ? coverName(r.title, r.subtitle) : undefined,
   })
 }
 
@@ -606,6 +612,13 @@ function bindChannel<T>(
     }
   }, 2000)
   unwatchers.push(() => window.clearInterval(poll))
+}
+
+/** Nome do hinário/álbum na capa; igual ao título não repete (regra dos monitores). */
+function coverName(title: string, subtitle: string): string | undefined {
+  const name = (subtitle || '').trim()
+  if (!name) return undefined
+  return name.localeCompare((title || '').trim(), undefined, { sensitivity: 'accent' }) === 0 ? undefined : name
 }
 
 export function startPalcoBridge() {
