@@ -30,7 +30,7 @@ import { networkInterfaces } from 'node:os'
 import { createHash } from 'node:crypto'
 import path from 'node:path'
 import { readFile, stat } from 'node:fs/promises'
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 import { app, ipcMain } from 'electron'
@@ -423,6 +423,10 @@ class PalcoSlot {
               this.#notifyClients()
               // Espelho/OBS/retorno: se a aba ficou com HTML antigo após o app
               // reiniciar, força 1 reload (WS reconecta sem recarregar a página).
+              // Relê o carimbo: receiver.html trocado com o app aberto (dev/update).
+              try {
+                this.#receiverBuild = String(Math.trunc(statSync(path.join(__dirname, 'palco', 'receiver.html')).mtimeMs))
+              } catch { /* sem receiver: mantém o carimbo */ }
               if (this.#receiverBuild && message.rxBuild !== this.#receiverBuild && !this.#reloadAsked.has(ws)) {
                 this.#reloadAsked.add(ws)
                 this.#sendTo(ws, { v: 2, type: 'obsControl', action: 'reload', requestId: this.#receiverBuild })
