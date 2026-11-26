@@ -37,6 +37,22 @@ export default {
     "toneMinDurationWarning": "音声の全長より時間が短いです（{min}）。アラートが重なる可能性があります。",
     "markerOffsetLabel": "アラートが鳴る残り分数",
     "markerPresetLabel": "アラート音",
+    "presetNone": "— 無効 —",
+
+    "presetAbertura": "開会（LouvorJA公式）",
+
+    "preset5min": "5分（LouvorJA公式）",
+
+    "preset1min": "1分（LouvorJA公式）",
+
+    "presetBeep": "ビープ（合成）",
+
+    "presetChime": "チャイム（合成）",
+
+    "presetGong": "ゴング（合成）",
+
+    "presetCustom": "端末のカスタム音声",
+
     "markerGroupPresets": "デフォルトの音",
     "markerGroupLibrary": "マイ音声",
     "markerPreview": "アラートを試聴",

@@ -8,6 +8,18 @@ export default {
       "empty": "لا مجموعات بعد. استورد ملف .slja في المحرر.",
       "emptyHint": "لا قوائم تشغيل لديك بعد.",
       "createHint": "أنشئ واحدة في قسم قوائم التشغيل بالمكتبة.",
+      "importedList": "تم الاستيراد: {parts}.",
+
+      "importedNewPlaylists": "{count} قائمة تشغيل جديدة",
+
+
+      "importedAddedTracks": "أُضيفت {count} مقطوعة",
+
+
+
+
+      "importedNothingNew": "لا يوجد جديد للاستيراد.",
+
       "importInvalid": "ملف قوائم تشغيل غير صالح.",
       "newPlaceholder": "اسم مجموعة جديدة…",
       "create": "إنشاء",
@@ -73,6 +85,10 @@ export default {
       "close": "إغلاق الكلمات"
     },
     "messages": {
+      convite_catalogo: 'الكتالوج الموسيقي غير متوفر بلغتك بعد. انضم إلى المجتمع وساعد في بناء كتالوج LouvorJA بلغتك.',
+      convite_titulo: 'الكتالوج قيد الإنشاء',
+      convite_hint: 'المعاينة تعرض الكتالوج بالبرتغالية — قريباً بلغتك، بمساعدتك.',
+
       "catalogEmpty": "لا مجموعة في الكتالوج المحلي.",
       "catalogFailed": "تعذّر تحميل كتالوج الألبومات.",
       "catalogSearchEmpty": "لا مجموعة تطابق هذا البحث.",

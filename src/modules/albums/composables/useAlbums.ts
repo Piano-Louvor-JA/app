@@ -21,6 +21,7 @@ export function useAlbums() {
 
   const {
     categories,
+    previewCategories,
     activeCollection,
     tracks,
     searchQuery,
@@ -182,6 +183,7 @@ export function useAlbums() {
 
   return {
     categories,
+    previewCategories,
     activeCollection,
     tracks,
     searchQuery,

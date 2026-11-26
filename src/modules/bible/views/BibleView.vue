@@ -111,7 +111,7 @@ function onSearchText(query: string) {
       v-else-if="filteredBooks.length === 0 && versions.length === 0"
       class="bible-view__state"
     >
-      {{ t('bible.emptyCatalog') }}
+      {{ t('bible.convite_catalogo') }}
     </div>
 
     <div

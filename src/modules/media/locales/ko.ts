@@ -115,6 +115,16 @@ export default {
       "audioUploadFailed": "오디오 업로드 실패",
       "audioLinked": "오디오 「{name}」을(를) 연결했습니다",
       "audioRemoveFailed": "오디오 제거 실패",
+      "collectionRenamedToast": "컬렉션 이름이 변경되었습니다",
+
+      "renameCollectionFailed": "컬렉션 이름 변경 실패",
+
+      "singlesPrepareFailed": "싱글 컬렉션 준비 실패",
+
+      "singleCreateFailed": "싱글 생성 실패",
+
+      "singleCoverUpdated": "싱글 커버가 업데이트되었습니다",
+
       "audioRemoved": "오디오를 제거했습니다",
       "showPanels": "패널 보기",
       "hidePanels": "패널 숨기기",

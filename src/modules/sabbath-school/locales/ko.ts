@@ -37,6 +37,22 @@ export default {
     "toneMinDurationWarning": "오디오 전체 길이보다 짧습니다({min}). 알림이 겹칠 수 있습니다.",
     "markerOffsetLabel": "알림이 울리는 남은 분",
     "markerPresetLabel": "알림 소리",
+    "presetNone": "— 비활성화 —",
+
+    "presetAbertura": "개회 (LouvorJA 공식)",
+
+    "preset5min": "5분 (LouvorJA 공식)",
+
+    "preset1min": "1분 (LouvorJA 공식)",
+
+    "presetBeep": "비프 (합성)",
+
+    "presetChime": "차임 (합성)",
+
+    "presetGong": "공 (합성)",
+
+    "presetCustom": "기기의 사용자 지정 오디오",
+
     "markerGroupPresets": "기본 소리",
     "markerGroupLibrary": "내 소리",
     "markerPreview": "알림 미리듣기",

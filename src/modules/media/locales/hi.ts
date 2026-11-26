@@ -115,6 +115,16 @@ export default {
       "audioUploadFailed": "ऑडियो अपलोड विफल",
       "audioLinked": "ऑडियो «{name}» जुड़ा",
       "audioRemoveFailed": "ऑडियो हटाने में विफल",
+      "collectionRenamedToast": "संग्रह का नाम बदला गया",
+
+      "renameCollectionFailed": "संग्रह का नाम बदलने में विफल",
+
+      "singlesPrepareFailed": "सिंगल्स संग्रह तैयार करने में विफल",
+
+      "singleCreateFailed": "सिंगल बनाने में विफल",
+
+      "singleCoverUpdated": "सिंगल कवर अपडेट हुआ",
+
       "audioRemoved": "ऑडियो हटाया गया",
       "showPanels": "पैनल दिखाएँ",
       "hidePanels": "पैनल छिपाएँ",

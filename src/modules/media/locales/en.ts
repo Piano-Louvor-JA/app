@@ -115,6 +115,16 @@ export default {
       "audioUploadFailed": "Failed to upload audio",
       "audioLinked": "Audio “{name}” linked",
       "audioRemoveFailed": "Failed to remove audio",
+      "collectionRenamedToast": "Collection renamed",
+
+      "renameCollectionFailed": "Failed to rename collection",
+
+      "singlesPrepareFailed": "Failed to prepare Singles collection",
+
+      "singleCreateFailed": "Failed to create single",
+
+      "singleCoverUpdated": "Single cover updated",
+
       "audioRemoved": "Audio removed",
       "showPanels": "Show panels",
       "hidePanels": "Hide panels",

@@ -8,6 +8,18 @@ export default {
       "empty": "还没有歌集。请在编辑器中导入 .slja 文件。",
       "emptyHint": "您还没有任何播放列表。",
       "createHint": "在媒体库的“播放列表”部分创建一个。",
+      "importedList": "已导入：{parts}。",
+
+      "importedNewPlaylists": "{count} 个新播放列表",
+
+
+      "importedAddedTracks": "添加了 {count} 首曲目",
+
+
+
+
+      "importedNothingNew": "没有可导入的新内容。",
+
       "importInvalid": "无效的播放列表文件。",
       "newPlaceholder": "新歌集名称…",
       "create": "创建",
@@ -73,6 +85,10 @@ export default {
       "close": "关闭歌词"
     },
     "messages": {
+      convite_catalogo: '音乐目录尚不支持您的语言。欢迎加入社区，帮助构建您语言的 LouvorJA 目录。',
+      convite_titulo: '目录建设中',
+      convite_hint: '上方预览为葡萄牙语目录 — 有了您的帮助，很快会支持您的语言。',
+
       "catalogEmpty": "本地目录中未找到歌集。",
       "catalogFailed": "无法加载专辑目录。",
       "catalogSearchEmpty": "未找到匹配该搜索的歌集。",

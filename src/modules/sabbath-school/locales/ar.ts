@@ -37,6 +37,22 @@ export default {
     "toneMinDurationWarning": "المدة أقصر من طول الصوت الكلي ({min}). قد تتداخل التنبيهات.",
     "markerOffsetLabel": "الدقائق المتبقية عند إطلاق التنبيه",
     "markerPresetLabel": "صوت التنبيه",
+    "presetNone": "— معطّل —",
+
+    "presetAbertura": "الافتتاح (رسمي LouvorJA)",
+
+    "preset5min": "5 دقائق (رسمي LouvorJA)",
+
+    "preset1min": "دقيقة واحدة (رسمي LouvorJA)",
+
+    "presetBeep": "صفارة (اصطناعي)",
+
+    "presetChime": "جرس (اصطناعي)",
+
+    "presetGong": "غونغ (اصطناعي)",
+
+    "presetCustom": "صوت مخصص من الجهاز",
+
     "markerGroupPresets": "الأصوات الافتراضية",
     "markerGroupLibrary": "أصواتي",
     "markerPreview": "معاينة التنبيه",

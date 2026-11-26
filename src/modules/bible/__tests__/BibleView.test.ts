@@ -106,7 +106,7 @@ describe('BibleView', () => {
     store.books = []
     store.versions = []
     wrapper = await mountView()
-    expect(wrapper.text()).toContain('bible.emptyCatalog')
+    expect(wrapper.text()).toContain('bible.convite_catalogo')
     wrapper.unmount()
   })
 

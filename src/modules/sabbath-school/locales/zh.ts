@@ -37,6 +37,22 @@ export default {
     "toneMinDurationWarning": "时长短于音频总长度（{min}）。提醒可能会重叠。",
     "markerOffsetLabel": "提醒触发时的剩余分钟数",
     "markerPresetLabel": "提醒声音",
+    "presetNone": "— 已禁用 —",
+
+    "presetAbertura": "开场（LouvorJA 官方）",
+
+    "preset5min": "5 分钟（LouvorJA 官方）",
+
+    "preset1min": "1 分钟（LouvorJA 官方）",
+
+    "presetBeep": "提示音（合成）",
+
+    "presetChime": "钟声（合成）",
+
+    "presetGong": "锣声（合成）",
+
+    "presetCustom": "设备自定义音频",
+
     "markerGroupPresets": "默认声音",
     "markerGroupLibrary": "我的声音",
     "markerPreview": "预览提醒",

@@ -8,6 +8,18 @@ export default {
       "empty": "Aucune compilation créée pour l'instant. Importez un fichier .slja dans l'éditeur.",
       "emptyHint": "Vous n'avez pas encore de playlists.",
       "createHint": "Créez-en une dans la section Playlists de la Bibliothèque.",
+      "importedList": "Importé : {parts}.",
+
+      "importedNewPlaylists": "{count} nouvelle(s) playlist(s)",
+
+
+      "importedAddedTracks": "{count} piste(s) ajoutée(s)",
+
+
+
+
+      "importedNothingNew": "Rien de nouveau à importer.",
+
       "importInvalid": "Fichier de playlists invalide.",
       "newPlaceholder": "Nom de la nouvelle compilation...",
       "create": "Créer",
@@ -70,6 +82,10 @@ export default {
       "close": "Fermer les paroles"
     },
     "messages": {
+      convite_catalogo: 'Le catalogue musical n\'est pas encore disponible dans votre langue. Rejoignez la communauté et aidez à construire le catalogue LouvorJA dans votre langue.',
+      convite_titulo: 'Catalogue en construction',
+      convite_hint: "L'aperçu montre le catalogue en portugais — bientôt dans votre langue, avec votre aide.",
+
       "catalogEmpty": "Aucune compilation trouvée dans le catalogue local.",
       "catalogFailed": "Impossible de charger le catalogue d'albums.",
       "catalogSearchEmpty": "Aucune compilation trouvée pour cette recherche.",

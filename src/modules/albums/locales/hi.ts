@@ -8,6 +8,18 @@ export default {
       "empty": "अभी कोई संग्रह नहीं। संपादक में .slja फ़ाइल आयात करें।",
       "emptyHint": "आपकी अभी कोई प्लेलिस्ट नहीं है।",
       "createHint": "लाइब्रेरी के प्लेलिस्ट अनुभाग में बनाएँ।",
+      "importedList": "आयातित: {parts}।",
+
+      "importedNewPlaylists": "{count} नई प्लेलिस्ट",
+
+
+      "importedAddedTracks": "{count} ट्रैक जोड़े गए",
+
+
+
+
+      "importedNothingNew": "आयात करने के लिए कुछ नया नहीं है।",
+
       "importInvalid": "अमान्य प्लेलिस्ट फ़ाइल।",
       "newPlaceholder": "नया संग्रह नाम…",
       "create": "बनाएँ",
@@ -73,6 +85,10 @@ export default {
       "close": "बोल बंद करें"
     },
     "messages": {
+      convite_catalogo: 'संगीत कैटलॉग अभी आपकी भाषा में उपलब्ध नहीं है। समुदाय से जुड़ें और अपनी भाषा में LouvorJA कैटलॉग बनाने में मदद करें।',
+      convite_titulo: 'कैटलॉग निर्माणाधीन',
+      convite_hint: 'ऊपर पूर्वावलोकन पुर्तगाली कैटलॉग दिखाता है — आपकी मदद से जल्द ही आपकी भाषा में।',
+
       "catalogEmpty": "स्थानीय सूची में संग्रह नहीं मिला।",
       "catalogFailed": "एल्बम सूची लोड नहीं हुई।",
       "catalogSearchEmpty": "इस खोज हेतु संग्रह नहीं मिला।",

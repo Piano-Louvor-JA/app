@@ -8,6 +8,18 @@ export default {
       "empty": "No collections yet. Import a .slja file in the editor.",
       "emptyHint": "You don't have any playlists yet.",
       "createHint": "Create one in the Playlists section of the Library.",
+      "importedList": "Imported: {parts}.",
+
+      "importedNewPlaylists": "{count} new playlist(s)",
+
+
+      "importedAddedTracks": "{count} track(s) added",
+
+
+
+
+      "importedNothingNew": "Nothing new to import.",
+
       "importInvalid": "Invalid playlists file.",
       "newPlaceholder": "New collection name...",
       "create": "Create",
@@ -73,6 +85,10 @@ export default {
       "close": "Close lyrics"
     },
     "messages": {
+      convite_catalogo: 'The music catalog is not yet available in your language. Join the community and help build the LouvorJA catalog in your own language.',
+      convite_titulo: 'Catalog under construction',
+      convite_hint: 'The preview above shows the Portuguese catalog — soon in your language, with your help.',
+
       "catalogEmpty": "No collection found in the local catalog.",
       "catalogFailed": "Could not load the album catalog.",
       "catalogSearchEmpty": "No collection found for this search.",

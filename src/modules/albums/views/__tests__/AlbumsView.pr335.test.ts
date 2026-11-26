@@ -898,7 +898,7 @@ describe('AlbumsView', () => {
     Object.defineProperty(input, 'files', { value: [file], configurable: true })
     input.dispatchEvent(new Event('change', { bubbles: true }))
     await flushPromises()
-    expect(body().querySelector('.albums-view__playlists-feedback')?.textContent).toContain('faixa(s) adicionada(s)')
+    expect(body().querySelector('.albums-view__playlists-feedback')?.textContent).toContain('albums.playlists.importedList')
     const culto = listPlaylists().find((p) => p.name === 'Culto')!
     expect(culto.items).toHaveLength(2)
     w.unmount()
@@ -917,7 +917,7 @@ describe('AlbumsView', () => {
     Object.defineProperty(input, 'files', { value: [file], configurable: true })
     input.dispatchEvent(new Event('change', { bubbles: true }))
     await flushPromises()
-    expect(body().querySelector('.albums-view__playlists-feedback')?.textContent).toContain('Nada novo')
+    expect(body().querySelector('.albums-view__playlists-feedback')?.textContent).toContain('albums.playlists.importedNothingNew')
     w.unmount()
   })
 
@@ -972,7 +972,7 @@ describe('AlbumsView', () => {
   it('gaps onda1 2: catálogo vazio sem loading → catalogEmpty (689); cc-cancel (762); hydrate reentrante real (147)', async () => {
     setState({ categories: [], isLoadingCatalog: false })
     const w0 = await mountView()
-    expect(w0.text()).toContain('albums.messages.catalogEmpty')
+    expect(w0.text()).toContain('albums.messages.convite_catalogo')
     w0.unmount()
     // cc-cancel → cancelCollection (762) com cards presentes
     setState() // restaura categorias default (o w0 usou [])
