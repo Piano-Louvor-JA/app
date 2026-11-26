@@ -318,7 +318,7 @@ describe('item-helpers — survivors cirúrgicos', () => {
 
     it('images com 1 path → subtitle = filename (L384)', () => {
       const item = buildLiturgyItemFromDraft(mdraft({ type: 'images', filePaths: ['/pasta/foto.jpg'] }), ctx())
-      expect(item.subtitle).toBe('foto.jpg')
+      expect(item.subtitle).toBe('')
     })
 
     it('images com details → NÃO sobrescreve subtitle (L381 !details)', () => {
@@ -327,8 +327,11 @@ describe('item-helpers — survivors cirúrgicos', () => {
     })
 
     it('non-images file com filePath, sem details → subtitle = filename (L398)', () => {
-      const item = buildLiturgyItemFromDraft(mdraft({ type: 'video', filePath: '/dir/video.mp4' }), ctx())
-      expect(item.subtitle).toBe('video.mp4')
+      // Arquivo sem anotação fica sem subtítulo (nada de nome do arquivo).
+      const item = buildLiturgyItemFromDraft(mdraft({ type: 'pdf', filePath: '/dir/doc.pdf' }), ctx())
+      expect(item.subtitle).toBe('')
+      // Vídeo sem anotação fica sem subtítulo.
+      expect(buildLiturgyItemFromDraft(mdraft({ type: 'video', filePath: '/dir/video.mp4' }), ctx()).subtitle).toBe('')
     })
 
     it('non-images file com details → subtitle = details (L398 !details false)', () => {
@@ -339,7 +342,7 @@ describe('item-helpers — survivors cirúrgicos', () => {
     it('site com url e sem details → subtitle = url (L384-391)', () => {
       const item = buildLiturgyItemFromDraft(mdraft({ type: 'site', url: ' https://a.com ' }), ctx())
       expect(item.url).toBe('https://a.com')
-      expect(item.subtitle).toBe('https://a.com')
+      expect(item.subtitle).toBe('')
     })
 
     it('site com url vazia + details → url "" e subtitle details (L389 item.url &&)', () => {

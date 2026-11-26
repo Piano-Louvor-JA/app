@@ -1,15 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-beforeEach(() => vi.resetModules())
+beforeEach(() => {
+  vi.resetModules()
+  // Isola do .env local: uma chave de parceiro configurada na máquina de dev
+  // virava header extra e quebrava as comparações exatas de headers.
+  vi.stubEnv('VITE_PARTNER_KEY', '')
+  vi.stubEnv('VITE_PARTNER_KEY_STG', '')
+  vi.stubEnv('VITE_PARTNER_KEY_PROD', '')
+})
 afterEach(() => {
   vi.unstubAllEnvs()
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
 })
 
-async function client(ua = 'Linux', version = '1.31.0') {
+// Versão vem do define __APP_VERSION__ (package.json); no vitest é '0.0.0-test'.
+const TEST_VERSION = '0.0.0-test'
+
+async function client(ua = 'Linux') {
   vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(ua)
-  vi.stubEnv('VITE_APP_VERSION', version)
   return import('../client-platform')
 }
 
@@ -28,7 +37,7 @@ describe('identidade de plataforma nas requests', () => {
     expect(await globalThis.fetch('https://localhost/catalog')).toBe(response)
     const headers = new Headers(fetch.mock.calls[0]![1].headers)
     expect(headers.get('X-Client-Platform')).toBe(platform)
-    expect(headers.get('X-Client-Version')).toBe('1.31.0')
+    expect(headers.get('X-Client-Version')).toBe(TEST_VERSION)
   })
 
   it('instala uma única vez e tolera ausência inicial de fetch', async () => {
@@ -59,13 +68,19 @@ describe('identidade de plataforma nas requests', () => {
       .toEqual({ 'x-client-platform': 'custom', 'x-client-version': '2.0.0' })
   })
 
-  it('não inventa versão ausente nem adiciona headers a protocolos locais', async () => {
+  it('versão: package.json via __APP_VERSION__; ausente não inventa', async () => {
+    const { clientVersion } = await client()
+    expect(clientVersion()).toBe(TEST_VERSION)
+    expect(clientVersion(' 1.37.2 ')).toBe('1.37.2')
+    expect(clientVersion('')).toBe('')
+    expect(clientVersion(null)).toBe('')
+  })
+
+  it('não adiciona headers a protocolos locais', async () => {
     const fetch = vi.fn().mockResolvedValue(new Response())
     vi.stubGlobal('fetch', fetch)
-    const { installClientPlatformHeader } = await client('Linux', '')
+    const { installClientPlatformHeader } = await client('Linux')
     installClientPlatformHeader()
-    await globalThis.fetch('http://localhost/catalog')
-    expect(new Headers(fetch.mock.calls[0]![1].headers).has('X-Client-Version')).toBe(false)
     for (const url of ['/catalog', 'file:///music.mp3', 'data:text/plain,hino']) {
       const options = { cache: 'no-store' as const }
       await globalThis.fetch(url, options)
@@ -88,6 +103,21 @@ describe('identidade de plataforma nas requests', () => {
       await globalThis.fetch(url)
       expect(fetch).toHaveBeenLastCalledWith(url, undefined)
     }
+  })
+
+  it('injeta X-Partner-Key só na API Piano quando a env STG está setada', async () => {
+    vi.stubEnv('VITE_PIANO_PROFILE', 'homologation')
+    vi.stubEnv('VITE_PARTNER_KEY_STG', 'plj_stgkeyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')
+    const fetch = vi.fn().mockResolvedValue(new Response())
+    vi.stubGlobal('fetch', fetch)
+    const { installClientPlatformHeader } = await client()
+    installClientPlatformHeader()
+    await globalThis.fetch('https://api-stg.pianolouvorja.com.br/json_db/album.json')
+    expect(new Headers(fetch.mock.calls[0]![1].headers).get('X-Partner-Key')).toBe(
+      'plj_stgkeyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+    )
+    await globalThis.fetch('https://api.louvorja.com.br/json_db/album.json')
+    expect(new Headers(fetch.mock.calls[1]![1].headers).has('X-Partner-Key')).toBe(false)
   })
 
   it('mantém o fetch original utilizável se não conseguir ler a URL', async () => {

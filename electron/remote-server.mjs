@@ -285,6 +285,8 @@ export async function startRemoteServer(wss, contents, opts = {}) {
             durationMs:
               typeof msg.durationMs === 'number' ? msg.durationMs : undefined,
             name: typeof msg.name === 'string' ? msg.name : undefined,
+            // Canal do vídeo do YouTube (youtube.play), para o histórico do desktop.
+            channel: typeof msg.channel === 'string' ? msg.channel : undefined,
             // Destino da barra de vídeo (monitor:<id> ou tv:<slot>).
             targetId: typeof msg.targetId === 'string' ? msg.targetId : undefined,
             enabled: typeof msg.enabled === 'boolean' ? msg.enabled : undefined,

@@ -338,6 +338,10 @@ export default {
       "librasTitle": "Libras（自動翻訳）",
       "librasHint": "現在の賛美歌の歌詞を Libras（テキストグロス）で表示します。自動翻訳です。原文はそのまま表示されます。",
       "librasToggleLabel": "Libras を有効にする",
+      "librasAvatarLabel": "通訳者のアバター",
+      "librasAvatarIcaro": "イーカロ",
+      "librasAvatarHozana": "ホザナ",
+      "librasAvatarGuga": "グーガ",
       "languageHint": "アプリの表示言語を選択します。",
       "languagePortuguese": "Português (BR)",
       "languageEnglish": "English",
@@ -451,7 +455,22 @@ export default {
       "mediaFolderMoved": "メディアを {path} に移動しました",
       "mediaFolderError": "メディアフォルダーを移動できませんでした。再試行してください。",
       "mediaFolderDestInside": "現在のメディアフォルダーの外にあるフォルダーを選択してください。",
-      "mediaFolderPersistError": "メディアはコピーされましたが、共有パスを保存できませんでした。"
+      "mediaFolderPersistError": "メディアはコピーされましたが、共有パスを保存できませんでした。",
+      "legacyMediaArchiveSummary": "{size} の圧縮ファイル：ここにないメディアを展開せずに直接コピーします。",
+      "legacyMediaCancelled": "読み込みを停止しました：{imported} 件のファイルをコピーしました。止まったところから続けるには、ファイルまたはフォルダーをもう一度選んでください。",
+      "legacyMediaHintLinux": "サイトからダウンロードしたファイル（.tar.gz）を選んでください。アプリが展開せずに直接メディアをコピーします。展開してフォルダーを選んでもかまいません。ここにないファイル（カバー、画像、曲）だけをコピーします。",
+      "legacyMediaInvalidArchive": "このファイルには Louvor JA のメディア（カバー、画像、曲）が含まれていません。サイトからダウンロードしたファイルを選んでください。",
+      "legacyMediaInvalidFolderLinux": "このフォルダーにはメディアがありません。サイトのファイルから展開したフォルダー（例：LouvorJA-PIANO）か、その中の Media フォルダーを選んでください。",
+      "legacyMediaLiveCounts": "{imported} 件を今保存 · {skipped} 件は既存（メディアセンターに表示済み）",
+      "legacyMediaPause": "一時停止",
+      "legacyMediaPaused": "{total} 件中 {current} 件で一時停止",
+      "legacyMediaPausedBytes": "{total} 中 {current} で一時停止",
+      "legacyMediaPickArchive": "ダウンロードしたファイルを選ぶ（.tar.gz）",
+      "legacyMediaPickFolderLinux": "メディアフォルダーを選ぶ",
+      "legacyMediaPickHintLinux": "ファイルから展開したフォルダー（例：LouvorJA-PIANO）か、その中の Media フォルダーを選んでください。カバー、画像、曲はアプリが自動で見つけます。",
+      "legacyMediaProgressBytes": "{total} 中 {current} を読み込み中",
+      "legacyMediaResume": "再開",
+      "legacyMediaStop": "停止"
     },
     "remote": {
       "renewToken": "トークンを更新",
@@ -813,7 +832,13 @@ export default {
       "transformNone": "なし",
       "speedSlow": "遅い",
       "speedNormal": "標準",
-      "speedFast": "速い"
+      "speedFast": "速い",
+      "hymnNumberShow": "表紙に讃美歌番号（讃美歌集）",
+      "hymnNumberSize": "讃美歌番号のサイズ",
+      "hymnalNameColor": "讃美歌集名の色",
+      "hymnalNameColorDefault": "標準（白）",
+      "hymnalNameShow": "表紙に讃美歌集名",
+      "hymnalNameSize": "讃美歌集名のサイズ"
     }
   }
 }

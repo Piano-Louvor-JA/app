@@ -238,4 +238,79 @@ describe("MediaProjectionView — boxStyle branches (90/97/101)", () => {
       stageSettingsStateMPV.value = null
     }
   })
+
+  describe("número do hino na capa do hinário", () => {
+    it("mostra o número grande entre o nome do hinário e o título", async () => {
+      localStorage.setItem(
+        MEDIA_RUNTIME_STORAGE_KEY,
+        JSON.stringify(runtimePayload({ isCover: true, title: "Santo, Santo, Santo!", subtitle: "Hinário Adventista", hymnNumber: 1 })),
+      )
+      const w = await mountView()
+      const number = w.find(".media-projection__hymn-number")
+      expect(number.exists()).toBe(true)
+      expect(number.text()).toBe("1")
+      // Padrão: 200 px @1920 → 10.4167cqw (maior que o título).
+      expect(number.attributes("style")).toContain("font-size: 10.4167cqw")
+      const html = w.html()
+      expect(html.indexOf("media-projection__kicker")).toBeLessThan(html.indexOf("media-projection__hymn-number"))
+      expect(html.indexOf("media-projection__hymn-number")).toBeLessThan(html.indexOf("media-projection__title--cover"))
+      w.unmount()
+    })
+
+    it("tamanho e desligar vêm da Personalização; sem número, nada", async () => {
+      const real = await vi.importActual<typeof import("../../../settings/types/stage-settings")>("../../../settings/types/stage-settings")
+      stageSettingsStateMPV.value = { ...real.DEFAULT_STAGE_SETTINGS, hymnNumberSize: 384 }
+      try {
+        localStorage.setItem(MEDIA_RUNTIME_STORAGE_KEY, JSON.stringify(runtimePayload({ isCover: true, hymnNumber: 45 })))
+        let w = await mountView()
+        expect(w.find(".media-projection__hymn-number").attributes("style")).toContain("font-size: 20cqw")
+        w.unmount()
+
+        stageSettingsStateMPV.value = { ...real.DEFAULT_STAGE_SETTINGS, hymnNumberShow: false }
+        w = await mountView()
+        expect(w.find(".media-projection__hymn-number").exists()).toBe(false)
+        w.unmount()
+      } finally {
+        stageSettingsStateMPV.value = null
+      }
+
+      localStorage.setItem(MEDIA_RUNTIME_STORAGE_KEY, JSON.stringify(runtimePayload({ isCover: true, hymnNumber: null })))
+      const w = await mountView()
+      expect(w.find(".media-projection__hymn-number").exists()).toBe(false)
+      w.unmount()
+    })
+  })
+
+  describe("nome do hinário na capa", () => {
+    it("tamanho, cor e esconder vêm da Personalização (padrão = como era)", async () => {
+      const real = await vi.importActual<typeof import("../../../settings/types/stage-settings")>("../../../settings/types/stage-settings")
+      localStorage.setItem(MEDIA_RUNTIME_STORAGE_KEY, JSON.stringify(runtimePayload({ isCover: true, title: "Santo", subtitle: "Hinário Adventista", hymnNumber: 1 })))
+      let w = await mountView()
+      // Padrão: 28 px @1920 → 1.4583cqw, sem cor própria (branco do CSS).
+      const kicker = w.find(".media-projection__kicker")
+      expect(kicker.text()).toBe("Hinário Adventista")
+      expect(kicker.attributes("style")).toContain("font-size: 1.4583cqw")
+      expect(kicker.attributes("style") ?? "").not.toContain("color")
+      w.unmount()
+
+      stageSettingsStateMPV.value = { ...real.DEFAULT_STAGE_SETTINGS, hymnalNameSize: 48, hymnalNameColor: "#F6C32A" }
+      try {
+        w = await mountView()
+        const style = w.find(".media-projection__kicker").attributes("style")
+        expect(style).toContain("font-size: 2.5cqw")
+        expect(style).toContain("color: rgb(246, 195, 42)")
+        w.unmount()
+
+        stageSettingsStateMPV.value = { ...real.DEFAULT_STAGE_SETTINGS, hymnalNameShow: false }
+        w = await mountView()
+        expect(w.find(".media-projection__kicker").exists()).toBe(false)
+        // O número continua.
+        expect(w.find(".media-projection__hymn-number").exists()).toBe(true)
+        w.unmount()
+      } finally {
+        stageSettingsStateMPV.value = null
+      }
+    })
+  })
 })
+

@@ -48,6 +48,7 @@ import {
   loadMediaTrack,
   resolveAlbumSubtitle,
 } from '../services/media-catalog'
+import { resolveHymnNumber } from '../services/hymn-number'
 import {
   clearMediaRuntime,
   publishMediaRuntime,
@@ -257,6 +258,7 @@ export const useMediaStore = defineStore('media', () => {
       // Frame PDF/PPT (frame-slide): data:image/ direto, sem véu (paridade receiver).
       frameDataUrl: slide.frameDataUrl ?? null,
       isCover: slide.isCover,
+      hymnNumber: session.value.hymnNumber ?? null,
       slideIndex: slideIndex.value,
       slideCount: session.value.slides.length,
       nextLyric: nextSlide ? stripHtmlBreaks(nextSlide.lyric) : '',
@@ -592,6 +594,7 @@ export const useMediaStore = defineStore('media', () => {
     const slideTimesSec = buildSlideTimesSec(slides, mode)
     const albumId = params.albumId ?? null
     const subtitle = resolveAlbumSubtitle(track, albumId)
+    const hymnNumber = resolveHymnNumber(track, albumId)
 
     unbindAudio()
     try {
@@ -606,6 +609,7 @@ export const useMediaStore = defineStore('media', () => {
       mode,
       title: track.name,
       subtitle,
+      hymnNumber,
       coverUrl: track.coverUrl,
       audioUrl: playbackUrl,
       hasInstrumental: Boolean(track.instrumentalUrl?.trim()),

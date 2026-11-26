@@ -9,17 +9,9 @@ export default {
       "emptyHint": "لا قوائم تشغيل لديك بعد.",
       "createHint": "أنشئ واحدة في قسم قوائم التشغيل بالمكتبة.",
       "importedList": "تم الاستيراد: {parts}.",
-
       "importedNewPlaylists": "{count} قائمة تشغيل جديدة",
-
-
       "importedAddedTracks": "أُضيفت {count} مقطوعة",
-
-
-
-
       "importedNothingNew": "لا يوجد جديد للاستيراد.",
-
       "importInvalid": "ملف قوائم تشغيل غير صالح.",
       "newPlaceholder": "اسم مجموعة جديدة…",
       "create": "إنشاء",
@@ -54,7 +46,11 @@ export default {
       "create": "إنشاء",
       "export": "تصدير القوائم",
       "import": "استيراد القوائم",
-      "empty": "لا قوائم تشغيل بعد."
+      "empty": "لا قوائم تشغيل بعد.",
+      "playInstrumental": "تشغيل {name} مع المرافقة (موسيقى فقط)",
+      "playInstrumentalHint": "المرافقة: تشغيل كل الترانيم بالموسيقى فقط",
+      "playNoAudio": "تشغيل {name} بدون صوت (الشرائح فقط)",
+      "playNoAudioHint": "بدون صوت: عرض شرائح الترانيم فقط دون صوت"
     },
     "title": "مركز الوسائط",
     "subtitle": "الألبومات والمجموعات",
@@ -85,10 +81,9 @@ export default {
       "close": "إغلاق الكلمات"
     },
     "messages": {
-      convite_catalogo: 'الكتالوج الموسيقي غير متوفر بلغتك بعد. انضم إلى المجتمع وساعد في بناء كتالوج LouvorJA بلغتك.',
-      convite_titulo: 'الكتالوج قيد الإنشاء',
-      convite_hint: 'المعاينة تعرض الكتالوج بالبرتغالية — قريباً بلغتك، بمساعدتك.',
-
+      "convite_catalogo": "لا يوجد حتى الآن كتالوج منشور لهذه اللغة. انضم إلى مجتمع PIANO LouvorJA وساعد في ترجمة المجموعات ونشرها!",
+      "convite_titulo": "الكتالوج قيد الإنشاء",
+      "convite_hint": "المعاينة تعرض الكتالوج بالبرتغالية — قريباً بلغتك، بمساعدتك.",
       "catalogEmpty": "لا مجموعة في الكتالوج المحلي.",
       "catalogFailed": "تعذّر تحميل كتالوج الألبومات.",
       "catalogSearchEmpty": "لا مجموعة تطابق هذا البحث.",
@@ -101,6 +96,19 @@ export default {
       "deleteCollectionAction": "Delete collection",
       "deleteCollectionTitle": "Delete “{name}”?",
       "deleteCollectionText": "The local copy will be deleted. The original in Community is not affected."
+    },
+    "disabledAlbums": {
+      "badge": "ألبوم معطّل",
+      "collectionNote": "الألبوم معطّل: تظهر ترانيمه باهتة في البحث ويتخطاها المحدِّد. هنا ما زالت تُشغَّل عند النقر.",
+      "count": "المعطّلة: {count}",
+      "description": "عطّل الألبومات التي لا تستخدمها (مثل كتاب الترانيم القديم). تظهر ترانيمها باهتة في البحث ويتخطاها زر Enter والأسهم. يمكنك أيضًا تعطيل الألبوم من بطاقته في مركز الوسائط.",
+      "disable": "تعطيل الألبوم",
+      "disableConfirmTitle": "تعطيل «{name}»؟",
+      "disableConfirmMessage": "ستظهر أغاني هذا الألبوم باهتة في البحث ويتخطاها المحدد. يمكنك إعادة التفعيل لاحقًا عبر العين على البطاقة.",
+      "disableConfirmYes": "تعطيل",
+      "enable": "تفعيل الألبوم",
+      "filter": "تصفية الألبومات",
+      "title": "الألبومات المفعّلة"
     }
   }
 }

@@ -1,6 +1,6 @@
 export default {
   "liturgy": {
-  "fileFilters": { "video": "视频", "all": "全部" },
+  "fileFilters": { "video": "视频", "presentation": "演示文稿 (PowerPoint/LibreOffice)", "all": "全部" },
   "fallback": { "music": "音乐", "video": "视频", "audio": "音频" },
     "title": "崇拜礼仪",
     "subtitle": "崇拜安排",
@@ -114,7 +114,8 @@ export default {
       "other_files": "其他",
       "online_video": "YouTube/Vimeo 等",
       "site": "网站/社交",
-      "verse": "经文"
+      "verse": "经文",
+      "playlist": "播放列表"
     },
     "typeDescriptions": {
       "category": "分类用作礼仪各部分之间的视觉分隔。",
@@ -131,7 +132,8 @@ export default {
       "other_files": "其他本地文件",
       "online_video": "在线视频（YouTube、Vimeo 等）",
       "site": "网站与社交媒体",
-      "verse": "圣经经文"
+      "verse": "圣经经文",
+      "playlist": "来自媒体中心的歌曲队列"
     },
     "dialog": {
       "title": "新环节",
@@ -240,7 +242,11 @@ export default {
       "searchMusic": "搜索诗歌…",
       "musicMode": "模式",
       "musicModeAudio": "音频",
-      "musicModeInstrumental": "伴奏"
+      "musicModeInstrumental": "伴奏",
+      "albumDisabled": "专辑已停用",
+      "playlistPlaceholder": "选择一个播放列表",
+      "playlistRequired": "请选择一个播放列表。",
+      "selectPlaylist": "选择播放列表"
     },
     "namePlaceholders": {
       "category": "例：开场主持、崇拜开始、欢迎、安息日学、安息日崇拜…",
@@ -256,7 +262,8 @@ export default {
       "other_files": "例：辅助文件",
       "online_video": "例：YouTube 上的圣诗",
       "site": "例：教会页面",
-      "verse": "出处或标题"
+      "verse": "出处或标题",
+      "playlist": "例如：开场赞美"
     },
     "actions": {
       "save": "保存",
@@ -301,7 +308,12 @@ export default {
       "collapseCategory": "折叠分类",
       "expandCategory": "展开分类",
       "addSubItem": "添加子项目",
-      "reorder": "拖动排序"
+      "reorder": "拖动排序",
+      "playlistControls": "播放列表控制",
+      "playlistInstrumental": "以伴奏播放",
+      "playlistNoAudio": "无声播放（仅幻灯片）",
+      "playlistPlay": "播放播放列表",
+      "playlistShuffle": "随机播放"
     },
     "messages": {
       "removeItemTitle": "从礼仪删除项目",
@@ -358,7 +370,16 @@ export default {
       "urlInvalid": "该链接不适合投影。",
       "projectionFailed": "无法在配置的屏幕上打开投影。",
       "fileMissingOnMachine": "此电脑上找不到文件——路径来自其他电脑（同步的礼仪）。请在本设备重新选择文件。",
-      "presentationOfficeMissing": "投影 PPT/PPTX 需要安装 LibreOffice（或设置 LIBREOFFICE_PATH）。"
+      "presentationOfficeMissing": "投影 PPT/PPTX 需要安装 LibreOffice（或设置 LIBREOFFICE_PATH）。",
+      "dropDesktopOnly": "只有桌面应用支持将文件拖到礼拜程序中。",
+      "dropHint": "将文件拖放到这里以添加到礼拜程序",
+      "dropMoreFilesPending": "已在对话框中打开第一个文件。如有需要，保存后再拖放其余文件。",
+      "dropPathFailed": "无法读取拖放文件的路径。请使用“添加”选择文件。",
+      "playlistCatalogEmpty": "还没有播放列表。请在媒体中心（播放列表）中创建。",
+      "playlistEmpty": "此播放列表为空。请在媒体中心添加歌曲。",
+      "playlistMissing": "找不到播放列表。请在媒体中心选择其他播放列表。",
+      "playlistTrackCount": "{count} 首歌曲",
+      "playlistTrackCountOne": "1 首歌曲"
     },
     "slja": {
       "importButton": "导入 .slja",
@@ -374,6 +395,45 @@ export default {
       "new": "新建自定义礼仪",
       "namePlaceholder": "礼仪名称（如：青年崇拜 12/07）",
       "empty": "没有自定义礼仪。创建第一个吧。"
+    },
+    "appearance": {
+      "align": "标题对齐",
+      "align_center": "居中",
+      "align_left": "左对齐",
+      "background": "行背景",
+      "bold": "粗体",
+      "button": "自定义礼拜程序",
+      "categorySection": "分类行",
+      "default": "默认",
+      "openStage": "自定义投影（舞台）",
+      "reset": "恢复默认",
+      "showSubtitle": "显示副标题",
+      "showTime": "显示时间",
+      "size": "标题大小",
+      "size_lg": "大",
+      "size_md": "中",
+      "size_sm": "小",
+      "size_xl": "特大",
+      "title": "自定义礼拜程序",
+      "titleColor": "标题颜色",
+      "typesHint": "应用于此屏幕上的礼拜程序列表。",
+      "typesSection": "每种项目类型的颜色",
+      "uppercase": "大写"
+    },
+    "transfer": {
+      "append": "追加",
+      "confirmMessage": "本周已有项目。要用文件中的礼拜程序替换，还是把其项目追加到每天末尾？",
+      "confirmTitle": "导入礼拜程序",
+      "export": "导出礼拜程序",
+      "exportHint": "将本周礼拜程序（周日至周六及单独项）保存为 .json 文件",
+      "exported": "已导出本周礼拜程序。",
+      "group": "导出和导入礼拜程序",
+      "import": "导入礼拜程序",
+      "importHint": "打开已导出的礼拜程序文件（.json）",
+      "imported": "已导入礼拜程序。",
+      "invalid": "此文件不是 Louvor JA 导出的礼拜程序。",
+      "replace": "替换",
+      "version": "此礼拜程序由较新版本的应用导出。请更新应用后再导入。"
     }
   }
 }

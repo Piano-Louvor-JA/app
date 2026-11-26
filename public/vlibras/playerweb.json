@@ -1,0 +1,13 @@
+{
+    "companyName": "Vlibras",
+    "productName": "Vlibras",
+    "dataUrl": "https://vlibras.gov.br/app/unity/playerweb.data.unityweb?v=7.12.2",
+    "wasmCodeUrl": "https://vlibras.gov.br/app/unity/playerweb.wasm.code.unityweb?v=7.12.2",
+    "wasmFrameworkUrl": "https://vlibras.gov.br/app/unity/playerweb.wasm.framework.unityweb?v=7.12.2",
+    "TOTAL_MEMORY": 268435456,
+    "graphicsAPI": ["WebGL 1.0"],
+    "webglContextAttributes": { "preserveDrawingBuffer": false, "alpha": true, "antialias": true },
+    "splashScreenStyle": "Light",
+    "backgroundColor": "transparent",
+    "cacheControl": { "default": "must-revalidate" }
+}

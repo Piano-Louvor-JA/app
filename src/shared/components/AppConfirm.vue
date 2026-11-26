@@ -8,6 +8,8 @@ const props = defineProps<{
 	confirmLabel: string;
 	cancelLabel: string;
 	danger?: boolean;
+	/** Terceira resposta opcional (ex.: "Acrescentar" além de substituir/cancelar). */
+	secondaryLabel?: string;
 	zIndex?: number;
 	/** Enter confirma. Fica desligado nos confirms de exclusão. */
 	enterConfirms?: boolean;
@@ -16,6 +18,7 @@ const props = defineProps<{
 const emit = defineEmits<{
 	confirm: [];
 	cancel: [];
+	secondary: [];
 }>();
 
 useEnterToConfirm(
@@ -54,6 +57,14 @@ useEnterToConfirm(
             @click="emit('cancel')"
           >
             {{ cancelLabel }}
+          </button>
+          <button
+            v-if="secondaryLabel"
+            type="button"
+            class="app-confirm__btn app-confirm__btn--secondary"
+            @click="emit('secondary')"
+          >
+            {{ secondaryLabel }}
           </button>
           <!-- /* v8 ignore next */ arrow de template: comportamento provado
                pelos testes de confirm (fantasma de source map, ver

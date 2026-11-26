@@ -135,6 +135,27 @@ jobs:
           exit $missing
           echo "Firebase client config injetada."
 
+      # X-Partner-Key: uma chave por ambiente (STG ≠ prod). Só a do perfil
+      # entra no bundle (VITE_PARTNER_KEY) — não embutir as duas.
+      - name: Resolve partner key for profile
+        env:
+          KEY_PROD: ${{ secrets.VITE_PARTNER_KEY_PROD }}
+          KEY_STG: ${{ secrets.VITE_PARTNER_KEY_STG }}
+        run: |
+          if [ "${PIANO_BUILD_PROFILE}" = "release" ]; then
+            key="${KEY_PROD:-}"
+            label=PROD
+          else
+            key="${KEY_STG:-}"
+            label=STG
+          fi
+          if [ -z "$key" ]; then
+            echo "::warning::VITE_PARTNER_KEY_${label} ausente — build sem X-Partner-Key (API aceita; métricas de parceiro ficam vazias)."
+          else
+            echo "VITE_PARTNER_KEY=$key" >> "$GITHUB_ENV"
+            echo "Partner key ${label} injetada no bundle."
+          fi
+
       - name: Build Vite
         env:
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}

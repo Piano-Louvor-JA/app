@@ -21,10 +21,16 @@ import {
 } from '../services/annotation-projection'
 import { parseLiturgyWebTarget } from '../services/liturgy-web-runtime'
 import { formatDurationLabel } from '../services/liturgy-format'
-import { categoryTimeRangeWithEstimate } from '../services/liturgy-item-helpers'
+import { categoryTimeRangeWithEstimate, notesFromSubtitle } from '../services/liturgy-item-helpers'
 import { getItemTypeIcon, isExecutableItem } from '../services/liturgy-item-helpers'
 import { probeMediaDurationMs } from '../services/media-probe'
 import { normalizeTitleColor, sanitizeNotesHtml } from '../services/rich-notes'
+import {
+  DEFAULT_LITURGY_APPEARANCE,
+  liturgyTypeColor,
+  type LiturgyAppearance,
+  type LiturgyTitleSize,
+} from '../services/liturgy-appearance'
 import type { LiturgyItem } from '../types/liturgy'
 import type { OnlineVideoItemStatus } from '@/shared/types/desktop-bridge'
 import '../styles/rich-notes.css'
@@ -33,6 +39,8 @@ const props = defineProps<{
   item: LiturgyItem
   index: number
   selected: boolean
+  /** Aparência da lista (painel de personalização da liturgia). */
+  appearance?: LiturgyAppearance
   siteProjecting?: boolean
   videoProjecting?: boolean
   startLabel: string
@@ -80,6 +88,10 @@ const emit = defineEmits<{
   musicInstrumental: []
   musicSlides: []
   musicLyric: []
+  playlistPlay: []
+  playlistInstrumental: []
+  playlistNoAudio: []
+  playlistShuffle: []
   setPlayer: [playerId: string]
   videoFileSelected: [durationSec: number]
   dragStart: [index: number]
@@ -119,10 +131,57 @@ const rootEl = ref<HTMLElement | null>(null)
 let dragGhostEl: HTMLElement | null = null
 
 const isCategory = computed(() => props.item.type === 'category')
-/** Categoria usa a cor de realce do tema; os itens mantêm a cor do tipo. */
+const look = computed(() => props.appearance ?? DEFAULT_LITURGY_APPEARANCE)
+/**
+ * Categoria usa a cor de realce do tema; os itens mantêm a cor do tipo.
+ * Cor escolhida para o tipo (personalização da liturgia) vale para os dois.
+ */
 const categoryOrItemAccent = computed(() =>
-  isCategory.value ? 'var(--ds-color-primary)' : props.item.accentColor,
+  isCategory.value
+    ? look.value.typeColors.category || 'var(--ds-color-primary)'
+    : liturgyTypeColor(look.value, props.item.type, props.item.accentColor),
 )
+
+const TITLE_SIZES: Record<LiturgyTitleSize, string> = {
+  sm: '0.9rem',
+  md: '1rem',
+  lg: '1.2rem',
+  xl: '1.45rem',
+}
+/** Linha da categoria personalizada: classes e variáveis de CSS. */
+const categoryLookClasses = computed(() => {
+  if (!isCategory.value) return {}
+  const cat = look.value.category
+  return {
+    'liturgy-item--cat-center': cat.titleAlign === 'center',
+    'liturgy-item--cat-upper': cat.uppercase,
+    'liturgy-item--cat-light': !cat.bold,
+    'liturgy-item--cat-bg': Boolean(cat.background),
+  }
+})
+const categoryLookStyle = computed(() => {
+  if (!isCategory.value) return undefined
+  const cat = look.value.category
+  return {
+    '--liturgy-category-accent-color': categoryOrItemAccent.value,
+    '--liturgy-category-title-size': TITLE_SIZES[cat.titleSize],
+    ...(cat.background ? { '--liturgy-category-bg': cat.background } : {}),
+    ...(cat.titleColor ? { '--liturgy-category-title-color': cat.titleColor } : {}),
+  }
+})
+/** Itens de arquivo: o nome do arquivo/"N imagens" (gravado em itens antigos) não aparece. */
+const FILE_TYPES = new Set(['video', 'audio', 'images', 'pdf', 'presentation', 'other_files', 'online_video', 'site'])
+const displaySubtitle = computed(() =>
+  FILE_TYPES.has(props.item.type) ? notesFromSubtitle(props.item) : props.item.subtitle,
+)
+/** Música: só o título complementar (sem repetir o título do catálogo). */
+const displayName = computed(() =>
+  props.item.type === 'music' && props.item.complementaryTitle?.trim()
+    ? props.item.complementaryTitle.trim()
+    : props.item.name,
+)
+const showCategoryTime = computed(() => !isCategory.value || look.value.category.showTime)
+const showSubtitle = computed(() => !isCategory.value || look.value.category.showSubtitle)
 
 const OFFLINE_ICONS: Record<Exclude<OnlineVideoItemStatus['state'], 'none'>, string> = {
   queued: 'ti-clock',
@@ -195,6 +254,50 @@ const executable = computed(() => isExecutableItem(props.item))
 const isMusicItem = computed(
   () => props.item.type === 'music' && props.item.musicId != null,
 )
+const isPlaylistItem = computed(
+  () => props.item.type === 'playlist' && Boolean(props.item.playlistId?.trim()),
+)
+/**
+ * Clicar em qualquer parte da linha faz o mesmo que o ícone principal do
+ * item: hino do catálogo toca cantado; site e vídeo/YouTube abrem o controle
+ * do player; anotação projeta (como a seta dela); os demais executáveis
+ * abrem como no play. Categoria fica só nos botões.
+ */
+const rowPlays = computed(() => {
+  if (props.item.done || isCategory.value) return false
+  if (
+    isAnnotation.value ||
+    isMusicItem.value ||
+    isPlaylistItem.value ||
+    isSiteItem.value ||
+    isVideoRemote.value
+  ) {
+    return true
+  }
+  return executable.value
+})
+
+const ROW_CONTROLS = 'button, a, input, select, textarea, label, [role="button"], [contenteditable="true"]'
+
+function onRowClick(event: MouseEvent) {
+  if (!rowPlays.value) return
+  const target = event.target as Element | null
+  if (target?.closest(ROW_CONTROLS)) return
+  if (isAnnotation.value) {
+    emit('playScreens')
+    return
+  }
+  if (isMusicItem.value) {
+    if (!props.musicBusy) emit('musicSung')
+    return
+  }
+  if (isPlaylistItem.value) {
+    emit('playlistPlay')
+    return
+  }
+  emit('select')
+}
+
 const categoryTimeRange = computed(() => {
   // SPEC t_50c9ac95 (B2/B3): end real → intervalo exato; sem end + filhos
   // com duração → "~Xmin (estimado)"; sem dados → só o start.
@@ -492,47 +595,71 @@ const projectActionTitle = computed(() => {
       'liturgy-item--waiting': showWaiting,
       'liturgy-item--dimmed': isDimmed,
       'liturgy-item--drag-source': isDragSource,
+      ...categoryLookClasses,
+      'liturgy-item--row-play': rowPlays,
     }"
+    :style="categoryLookStyle"
     @mouseenter="rowHovered = true"
     @mouseleave="rowHovered = false"
     @dragover.prevent
     @drop.prevent="emit('drop', index)"
   >
-    <label
-      class="liturgy-item__check"
-      :class="{
-        'liturgy-item__check--linked': isLinked,
-        'liturgy-item__check--done': item.done,
-        'liturgy-item__check--indeterminate': indeterminate && !item.done,
-        'liturgy-item__check--active': showInProgress,
-      }"
-      :title="doneLabel"
-      @click.stop
-    >
-      <input
-        type="checkbox"
-        class="liturgy-item__check-input"
-        :checked="item.done"
-        :indeterminate="Boolean(indeterminate && !item.done)"
-        :aria-label="doneLabel"
-        @change="emit('toggleDone')"
+    <!-- Coluna da esquerda: marcar e, na categoria, recolher/expandir. -->
+    <div class="liturgy-item__rail">
+      <label
+        class="liturgy-item__check"
+        :class="{
+          'liturgy-item__check--linked': isLinked,
+          'liturgy-item__check--done': item.done,
+          'liturgy-item__check--indeterminate': indeterminate && !item.done,
+          'liturgy-item__check--active': showInProgress,
+        }"
+        :title="doneLabel"
+        @click.stop
       >
-      <span
-        class="liturgy-item__check-box"
-        aria-hidden="true"
+        <input
+          type="checkbox"
+          class="liturgy-item__check-input"
+          :checked="item.done"
+          :indeterminate="Boolean(indeterminate && !item.done)"
+          :aria-label="doneLabel"
+          @change="emit('toggleDone')"
+        >
+        <span
+          class="liturgy-item__check-box"
+          aria-hidden="true"
+        >
+          <i
+            v-if="item.done"
+            class="ti ti-check"
+          />
+          <i
+            v-else-if="indeterminate"
+            class="ti ti-minus"
+          />
+        </span>
+      </label>
+      <button
+        v-if="collapsible"
+        type="button"
+        class="liturgy-item__action liturgy-item__action--collapse"
+        :title="collapseLabel"
+        :aria-label="collapseLabel"
+        :aria-expanded="!collapsed"
+        @click.stop="emit('toggleCollapse')"
       >
         <i
-          v-if="item.done"
-          class="ti ti-check"
+          class="ti"
+          :class="collapsed ? 'ti-chevron-right' : 'ti-chevron-down'"
+          aria-hidden="true"
         />
-        <i
-          v-else-if="indeterminate"
-          class="ti ti-minus"
-        />
-      </span>
-    </label>
+      </button>
+    </div>
 
-    <div class="liturgy-item__card">
+    <div
+      class="liturgy-item__card"
+      @click="onRowClick"
+    >
       <span
         v-if="isCategory && showInProgress"
         class="liturgy-item__progress"
@@ -581,14 +708,15 @@ const projectActionTitle = computed(() => {
 
         <div class="liturgy-item__body">
           <p
-            v-if="isCategory"
+            v-if="isCategory && showCategoryTime"
             class="liturgy-item__type liturgy-item__type--range"
           >
             {{ categoryTimeRange }}
           </p>
           <p
-            v-else
-            class="liturgy-item__type"
+            v-else-if="!isCategory"
+            class="liturgy-item__type liturgy-item__type--badge"
+            :style="{ '--liturgy-type-color': categoryOrItemAccent }"
           >
             {{ t(`liturgy.types.${item.type}`) }}
           </p>
@@ -597,13 +725,7 @@ const projectActionTitle = computed(() => {
               class="liturgy-item__name"
               :style="annotationTitleColor ? { color: annotationTitleColor } : undefined"
             >
-              {{ item.name }}
-              <span
-                v-if="item.complementaryTitle"
-                class="liturgy-item__complementary"
-              >
-                {{ item.complementaryTitle }}
-              </span>
+              {{ displayName }}
             </h3>
             <span
               v-if="statusKey"
@@ -637,16 +759,16 @@ const projectActionTitle = computed(() => {
           </p>
           <!-- eslint-disable-next-line vue/no-v-html -- HTML passa por sanitizeNotesHtml -->
           <div
-            v-if="richNotesHtml"
+            v-if="richNotesHtml && showSubtitle"
             class="liturgy-item__subtitle liturgy-item__rich-notes rich-notes"
             data-testid="liturgy-item-rich-notes"
             v-html="richNotesHtml"
           />
           <p
-            v-else-if="item.subtitle"
+            v-else-if="displaySubtitle && showSubtitle"
             class="liturgy-item__subtitle"
           >
-            {{ item.subtitle }}
+            {{ displaySubtitle }}
           </p>
           <p
             v-if="item.notes"
@@ -704,17 +826,7 @@ const projectActionTitle = computed(() => {
         </span>
 
         <div
-          class="liturgy-item__actions"
-          :class="{
-            'liturgy-item__actions--visible':
-              isCategory ||
-              isVideoRemote ||
-              isSiteItem ||
-              isMusicItem ||
-              isAudioItem ||
-              isAnnotation ||
-              isLocalMediaUpload,
-          }"
+          class="liturgy-item__actions liturgy-item__actions--visible"
           @click.stop
         >
           <input
@@ -747,22 +859,6 @@ const projectActionTitle = computed(() => {
               aria-hidden="true"
             />
             <span>{{ t('liturgy.actions.addSubItem') }}</span>
-          </button>
-          <button
-            v-if="collapsible"
-            type="button"
-            class="liturgy-item__action liturgy-item__action--collapse"
-            :title="collapseLabel"
-            :aria-label="collapseLabel"
-            :aria-expanded="!collapsed"
-            :disabled="item.done"
-            @click="emit('toggleCollapse')"
-          >
-            <i
-              class="ti"
-              :class="collapsed ? 'ti-chevron-right' : 'ti-chevron-down'"
-              aria-hidden="true"
-            />
           </button>
           <div
             v-if="showPlayerSelect && playerOptions.length > 0"
@@ -838,10 +934,74 @@ const projectActionTitle = computed(() => {
             @slides="emit('musicSlides')"
             @lyric="emit('musicLyric')"
           />
+          <div
+            v-if="isPlaylistItem"
+            class="liturgy-item__playlist-actions"
+            role="group"
+            :aria-label="t('liturgy.actions.playlistControls')"
+          >
+            <button
+              type="button"
+              class="liturgy-item__action"
+              data-testid="playlist-shuffle"
+              :title="t('liturgy.actions.playlistShuffle')"
+              :aria-label="t('liturgy.actions.playlistShuffle')"
+              :disabled="item.done"
+              @click.stop="emit('playlistShuffle')"
+            >
+              <i
+                class="ti ti-arrows-shuffle"
+                aria-hidden="true"
+              />
+            </button>
+            <button
+              type="button"
+              class="liturgy-item__action liturgy-item__action--primary"
+              data-testid="playlist-play"
+              :title="t('liturgy.actions.playlistPlay')"
+              :aria-label="t('liturgy.actions.playlistPlay')"
+              :disabled="item.done"
+              @click.stop="emit('playlistPlay')"
+            >
+              <i
+                class="ti ti-player-play"
+                aria-hidden="true"
+              />
+            </button>
+            <button
+              type="button"
+              class="liturgy-item__action"
+              data-testid="playlist-instrumental"
+              :title="t('liturgy.actions.playlistInstrumental')"
+              :aria-label="t('liturgy.actions.playlistInstrumental')"
+              :disabled="item.done"
+              @click.stop="emit('playlistInstrumental')"
+            >
+              <i
+                class="ti ti-piano"
+                aria-hidden="true"
+              />
+            </button>
+            <button
+              type="button"
+              class="liturgy-item__action"
+              data-testid="playlist-no-audio"
+              :title="t('liturgy.actions.playlistNoAudio')"
+              :aria-label="t('liturgy.actions.playlistNoAudio')"
+              :disabled="item.done"
+              @click.stop="emit('playlistNoAudio')"
+            >
+              <i
+                class="ti ti-volume-off"
+                aria-hidden="true"
+              />
+            </button>
+          </div>
           <button
             v-if="
               !isCategory &&
                 !isMusicItem &&
+                !isPlaylistItem &&
                 !isVideoRemote &&
                 !isSiteItem &&
                 !isAnnotation &&
@@ -1088,6 +1248,59 @@ const projectActionTitle = computed(() => {
   }
 }
 
+.liturgy-item__rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+
+  // Recolher/expandir: botão de destaque (cor de realce, borda e sombra).
+  .liturgy-item__action--collapse {
+    width: 1.75rem;
+    height: 1.75rem;
+    min-width: 0;
+    padding: 0;
+    flex-shrink: 0;
+    border-radius: 999px;
+    border: 2px solid color-mix(in srgb, var(--ds-color-primary) 70%, white);
+    background: var(--ds-color-primary);
+    color: var(--ds-color-on-primary, #1a1208);
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--ds-color-primary) 22%, transparent),
+      0 4px 10px rgb(0 0 0 / 0.35);
+    transition:
+      transform 140ms ease,
+      background-color 140ms ease;
+
+    .ti {
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+
+    &:hover:not(:disabled) {
+      transform: scale(1.08);
+      background: color-mix(in srgb, var(--ds-color-primary) 85%, white);
+    }
+
+    &:disabled {
+      opacity: 0.45;
+      box-shadow: none;
+    }
+  }
+}
+
+// Categoria concluída: recolher/expandir continua ativo e em destaque
+// (o estilo de concluído apaga os demais botões de ação).
+.liturgy-item--done .liturgy-item__rail .liturgy-item__action--collapse {
+  color: var(--ds-color-on-primary, #1a1208);
+  background: var(--ds-color-primary);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--ds-color-primary) 22%, transparent),
+    0 4px 10px rgb(0 0 0 / 0.35);
+  filter: none;
+  opacity: 1;
+}
+
 .liturgy-item__check {
   position: relative;
   z-index: 1;
@@ -1233,6 +1446,10 @@ const projectActionTitle = computed(() => {
 
 // Categoria/separador: cabeçalho de seção, não pode se confundir com os
 // sub-itens. Fundo tingido pela cor da categoria + barra lateral grossa.
+.liturgy-item--row-play .liturgy-item__card {
+  cursor: pointer;
+}
+
 .liturgy-item--category {
   // Segue a cor de realce do tema (Aparência), não a cor salva no item.
   --liturgy-category-accent-color: var(--ds-color-primary);
@@ -1285,9 +1502,42 @@ const projectActionTitle = computed(() => {
   }
 
   .liturgy-item__name {
-    font-size: 1rem;
+    font-size: var(--liturgy-category-title-size, 1rem);
     font-weight: 700;
     letter-spacing: 0.01em;
+    color: var(--liturgy-category-title-color, inherit);
+  }
+
+  // Personalização da liturgia (painel da paleta).
+  &.liturgy-item--cat-center {
+    .liturgy-item__body {
+      text-align: center;
+    }
+
+    .liturgy-item__heading {
+      justify-content: center;
+    }
+  }
+
+  &.liturgy-item--cat-upper .liturgy-item__name {
+    text-transform: uppercase;
+  }
+
+  &.liturgy-item--cat-light .liturgy-item__name {
+    font-weight: 500;
+  }
+
+  &.liturgy-item--cat-bg:not(.liturgy-item--done) .liturgy-item__card {
+    background: var(--liturgy-category-bg);
+  }
+
+  // Em andamento: o realce continua, misturado ao fundo escolhido.
+  &.liturgy-item--cat-bg.liturgy-item--selected .liturgy-item__card {
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--ds-color-primary) 30%, var(--liturgy-category-bg)) 0%,
+      var(--liturgy-category-bg) 100%
+    );
   }
 }
 
@@ -1449,6 +1699,27 @@ const projectActionTitle = computed(() => {
 
 .liturgy-item__body {
   min-width: 0;
+}
+
+.liturgy-item__type.liturgy-item__type--badge {
+  /* Tipo do item em destaque: etiqueta na cor do tipo (Música, Vídeos…). */
+  display: inline-block;
+  max-width: 100%;
+  margin: 0 0 0.25rem;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.08em !important;
+  color: color-mix(in srgb, var(--liturgy-type-color) 75%, white) !important;
+  background: color-mix(in srgb, var(--liturgy-type-color) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--liturgy-type-color) 40%, transparent);
+
+  .liturgy-item--done & {
+    color: color-mix(in srgb, var(--ds-color-on-surface) 42%, transparent) !important;
+    background: color-mix(in srgb, var(--ds-color-on-surface) 6%, transparent);
+    border-color: transparent;
+  }
 }
 
 .liturgy-item__type {
@@ -1755,20 +2026,17 @@ const projectActionTitle = computed(() => {
 .liturgy-item__actions {
   display: flex;
   gap: 0.15rem;
-  opacity: 0;
-  transition: opacity 160ms ease;
+  opacity: 1;
 
-  .liturgy-item:hover &,
-  .liturgy-item--selected &,
-  &--visible {
-    opacity: 1;
-  }
-
-  .liturgy-item--done &,
-  .liturgy-item--done:hover &,
-  .liturgy-item--done &--visible {
+  .liturgy-item--done & {
     opacity: 0.45;
   }
+}
+
+.liturgy-item__playlist-actions {
+  display: inline-flex;
+  gap: 0.15rem;
+  align-items: center;
 }
 
 .liturgy-item__child-count {

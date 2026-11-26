@@ -338,6 +338,10 @@ export default {
       "librasTitle": "Libras (ترجمة تلقائية)",
       "librasHint": "يعرض كلمات الترنيمة الحالية بلغة Libras (شرح نصي). ترجمة تلقائية؛ يبقى الأصل ظاهرًا.",
       "librasToggleLabel": "تفعيل Libras",
+      "librasAvatarLabel": "أفاتار المترجم الفوري",
+      "librasAvatarIcaro": "إيكارو",
+      "librasAvatarHozana": "هوزانا",
+      "librasAvatarGuga": "غوغا",
       "languageHint": "Choose the application interface language.",
       "languagePortuguese": "Português (BR)",
       "languageEnglish": "English",
@@ -451,7 +455,22 @@ export default {
       "mediaFolderMoved": "Media moved to {path}",
       "mediaFolderError": "Could not move the media folder. Try again.",
       "mediaFolderDestInside": "Choose a folder outside the current media folder.",
-      "mediaFolderPersistError": "Media was copied, but the shared path could not be saved."
+      "mediaFolderPersistError": "Media was copied, but the shared path could not be saved.",
+      "legacyMediaArchiveSummary": "ملف مضغوط بحجم {size}: تُنسخ الوسائط غير الموجودة هنا منه مباشرةً دون فك الضغط.",
+      "legacyMediaCancelled": "توقّف الاستيراد: نُسخ {imported} ملف. اختر الملف أو المجلد مرة أخرى للمتابعة من حيث توقّف.",
+      "legacyMediaHintLinux": "اختر الملف الذي نزّلته من الموقع (.tar.gz): ينسخ التطبيق الوسائط منه مباشرةً دون حاجة لفك الضغط. وإن شئت، فك ضغطه واختر المجلد. تُنسخ فقط الملفات (الأغلفة والصور والترانيم) غير الموجودة هنا.",
+      "legacyMediaInvalidArchive": "لا يحتوي هذا الملف على وسائط Louvor JA (أغلفة أو صور أو ترانيم). اختر الملف الذي نزّلته من الموقع.",
+      "legacyMediaInvalidFolderLinux": "لا يحتوي هذا المجلد على الوسائط. اختر المجلد المستخرج من ملف الموقع (مثل LouvorJA-PIANO) أو مجلد Media بداخله.",
+      "legacyMediaLiveCounts": "{imported} حُفظت الآن · {skipped} موجودة مسبقًا (تظهر بالفعل في مركز الوسائط)",
+      "legacyMediaPause": "إيقاف مؤقت",
+      "legacyMediaPaused": "متوقف مؤقتًا عند {current} من {total}",
+      "legacyMediaPausedBytes": "متوقف مؤقتًا عند {current} من {total}",
+      "legacyMediaPickArchive": "اختيار الملف المُنزَّل (.tar.gz)",
+      "legacyMediaPickFolderLinux": "اختيار مجلد الوسائط",
+      "legacyMediaPickHintLinux": "اختر المجلد المستخرج من الملف (مثل LouvorJA-PIANO) أو مجلد Media بداخله. يجد التطبيق الأغلفة والصور والترانيم بنفسه.",
+      "legacyMediaProgressBytes": "قراءة {current} من {total}",
+      "legacyMediaResume": "استئناف",
+      "legacyMediaStop": "إيقاف"
     },
     "remote": {
       "renewToken": "Refresh token",
@@ -813,7 +832,13 @@ export default {
       "transformNone": "None",
       "speedSlow": "Slow",
       "speedNormal": "Normal",
-      "speedFast": "Fast"
+      "speedFast": "Fast",
+      "hymnNumberShow": "رقم الترنيمة على الغلاف (كتاب الترانيم)",
+      "hymnNumberSize": "حجم رقم الترنيمة",
+      "hymnalNameColor": "لون اسم كتاب الترانيم",
+      "hymnalNameColorDefault": "الافتراضي (أبيض)",
+      "hymnalNameShow": "اسم كتاب الترانيم على الغلاف",
+      "hymnalNameSize": "حجم اسم كتاب الترانيم"
     }
   }
 }

@@ -9,17 +9,9 @@ export default {
       "emptyHint": "आपकी अभी कोई प्लेलिस्ट नहीं है।",
       "createHint": "लाइब्रेरी के प्लेलिस्ट अनुभाग में बनाएँ।",
       "importedList": "आयातित: {parts}।",
-
       "importedNewPlaylists": "{count} नई प्लेलिस्ट",
-
-
       "importedAddedTracks": "{count} ट्रैक जोड़े गए",
-
-
-
-
       "importedNothingNew": "आयात करने के लिए कुछ नया नहीं है।",
-
       "importInvalid": "अमान्य प्लेलिस्ट फ़ाइल।",
       "newPlaceholder": "नया संग्रह नाम…",
       "create": "बनाएँ",
@@ -54,7 +46,11 @@ export default {
       "create": "बनाएँ",
       "export": "प्लेलिस्ट निर्यात",
       "import": "प्लेलिस्ट आयात",
-      "empty": "अभी कोई प्लेलिस्ट नहीं बनी।"
+      "empty": "अभी कोई प्लेलिस्ट नहीं बनी।",
+      "playInstrumental": "{name} को संगीत संगत (इंस्ट्रुमेंटल) के साथ चलाएँ",
+      "playInstrumentalHint": "संगत: सभी गीत केवल इंस्ट्रुमेंटल के साथ चलें",
+      "playNoAudio": "{name} को बिना आवाज़ के चलाएँ (केवल स्लाइड)",
+      "playNoAudioHint": "बिना आवाज़: केवल गीतों की स्लाइड दिखें, बिना ध्वनि"
     },
     "title": "मीडिया केंद्र",
     "subtitle": "एल्बम और संग्रह",
@@ -85,10 +81,9 @@ export default {
       "close": "बोल बंद करें"
     },
     "messages": {
-      convite_catalogo: 'संगीत कैटलॉग अभी आपकी भाषा में उपलब्ध नहीं है। समुदाय से जुड़ें और अपनी भाषा में LouvorJA कैटलॉग बनाने में मदद करें।',
-      convite_titulo: 'कैटलॉग निर्माणाधीन',
-      convite_hint: 'ऊपर पूर्वावलोकन पुर्तगाली कैटलॉग दिखाता है — आपकी मदद से जल्द ही आपकी भाषा में।',
-
+      "convite_catalogo": "इस भाषा के लिए अभी कोई कैटलॉग प्रकाशित नहीं है। PIANO LouvorJA समुदाय में शामिल हों और संग्रहों का अनुवाद तथा प्रकाशन करने में सहायता करें!",
+      "convite_titulo": "कैटलॉग निर्माणाधीन",
+      "convite_hint": "ऊपर पूर्वावलोकन पुर्तगाली कैटलॉग दिखाता है — आपकी मदद से जल्द ही आपकी भाषा में।",
       "catalogEmpty": "स्थानीय सूची में संग्रह नहीं मिला।",
       "catalogFailed": "एल्बम सूची लोड नहीं हुई।",
       "catalogSearchEmpty": "इस खोज हेतु संग्रह नहीं मिला।",
@@ -101,6 +96,19 @@ export default {
       "deleteCollectionAction": "Delete collection",
       "deleteCollectionTitle": "Delete “{name}”?",
       "deleteCollectionText": "The local copy will be deleted. The original in Community is not affected."
+    },
+    "disabledAlbums": {
+      "badge": "एल्बम बंद है",
+      "collectionNote": "एल्बम बंद है: इसके गीत खोज में धुंधले दिखते हैं और चयन उन्हें छोड़ देता है। यहाँ क्लिक करने पर वे अभी भी चलते हैं।",
+      "count": "{count} बंद",
+      "description": "जिन एल्बमों का आप उपयोग नहीं करते उन्हें बंद करें (जैसे पुराना भजन-संग्रह)। उनके गीत खोज में धुंधले दिखते हैं और Enter व तीर कुंजियाँ उन्हें छोड़ देती हैं। आप मीडिया सेंटर में एल्बम के कार्ड से भी उसे बंद कर सकते हैं।",
+      "disable": "एल्बम बंद करें",
+      "disableConfirmTitle": "“{name}” बंद करें?",
+      "disableConfirmMessage": "इस एल्बम के गाने खोज में धुँधले दिखेंगे और चयनकर्ता उन्हें छोड़ देगा। बाद में कार्ड पर आँख से फिर चालू कर सकते हैं।",
+      "disableConfirmYes": "बंद करें",
+      "enable": "एल्बम चालू करें",
+      "filter": "एल्बम खोजें",
+      "title": "चालू एल्बम"
     }
   }
 }

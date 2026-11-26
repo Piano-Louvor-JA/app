@@ -9,17 +9,9 @@ export default {
       "emptyHint": "아직 재생목록이 없습니다.",
       "createHint": "라이브러리의 재생목록 섹션에서 만들 수 있습니다.",
       "importedList": "가져옴: {parts}.",
-
       "importedNewPlaylists": "새 플레이리스트 {count}개",
-
-
       "importedAddedTracks": "추가된 트랙 {count}개",
-
-
-
-
       "importedNothingNew": "가져올 새 항목이 없습니다.",
-
       "importInvalid": "잘못된 재생목록 파일입니다.",
       "newPlaceholder": "새 컬렉션 이름…",
       "create": "만들기",
@@ -54,7 +46,11 @@ export default {
       "create": "만들기",
       "export": "재생목록 내보내기",
       "import": "재생목록 가져오기",
-      "empty": "아직 만든 재생목록이 없습니다."
+      "empty": "아직 만든 재생목록이 없습니다.",
+      "playInstrumental": "{name}을(를) 반주(MR)로 재생",
+      "playInstrumentalHint": "반주: 모든 곡을 반주(MR)로만 재생",
+      "playNoAudio": "{name}을(를) 소리 없이 재생(슬라이드만)",
+      "playNoAudioHint": "소리 없음: 곡 슬라이드만 표시하고 소리는 내지 않음"
     },
     "title": "미디어 센터",
     "subtitle": "앨범 및 컬렉션",
@@ -85,10 +81,9 @@ export default {
       "close": "가사 닫기"
     },
     "messages": {
-      convite_catalogo: '음악 카탈로그가 아직 사용자의 언어로 제공되지 않습니다. 커뮤니티에 참여하여 이 언어로 LouvorJA 카탈로그를 만드는 데 도움을 주세요.',
-      convite_titulo: '카탈로그 준비 중',
-      convite_hint: '위 미리보기는 포르투갈어 카탈로그입니다. 도움으로 곧 당신의 언어로도.',
-
+      "convite_catalogo": "아직 이 언어로 게시된 카탈로그가 없습니다. PIANO LouvorJA 커뮤니티에 참여하여 컬렉션 번역과 게시에 함께해 주세요!",
+      "convite_titulo": "카탈로그 준비 중",
+      "convite_hint": "위 미리보기는 포르투갈어 카탈로그입니다. 도움으로 곧 당신의 언어로도.",
       "catalogEmpty": "로컬 카탈로그에서 컬렉션을 찾을 수 없습니다.",
       "catalogFailed": "앨범 카탈로그를 불러올 수 없습니다.",
       "catalogSearchEmpty": "이 검색에 해당하는 컬렉션이 없습니다.",
@@ -101,6 +96,19 @@ export default {
       "deleteCollectionAction": "Delete collection",
       "deleteCollectionTitle": "Delete “{name}”?",
       "deleteCollectionText": "The local copy will be deleted. The original in Community is not affected."
+    },
+    "disabledAlbums": {
+      "badge": "비활성 앨범",
+      "collectionNote": "비활성 앨범: 곡이 검색에서 흐리게 표시되고 선택에서 건너뜁니다. 여기서는 클릭하면 계속 재생됩니다.",
+      "count": "비활성 {count}개",
+      "description": "사용하지 않는 앨범(예: 이전 찬송가)을 끄세요. 해당 곡은 검색에서 흐리게 표시되고 Enter와 화살표 키가 건너뜁니다. 미디어 센터의 앨범 카드에서도 끌 수 있습니다.",
+      "disable": "앨범 끄기",
+      "disableConfirmTitle": "“{name}”을(를) 끌까요?",
+      "disableConfirmMessage": "이 앨범의 곡은 검색에서 흐리게 보이고 선택기가 건너뜁니다. 나중에 카드의 눈 아이콘으로 다시 켤 수 있습니다.",
+      "disableConfirmYes": "끄기",
+      "enable": "앨범 켜기",
+      "filter": "앨범 필터",
+      "title": "사용 중인 앨범"
     }
   }
 }

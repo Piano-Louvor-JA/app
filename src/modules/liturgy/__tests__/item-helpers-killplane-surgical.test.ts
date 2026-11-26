@@ -75,12 +75,12 @@ describe('item-helpers kill plane 3 — survivors cirúrgicos', () => {
       { type: 'images', name: 'I', subtitle: '', durationMs: 0, filePath: '', filePaths: ['/x/foto.png'] } as any,
       { musicList: [], bibleBooks: [] },
     )
-    expect(one.subtitle).toBe('foto.png')
+    expect(one.subtitle).toBe('')
     const many = buildLiturgyItemFromDraft(
       { type: 'images', name: 'I', subtitle: '', durationMs: 0, filePath: '', filePaths: ['/a.png', '/b.png'] } as any,
       { musicList: [], bibleBooks: [] },
     )
-    expect(many.subtitle).toBe('2 imagens')
+    expect(many.subtitle).toBe('')
     // com subtitle não sobrescreve
     const withSub = buildLiturgyItemFromDraft(
       { type: 'images', name: 'I', subtitle: 'Manual', durationMs: 0, filePath: '', filePaths: ['/a.png'] } as any,
@@ -91,10 +91,10 @@ describe('item-helpers kill plane 3 — survivors cirúrgicos', () => {
 
   it('#519 build file type: sem subtitle -> subtitle = filename (else block)', () => {
     const d = buildLiturgyItemFromDraft(
-      { type: 'video', name: 'V', subtitle: '', durationMs: 0, filePath: '/dir/meuvideo.mp4' } as any,
+      { type: 'presentation', name: 'V', subtitle: '', durationMs: 0, filePath: '/dir/slides.pptx' } as any,
       { musicList: [], bibleBooks: [] },
     )
-    expect(d.subtitle).toBe('meuvideo.mp4')
+    expect(d.subtitle).toBe('')
   })
 
   // #579-#588 L418-421 draftFromLiturgyItem

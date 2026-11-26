@@ -20,6 +20,7 @@ const baseDraft = (): LiturgyItemDraft => ({
   name: "Escola Sabatina",
   categoryId: null,
   scheduledRotationId: null,
+  playlistId: null,
   startTime: "09:00",
   endTime: "",
   filePath: "",

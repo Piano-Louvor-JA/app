@@ -416,6 +416,71 @@ describe('useLiturgyStore — gaps2', () => {
     expect(store.itemDraft.durationMs).toBe(0)
   })
 
+  it('trocar a música: o título vira o nome da música nova e as anotações são limpas', () => {
+    const store = useLiturgyStore()
+    store.musicList = [
+      { id: 1, name: 'Digno', durationMs: 1000 },
+      { id: 5, name: 'Jubilosos Te Adoramos', durationMs: 2000 },
+    ] as never
+    // Mesmo com título próprio, trocar a música força o título novo.
+    store.itemDraft = { ...store.itemDraft, musicId: 1, name: 'Digno', subtitle: 'Música adoradores', notesHtml: '<p>Música adoradores</p>' }
+    store.onMusicPick(5)
+    expect(store.itemDraft.name).toBe('Jubilosos Te Adoramos')
+    expect(store.itemDraft.subtitle).toBe('')
+    expect(store.itemDraft.notesHtml ?? '').toBe('')
+  })
+
+  it('remover a música (X) e escolher outra também troca o título e limpa as anotações', () => {
+    const store = useLiturgyStore()
+    store.musicList = [
+      { id: 1, name: 'Digno', durationMs: 1000 },
+      { id: 5, name: 'Jubilosos Te Adoramos', durationMs: 2000 },
+    ] as never
+    store.itemDraft = { ...store.itemDraft, musicId: 1, name: 'Digno', subtitle: 'Música adoradores' }
+    store.clearMusicPick()
+    store.onMusicPick(5)
+    expect(store.itemDraft.name).toBe('Jubilosos Te Adoramos')
+    expect(store.itemDraft.subtitle).toBe('')
+  })
+
+  it('remover a música e fechar: o próximo item aberto não herda a troca', () => {
+    const store = useLiturgyStore()
+    store.musicList = [
+      { id: 1, name: 'Digno', durationMs: 1000 },
+      { id: 5, name: 'Jubilosos Te Adoramos', durationMs: 2000 },
+    ] as never
+    store.itemDraft = { ...store.itemDraft, musicId: 1, name: 'Digno' }
+    store.clearMusicPick()
+    store.openAddDialog()
+    store.itemDraft = { ...store.itemDraft, type: 'music', musicId: null, name: '', subtitle: 'Anotação digitada antes' }
+    store.onMusicPick(5)
+    expect(store.itemDraft.subtitle).toBe('Anotação digitada antes')
+    expect(store.itemDraft.name).toBe('Jubilosos Te Adoramos')
+  })
+
+  it('o título complementar recebe o nome completo do catálogo (com o número do hino)', () => {
+    const store = useLiturgyStore()
+    store.musicList = [
+      { id: 1, name: 'Digno', displayLabel: 'Digno', durationMs: 1000 },
+      { id: 571, name: 'Tu És Digno', displayLabel: '571 - Tu És Digno', durationMs: 2000 },
+    ] as never
+    store.itemDraft = { ...store.itemDraft, musicId: 1, name: 'Digno' }
+    store.onMusicPick(571)
+    expect(store.itemDraft.name).toBe('571 - Tu És Digno')
+    store.itemDraft = { ...store.itemDraft, musicId: null, name: '' }
+    store.onMusicPick(571)
+    expect(store.itemDraft.name).toBe('571 - Tu És Digno')
+  })
+
+  it('escolher a mesma música de novo não mexe no título nem nas anotações', () => {
+    const store = useLiturgyStore()
+    store.musicList = [{ id: 1, name: 'Digno', durationMs: 1000 }] as never
+    store.itemDraft = { ...store.itemDraft, musicId: 1, name: 'Regência inicial', subtitle: 'Música adoradores' }
+    store.onMusicPick(1)
+    expect(store.itemDraft.name).toBe('Regência inicial')
+    expect(store.itemDraft.subtitle).toBe('Música adoradores')
+  })
+
   it('gaps2b: selectedItem índice fora → null; dentro → item', () => {
     const store = useLiturgyStore()
     store.selectedDay = LITURGY_WEEKDAYS[0]!

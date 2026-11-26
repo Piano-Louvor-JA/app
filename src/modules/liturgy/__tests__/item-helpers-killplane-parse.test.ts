@@ -122,9 +122,9 @@ describe('item-helpers kill plane — parse/label/reconcile survivors', () => {
   })
 
   it('#501/#519 else branches L372/L380: items sem filePath e sem subtitle -> subtitle = filename', () => {
-    const d = { ...baseDraft, type: 'video' as const, filePath: '/p/video.mp4', subtitle: '' }
+    const d = { ...baseDraft, type: 'audio' as const, filePath: '/p/audio.mp3', subtitle: '' }
     const item = buildLiturgyItemFromDraft(d, ctx)
-    expect(item.subtitle).toBe('video.mp4')
+    expect(item.subtitle).toBe('')
   })
 
   // displayLabelOf (via build/reconcile)

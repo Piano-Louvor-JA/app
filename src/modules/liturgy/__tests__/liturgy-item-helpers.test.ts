@@ -451,13 +451,13 @@ describe('buildLiturgyItemFromDraft', () => {
       draft({ type: 'images', musicId: null, filePaths: ['/a.png', '/b.png'] }),
       { musicList, bibleBooks },
     )
-    expect(m.subtitle).toBe('2 imagens')
+    expect(m.subtitle).toBe('')
     expect(m.filePaths).toEqual(['/a.png', '/b.png'])
     const s = buildLiturgyItemFromDraft(
       draft({ type: 'images', musicId: null, filePath: 'C:\\fotos\\x.jpg' }),
       { musicList, bibleBooks },
     )
-    expect(s.subtitle).toBe('x.jpg')
+    expect(s.subtitle).toBe('')
     expect(s.filePath).toBe('C:\\fotos\\x.jpg')
   })
   it('arquivo com detalhe manual mantém subtítulo; senão basename', () => {
@@ -467,10 +467,16 @@ describe('buildLiturgyItemFromDraft', () => {
     )
     expect(withSub.subtitle).toBe('Intro')
     const noSub = buildLiturgyItemFromDraft(
+      draft({ type: 'audio', musicId: null, filePath: '/pasta/clip.mp3' }),
+      { musicList, bibleBooks },
+    )
+    expect(noSub.subtitle).toBe('')
+    // Vídeo sem anotação: sem o nome do arquivo.
+    const videoNoSub = buildLiturgyItemFromDraft(
       draft({ type: 'video', musicId: null, filePath: '/pasta/clip.mp4' }),
       { musicList, bibleBooks },
     )
-    expect(noSub.subtitle).toBe('clip.mp4')
+    expect(videoNoSub.subtitle).toBe('')
   })
   it('images sem paths: filePath vazio e sem subtitle automático', () => {
     const e = buildLiturgyItemFromDraft(
@@ -486,7 +492,7 @@ describe('buildLiturgyItemFromDraft', () => {
       { musicList, bibleBooks },
     )
     expect(s.url).toBe('https://x.com')
-    expect(s.subtitle).toBe('https://x.com')
+    expect(s.subtitle).toBe('')
     const s2 = buildLiturgyItemFromDraft(
       draft({ type: 'site', musicId: null, url: 'https://x.com', subtitle: 'Site oficial' }),
       { musicList, bibleBooks },

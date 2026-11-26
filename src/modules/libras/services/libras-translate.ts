@@ -31,9 +31,9 @@ async function fetchGlossFromVLibras(normalizedLyrics: string): Promise<string |
             return null; // Trata 4xx/5xx como falha de serviço, não erro de aplicação
         }
 
-        const data = await response.json();
-        // Assumimos que a resposta contém o campo 'gloss' conforme o benchmark Violin
-        return data.gloss || null;
+        // API VLibras retorna o gloss em TEXTO PURO (ex.: "DEUS AMOR"), não JSON.
+        const gloss = (await response.text()).trim();
+        return gloss || null;
 
     } catch (error) {
         if (error instanceof DOMException && error.name === 'TimeoutError') {

@@ -18,6 +18,9 @@ import { bibleTransitionMs, effectiveLyricTransition, resolveBackgroundImage, st
 import '@styles/screen-transitions.css'
 import type { MediaProjectionRuntime } from '../types/media'
 import { DEFAULT_MEDIA_PROJECTION } from '../types/media'
+import VLibrasUnityPlayer from '../../libras/components/VLibrasUnityPlayer.vue'
+import { useLibrasLive } from '../../libras/composables/useLibrasLive'
+import { isLibrasEnabled, getLibrasAvatar, isLibrasSubtitleEnabled, getLibrasSpeed } from '../../libras/services/libras-preferences'
 
 const runtime = ref<MediaProjectionRuntime>({ ...DEFAULT_MEDIA_PROJECTION })
 
@@ -35,6 +38,19 @@ const lyric = computed(() => stripHtmlBreaks(runtime.value.lyric))
 // renderizar o nome da música no meio do hino (slides de solfejo/pausa são
 // filtrados no buildMediaSlides, mas qualquer slide vazio residual não vira título).
 const showTitle = computed(() => runtime.value.isCover)
+
+// F-B.2: intérprete Ícaro no canto — tradução ao vivo do slide (Libras ON).
+const librasEnabled = isLibrasEnabled()
+const librasAvatar = getLibrasAvatar()
+const librasSubtitle = isLibrasSubtitleEnabled()
+const librasSpeed = getLibrasSpeed()
+const unityPlayer = ref<InstanceType<typeof VLibrasUnityPlayer> | null>(null)
+const liveLyric = computed(() => (runtime.value.active && !runtime.value.isCover ? lyric.value : ''))
+const librasLive = useLibrasLive(liveLyric, computed(() => runtime.value.active))
+watch(librasLive.gloss, (gloss) => {
+  if (gloss) unityPlayer.value?.playGloss(gloss)
+  else unityPlayer.value?.stop()
+})
 
 function applyRuntime(raw: unknown) {
   runtime.value = normalizeMediaRuntime(raw)
@@ -128,6 +144,22 @@ const titleStyle = computed(() => {
     textTransform: st.titleUpperCase ? 'uppercase' : 'none',
   }
 })
+// Hinário: nome do hinário acima do número (Personalização → nome do hinário).
+const hymnalNameStyle = computed(() => ({
+  fontSize: `${+(((stage.value.hymnalNameSize ?? 28) / 1920) * 100).toFixed(4)}cqw`,
+  ...(stage.value.hymnalNameColor ? { color: stage.value.hymnalNameColor } : {}),
+}))
+
+// Hinário: número do hino grande acima do título (Personalização → número do hino).
+const showHymnNumber = computed(
+  () => runtime.value.hymnNumber != null && stage.value.hymnNumberShow !== false,
+)
+const hymnNumberStyle = computed(() => ({
+  fontSize: `${+(((stage.value.hymnNumberSize ?? 200) / 1920) * 100).toFixed(4)}cqw`,
+  fontWeight: String(stage.value.titleFontWeight ?? 800),
+  textShadow: titleStyle.value.textShadow,
+}))
+
 // Caixa no título: default = SEM caixa (padrão capa amarela 14/10 Rafael);
 // só aparece quando o usuário liga 'titleTextBox'.
 const titleBoxStyle = computed(() =>
@@ -206,9 +238,15 @@ const projectionFontStyle = useProjectionFont('hymns')
             aria-hidden="true"
           />
           <p
-            v-if="coverSubtitle"
+            v-if="coverSubtitle && stage.hymnalNameShow !== false"
             class="media-projection__kicker"
+            :style="hymnalNameStyle"
           >{{ coverSubtitle }}</p>
+          <p
+            v-if="showHymnNumber"
+            class="media-projection__hymn-number"
+            :style="hymnNumberStyle"
+          >{{ runtime.hymnNumber }}</p>
           <p
             class="media-projection__title media-projection__title--cover"
             :style="[titleStyle, titleBoxStyle]"
@@ -241,9 +279,26 @@ const projectionFontStyle = useProjectionFont('hymns')
     }"
     aria-hidden="true"
   />
+  <!-- F-B.2: intérprete Ícaro compacto — MONTADO sempre (prewarm: Unity
+       carrega fora do timing da música), VISÍVEL só com faixa ativa -->
+  <VLibrasUnityPlayer
+    ref="unityPlayer"
+    compact
+    :visible="runtime.active"
+    :avatar="librasAvatar"
+    :subtitle="librasSubtitle"
+    :speed="librasSpeed"
+  />
 </template>
 
 <style scoped lang="scss">
+.media-projection__hymn-number {
+  margin: 0;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
 .media-projection {
   position: relative;
   width: 100vw;
@@ -271,6 +326,7 @@ const projectionFontStyle = useProjectionFont('hymns')
   align-items: center;
   justify-content: center;
   gap: 1.25rem;
+  /* Margem lateral da letra: 4vw de cada lado (igual às TVs). */
   padding: 4vw;
   text-align: center;
 }
@@ -282,7 +338,8 @@ const projectionFontStyle = useProjectionFont('hymns')
 .media-projection__lyric {
   margin: 0;
   width: fit-content;
-  max-width: min(100%, 1600px);
+  /* Sem teto em px: fonte grande usa toda a largura (menos a margem). */
+  max-width: 100%;
   padding: 1.6vmin 1.8vmin;
   border-radius: clamp(14px, 2.4vmin, 32px) 0
     clamp(14px, 2.4vmin, 32px) 0;
@@ -313,7 +370,7 @@ const projectionFontStyle = useProjectionFont('hymns')
   align-items: center;
   justify-content: center;
   gap: 0.8cqw;
-  max-width: min(88%, 1600px);
+  max-width: 100%;
   padding: 3.6cqw 5cqw 3.8cqw;
   text-align: center;
   animation: media-titlecard-in 780ms cubic-bezier(0.22, 1, 0.36, 1) both;

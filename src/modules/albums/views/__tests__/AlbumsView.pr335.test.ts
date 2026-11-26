@@ -95,6 +95,7 @@ function useAlbumsMockFactory() {
   const r = <T>(v: T) => vueRef<T>(v)
   return {
       categories: r(s.categories ?? []),
+      previewCategories: r(s.previewCategories ?? []),
       activeCollection: r(null),
       tracks: r([]),
       searchQuery: r(''),
@@ -137,6 +138,8 @@ function useAlbumsMockFactory() {
       playAllInActiveCollection: vi.fn(async () => true),
       playAllInCategory: vi.fn(async () => true),
       openCollection: vi.fn(async () => true),
+      isAlbumDisabled: vi.fn(() => false),
+      setAlbumDisabled: vi.fn(),
     }
 }
 
@@ -663,7 +666,8 @@ describe('AlbumsView', () => {
     await flushPromises()
     expect(pushMock).toHaveBeenCalledWith({ name: 'media' })
     // o nome da playlist vai para o título do player
-    expect(playQueueMock).toHaveBeenCalledWith(expect.any(Array), 0, undefined, 'Com faixas')
+    // Play = com áudio (explícito: não herda o modo da música anterior).
+    expect(playQueueMock).toHaveBeenCalledWith(expect.any(Array), 0, 'audio', 'Com faixas')
     // remover faixa: o X pede confirmação; só sai depois de confirmar
     ;((body().querySelector('.albums-view__playlist') as HTMLElement).querySelector('.albums-view__playlist-track-remove') as HTMLElement).click()
     await flushPromises()
@@ -675,6 +679,26 @@ describe('AlbumsView', () => {
     ;((body().querySelector('.albums-view__playlist') as HTMLElement).querySelector('.albums-view__playlist-toggle') as HTMLElement).click()
     await flushPromises()
     expect(body().querySelector('.albums-view__playlist-tracks')).toBeNull()
+    w.unmount()
+  })
+
+  it('playlist: tocar com playback (instrumental) e sem áudio (só os slides)', async () => {
+    savePlaylists([
+      { id: 'pl-m', name: 'Culto', createdAt: '2026-01-01', items: [{ musicId: 7, title: 'Santo', track: 1 }] },
+    ])
+    const w = await mountView()
+    const btn = w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.playlists.title')!
+    await btn.trigger('click')
+    await flushPromises()
+    const row = body().querySelector('.albums-view__playlist') as HTMLElement
+    playQueueMock.mockClear()
+    ;(row.querySelector('[data-test="playlist-play-instrumental"]') as HTMLElement).click()
+    await flushPromises()
+    expect(playQueueMock).toHaveBeenLastCalledWith(expect.any(Array), 0, 'instrumental', 'Culto')
+    ;(row.querySelector('[data-test="playlist-play-no-audio"]') as HTMLElement).click()
+    await flushPromises()
+    expect(playQueueMock).toHaveBeenLastCalledWith(expect.any(Array), 0, 'no_audio', 'Culto')
+    expect(pushMock).toHaveBeenCalledWith({ name: 'media' })
     w.unmount()
   })
 
@@ -967,6 +991,18 @@ describe('AlbumsView', () => {
     expect(w4.find('.albums-view__editor-btn').exists()).toBe(false)
     await w4.find('.hc-cancel').trigger('click')
     expect((globalThis as AnyObj).__albumsCancelMock).toHaveBeenCalled()
+  })
+
+  it('catálogo vazio mostra convite sem catálogo português de fundo', async () => {
+    setState({ categories: [], isLoadingCatalog: false, previewCategories: [{
+      id: 'pt-preview', name: 'Catálogo em português', collections: [],
+    }] })
+    const wrapper = await mountView()
+    expect(wrapper.text()).toContain('albums.messages.convite_catalogo')
+    expect(wrapper.text()).not.toContain('Catálogo em português')
+    expect(wrapper.find('.albums-view__convite-backdrop').exists()).toBe(false)
+    expect(wrapper.find('.albums-view__convite-hint').exists()).toBe(false)
+    wrapper.unmount()
   })
 
   it('gaps onda1 2: catálogo vazio sem loading → catalogEmpty (689); cc-cancel (762); hydrate reentrante real (147)', async () => {

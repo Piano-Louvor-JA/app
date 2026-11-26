@@ -14,6 +14,7 @@ import {
   filterAlbumMusicIndex,
   loadAlbumMusicIndex,
 } from '../services/album-music-search'
+import { loadDisabledAlbums, saveDisabledAlbums } from '../services/disabled-albums'
 import {
   filterAlbumTracks,
   loadAlbumLyric,
@@ -51,8 +52,23 @@ export const useAlbumsStore = defineStore('albums', () => {
     filterAlbumTracks(tracks.value, searchQuery.value, musicIndex.value),
   )
 
+  /** Álbuns desativados (chaves): músicas deles vêm desativadas na busca. */
+  const disabledAlbums = ref<Set<string>>(new Set(loadDisabledAlbums()))
+
+  function isAlbumDisabled(key: string | number): boolean {
+    return disabledAlbums.value.has(String(key))
+  }
+
+  function setAlbumDisabled(key: string | number, disabled: boolean) {
+    const next = new Set(disabledAlbums.value)
+    if (disabled) next.add(String(key))
+    else next.delete(String(key))
+    disabledAlbums.value = next
+    saveDisabledAlbums([...next])
+  }
+
   const hubSearchResults = computed(() =>
-    filterAlbumMusicIndex(musicIndex.value, hubSearchQuery.value),
+    filterAlbumMusicIndex(musicIndex.value, hubSearchQuery.value, disabledAlbums.value),
   )
 
   const isHubSearching = computed(() => hubSearchQuery.value.trim().length > 0)
@@ -275,6 +291,9 @@ export const useAlbumsStore = defineStore('albums', () => {
     filteredTracks,
     hubSearchResults,
     isHubSearching,
+    disabledAlbums,
+    isAlbumDisabled,
+    setAlbumDisabled,
     hydrateCatalog,
     hydrateMusicIndex,
     openCollection,

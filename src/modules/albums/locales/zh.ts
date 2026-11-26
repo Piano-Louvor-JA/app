@@ -9,17 +9,9 @@ export default {
       "emptyHint": "您还没有任何播放列表。",
       "createHint": "在媒体库的“播放列表”部分创建一个。",
       "importedList": "已导入：{parts}。",
-
       "importedNewPlaylists": "{count} 个新播放列表",
-
-
       "importedAddedTracks": "添加了 {count} 首曲目",
-
-
-
-
       "importedNothingNew": "没有可导入的新内容。",
-
       "importInvalid": "无效的播放列表文件。",
       "newPlaceholder": "新歌集名称…",
       "create": "创建",
@@ -54,7 +46,11 @@ export default {
       "create": "创建",
       "export": "导出播放列表",
       "import": "导入播放列表",
-      "empty": "还没有创建播放列表。"
+      "empty": "还没有创建播放列表。",
+      "playInstrumental": "以伴奏（纯音乐）播放 {name}",
+      "playInstrumentalHint": "伴奏：所有歌曲只播放纯音乐",
+      "playNoAudio": "无声播放 {name}（仅幻灯片）",
+      "playNoAudioHint": "无声：只显示歌曲幻灯片，不播放声音"
     },
     "title": "媒体中心",
     "subtitle": "专辑与歌集",
@@ -85,10 +81,9 @@ export default {
       "close": "关闭歌词"
     },
     "messages": {
-      convite_catalogo: '音乐目录尚不支持您的语言。欢迎加入社区，帮助构建您语言的 LouvorJA 目录。',
-      convite_titulo: '目录建设中',
-      convite_hint: '上方预览为葡萄牙语目录 — 有了您的帮助，很快会支持您的语言。',
-
+      "convite_catalogo": "该语言暂无已发布的曲库。欢迎加入 PIANO LouvorJA 社区，协助翻译和发布合集吧！",
+      "convite_titulo": "目录建设中",
+      "convite_hint": "上方预览为葡萄牙语目录 — 有了您的帮助，很快会支持您的语言。",
       "catalogEmpty": "本地目录中未找到歌集。",
       "catalogFailed": "无法加载专辑目录。",
       "catalogSearchEmpty": "未找到匹配该搜索的歌集。",
@@ -101,6 +96,19 @@ export default {
       "deleteCollectionAction": "Delete collection",
       "deleteCollectionTitle": "Delete “{name}”?",
       "deleteCollectionText": "The local copy will be deleted. The original in Community is not affected."
+    },
+    "disabledAlbums": {
+      "badge": "专辑已停用",
+      "collectionNote": "专辑已停用：其歌曲在搜索中显示为灰色，选择时会被跳过。在这里点击仍可播放。",
+      "count": "已停用 {count} 个",
+      "description": "停用不使用的专辑（例如旧版赞美诗）。其歌曲在搜索中显示为灰色，Enter 键和方向键会跳过它们。也可以在媒体中心的专辑卡片上停用。",
+      "disable": "停用专辑",
+      "disableConfirmTitle": "停用“{name}”？",
+      "disableConfirmMessage": "该专辑的歌曲在搜索中会变灰，选择器会跳过它们。之后可在卡片上用眼睛图标重新启用。",
+      "disableConfirmYes": "停用",
+      "enable": "启用专辑",
+      "filter": "筛选专辑",
+      "title": "启用的专辑"
     }
   }
 }

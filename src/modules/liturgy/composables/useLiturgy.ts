@@ -376,6 +376,26 @@ export function useLiturgy() {
     )
   }
 
+  function onPlaylistPlay(index: number) {
+    albumsStore.closeLyric()
+    void store.playPlaylistMode(index, 'audio', router)
+  }
+
+  function onPlaylistInstrumental(index: number) {
+    albumsStore.closeLyric()
+    void store.playPlaylistMode(index, 'instrumental', router)
+  }
+
+  function onPlaylistNoAudio(index: number) {
+    albumsStore.closeLyric()
+    void store.playPlaylistMode(index, 'no_audio', router)
+  }
+
+  function onPlaylistShuffle(index: number) {
+    albumsStore.closeLyric()
+    void store.playPlaylistMode(index, 'audio', router, { shuffled: true })
+  }
+
   function onOpenAddDialog() {
     albumsStore.closeLyric()
     store.openAddDialog()
@@ -462,6 +482,7 @@ export function useLiturgy() {
     stopCountdown: store.stopCountdown,
     openAddDialog: onOpenAddDialog,
     openAddSubItemDialog: onOpenAddSubItemDialog,
+    openDroppedFilesDialog: store.openDroppedFilesDialog,
     openEditDialog: onOpenEditDialog,
     closeItemDialog: store.closeItemDialog,
     saveItemDraft: store.saveItemDraft,
@@ -487,6 +508,9 @@ export function useLiturgy() {
     setNotes: store.setNotes,
     onManageTeam,
     onMusicPick: store.onMusicPick,
+    exportLiturgy: store.exportLiturgy,
+    importLiturgy: store.importLiturgy,
+    hasLiturgyContent: () => store.hasLiturgyContent,
     clearMusicPick: store.clearMusicPick,
     refreshMusicCatalog: store.refreshMusicCatalog,
     onVideoFileSelected(itemId: string, durationSec: number) {
@@ -496,6 +520,10 @@ export function useLiturgy() {
     onMusicInstrumental,
     onMusicSlides,
     onMusicLyric,
+    onPlaylistPlay,
+    onPlaylistInstrumental,
+    onPlaylistNoAudio,
+    onPlaylistShuffle,
     closeLyric: albumsStore.closeLyric,
   }
 }

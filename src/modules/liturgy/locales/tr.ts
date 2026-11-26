@@ -1,6 +1,6 @@
 export default {
   "liturgy": {
-  "fileFilters": { "video": "Videolar", "all": "Tümü" },
+  "fileFilters": { "video": "Videolar", "presentation": "Sunumlar (PowerPoint/LibreOffice)", "all": "Tümü" },
   "fallback": { "music": "Müzik", "video": "Video", "audio": "Ses" },
     "title": "Ayin Liturjisi",
     "subtitle": "Ayin düzeni",
@@ -114,7 +114,8 @@ export default {
       "other_files": "Diğer",
       "online_video": "YouTube/Vimeo vb.",
       "site": "Sitler/ağlar",
-      "verse": "Ayet"
+      "verse": "Ayet",
+      "playlist": "Çalma listesi"
     },
     "typeDescriptions": {
       "category": "Kategoriler, liturjinin bölümleri arasında görsel ayırıcı olarak kullanılır.",
@@ -131,7 +132,8 @@ export default {
       "other_files": "Diğer yerel dosyalar",
       "online_video": "Çevrimiçi video (YouTube, Vimeo vb.)",
       "site": "Web siteleri ve sosyal ağlar",
-      "verse": "Kutsal Kitap ayeti"
+      "verse": "Kutsal Kitap ayeti",
+      "playlist": "Medya Merkezi'nden şarkı kuyruğu"
     },
     "dialog": {
       "title": "Yeni an",
@@ -240,7 +242,11 @@ export default {
       "searchMusic": "İlahi ara…",
       "musicMode": "Mod",
       "musicModeAudio": "Ses",
-      "musicModeInstrumental": "Enstrümantal"
+      "musicModeInstrumental": "Enstrümantal",
+      "albumDisabled": "Albüm kapalı",
+      "playlistPlaceholder": "Bir çalma listesi seçin",
+      "playlistRequired": "Bir çalma listesi seçin.",
+      "selectPlaylist": "Çalma listesi seç"
     },
     "namePlaceholders": {
       "category": "örn.: açılış sunumu, ayin başlangıcı, karşılama, Sebt Günü Okulu, Kutsal Ayin…",
@@ -256,7 +262,8 @@ export default {
       "other_files": "örn.: yardımcı dosya",
       "online_video": "örn.: YouTube'da ilahi",
       "site": "örn.: kilise sayfası",
-      "verse": "Referans veya başlık"
+      "verse": "Referans veya başlık",
+      "playlist": "ör.: Açılış ilahileri"
     },
     "actions": {
       "save": "Kaydet",
@@ -301,7 +308,12 @@ export default {
       "collapseCategory": "Kategoriyi daralt",
       "expandCategory": "Kategoriyi genişlet",
       "addSubItem": "Alt öğe ekle",
-      "reorder": "Sıralamak için sürükleyin"
+      "reorder": "Sıralamak için sürükleyin",
+      "playlistControls": "Çalma listesi kontrolleri",
+      "playlistInstrumental": "Altyapıyla çal",
+      "playlistNoAudio": "Sessiz çal (yalnızca slaytlar)",
+      "playlistPlay": "Çalma listesini çal",
+      "playlistShuffle": "Karışık çal"
     },
     "messages": {
       "removeItemTitle": "Öğeyi liturjiden kaldır",
@@ -358,7 +370,16 @@ export default {
       "urlInvalid": "Bağlantı projeksiyon için uygun değil.",
       "projectionFailed": "Projeksiyon yapılandırılan ekranlarda açılamadı.",
       "fileMissingOnMachine": "Dosya bu bilgisayarda bulunamadı — başka bilgisayara ait yol (eşitlenen liturji). Dosyayı bu cihazda yeniden seçin.",
-      "presentationOfficeMissing": "PPT/PPTX projeksiyonu için LibreOffice kurun (veya LIBREOFFICE_PATH tanımlayın)."
+      "presentationOfficeMissing": "PPT/PPTX projeksiyonu için LibreOffice kurun (veya LIBREOFFICE_PATH tanımlayın).",
+      "dropDesktopOnly": "Dosyaları ayine sürüklemek yalnızca masaüstü uygulamasında çalışır.",
+      "dropHint": "Ayine eklemek için dosyaları buraya bırakın",
+      "dropMoreFilesPending": "İlk dosya pencerede açıldı. Gerekirse kaydettikten sonra kalanları yeniden bırakın.",
+      "dropPathFailed": "Bırakılan dosyaların yolları okunamadı. Ekle'yi kullanıp dosyayı seçin.",
+      "playlistCatalogEmpty": "Henüz çalma listesi yok. Medya Merkezi'nde (Çalma listeleri) oluşturun.",
+      "playlistEmpty": "Bu çalma listesi boş. Medya Merkezi'nden şarkı ekleyin.",
+      "playlistMissing": "Çalma listesi bulunamadı. Medya Merkezi'nden başka birini seçin.",
+      "playlistTrackCount": "{count} şarkı",
+      "playlistTrackCountOne": "1 şarkı"
     },
     "slja": {
       "importButton": ".slja içe aktar",
@@ -374,6 +395,45 @@ export default {
       "new": "Yeni özel liturji",
       "namePlaceholder": "Liturji adı (örn.: Gençlik Ayini 12/07)",
       "empty": "Özel liturji yok. İlkini oluşturun."
+    },
+    "appearance": {
+      "align": "Başlık hizası",
+      "align_center": "Ortada",
+      "align_left": "Solda",
+      "background": "Satır arka planı",
+      "bold": "Kalın",
+      "button": "Ayini özelleştir",
+      "categorySection": "Kategori satırları",
+      "default": "Varsayılan",
+      "openStage": "Yansıtmayı özelleştir (sahne)",
+      "reset": "Varsayılana dön",
+      "showSubtitle": "Alt başlığı göster",
+      "showTime": "Saati göster",
+      "size": "Başlık boyutu",
+      "size_lg": "B",
+      "size_md": "O",
+      "size_sm": "K",
+      "size_xl": "ÇB",
+      "title": "Ayini özelleştir",
+      "titleColor": "Başlık rengi",
+      "typesHint": "Bu ekrandaki ayin listesine uygulanır.",
+      "typesSection": "Her öğe türünün rengi",
+      "uppercase": "Büyük harf"
+    },
+    "transfer": {
+      "append": "Ekle",
+      "confirmMessage": "Haftada zaten öğeler var. Dosyadaki ayinle değiştirilsin mi, yoksa öğeleri her günün sonuna mı eklensin?",
+      "confirmTitle": "Ayini içe aktar",
+      "export": "Ayini dışa aktar",
+      "exportHint": "Haftanın ayinini (Paz–Cmt ve tek seferlik) bir .json dosyasına kaydeder",
+      "exported": "Haftanın ayini dışa aktarıldı.",
+      "group": "Ayini dışa ve içe aktar",
+      "import": "Ayini içe aktar",
+      "importHint": "Dışa aktarılmış bir ayin dosyasını (.json) açar",
+      "imported": "Ayin içe aktarıldı.",
+      "invalid": "Bu dosya Louvor JA ile dışa aktarılmış bir ayin değil.",
+      "replace": "Değiştir",
+      "version": "Bu ayin uygulamanın daha yeni bir sürümüyle dışa aktarılmış. İçe aktarmak için uygulamayı güncelleyin."
     }
   }
 }

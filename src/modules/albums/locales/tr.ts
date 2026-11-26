@@ -9,17 +9,9 @@ export default {
       "emptyHint": "Henüz çalma listeniz yok.",
       "createHint": "Kitaplığın Çalma Listeleri bölümünden bir tane oluşturun.",
       "importedList": "İçe aktarıldı: {parts}.",
-
       "importedNewPlaylists": "{count} yeni çalma listesi",
-
-
       "importedAddedTracks": "{count} parça eklendi",
-
-
-
-
       "importedNothingNew": "İçe aktarılacak yeni bir şey yok.",
-
       "importInvalid": "Geçersiz çalma listesi dosyası.",
       "newPlaceholder": "Yeni koleksiyon adı…",
       "create": "Oluştur",
@@ -54,7 +46,11 @@ export default {
       "create": "Oluştur",
       "export": "Listeleri dışa aktar",
       "import": "Listeleri içe aktar",
-      "empty": "Henüz çalma listesi oluşturulmadı."
+      "empty": "Henüz çalma listesi oluşturulmadı.",
+      "playInstrumental": "{name} listesini altyapıyla (enstrümantal) çal",
+      "playInstrumentalHint": "Altyapı: tüm şarkılar yalnızca enstrümantal çalınır",
+      "playNoAudio": "{name} listesini sessiz çal (yalnızca slaytlar)",
+      "playNoAudioHint": "Sessiz: yalnızca şarkı slaytları gösterilir, ses çalmaz"
     },
     "title": "Medya Merkezi",
     "subtitle": "Albümler ve Koleksiyonlar",
@@ -85,10 +81,9 @@ export default {
       "close": "Sözleri kapat"
     },
     "messages": {
-      convite_catalogo: 'Müzik kataloğu dilinizde henüz mevcut değil. Topluluğa katılın ve LouvorJA kataloğunun kendi dilinizde oluşmasına yardımcı olun.',
-      convite_titulo: 'Katalog yapım aşamasında',
-      convite_hint: 'Önizleme Portekizce kataloğu gösteriyor — yardımınızla yakında dilinizde.',
-
+      "convite_catalogo": "Bu dil için henüz yayınlanmış bir katalog yok. PIANO LouvorJA topluluğuna katılın, çeviri yapmaya ve koleksiyonları yayınlamaya yardım edin!",
+      "convite_titulo": "Katalog yapım aşamasında",
+      "convite_hint": "Önizleme Portekizce kataloğu gösteriyor — yardımınızla yakında dilinizde.",
       "catalogEmpty": "Yerel katalogda koleksiyon bulunamadı.",
       "catalogFailed": "Albüm kataloğu yüklenemedi.",
       "catalogSearchEmpty": "Bu arama için koleksiyon bulunamadı.",
@@ -101,6 +96,19 @@ export default {
       "deleteCollectionAction": "Delete collection",
       "deleteCollectionTitle": "Delete “{name}”?",
       "deleteCollectionText": "The local copy will be deleted. The original in Community is not affected."
+    },
+    "disabledAlbums": {
+      "badge": "Albüm kapalı",
+      "collectionNote": "Albüm kapalı: şarkıları aramada soluk görünür ve seçici bunları atlar. Burada tıklayınca yine çalar.",
+      "count": "{count} kapalı",
+      "description": "Kullanmadığınız albümleri kapatın (örneğin eski ilahi kitabı). Şarkıları aramada soluk görünür; Enter ve ok tuşları bunları atlar. Albümü Medya Merkezi'ndeki kartından da kapatabilirsiniz.",
+      "disable": "Albümü kapat",
+      "disableConfirmTitle": "“{name}” kapatılsın mı?",
+      "disableConfirmMessage": "Bu albümün şarkıları aramada soluk görünür ve seçici onları atlar. Sonra karttaki göz ile yeniden açabilirsiniz.",
+      "disableConfirmYes": "Kapat",
+      "enable": "Albümü aç",
+      "filter": "Albümleri filtrele",
+      "title": "Etkin albümler"
     }
   }
 }

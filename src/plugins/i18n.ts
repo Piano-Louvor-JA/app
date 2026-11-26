@@ -181,6 +181,21 @@ import MediaHi from '@modules/media/locales/hi'
 import MediaIt from '@modules/media/locales/it'
 import MediaNl from '@modules/media/locales/nl'
 import MediaPl from '@modules/media/locales/pl'
+import OnboardingPtBR from '@modules/onboarding/locales/pt-BR'
+import OnboardingEn from '@modules/onboarding/locales/en'
+import OnboardingEs from '@modules/onboarding/locales/es'
+import OnboardingRu from '@modules/onboarding/locales/ru'
+import OnboardingUk from '@modules/onboarding/locales/uk'
+import OnboardingFr from '@modules/onboarding/locales/fr'
+import OnboardingJa from '@modules/onboarding/locales/ja'
+import OnboardingKo from '@modules/onboarding/locales/ko'
+import OnboardingZh from '@modules/onboarding/locales/zh'
+import OnboardingTr from '@modules/onboarding/locales/tr'
+import OnboardingAr from '@modules/onboarding/locales/ar'
+import OnboardingHi from '@modules/onboarding/locales/hi'
+import OnboardingIt from '@modules/onboarding/locales/it'
+import OnboardingNl from '@modules/onboarding/locales/nl'
+import OnboardingPl from '@modules/onboarding/locales/pl'
 import RandomPtBR from '@modules/random/locales/pt-BR'
 import RandomEn from '@modules/random/locales/en'
 import RandomEs from '@modules/random/locales/es'
@@ -296,11 +311,7 @@ export function detectInitialLocale(): SupportedLocale {
  * Converte um locale BCP-47 (ex: `pt-BR`, `en-US`, `es-ES`) para o
  * prefixo usado pela API do Louvor JA (`pt`, `en`, `es`).
  */
-export function localeToApiPrefix(locale: string): string {
-  const prefix = locale.slice(0, 2).toLowerCase()
-  if (prefix === 'en' || prefix === 'es') return prefix
-  return 'pt'
-}
+export { localeToApiPrefix } from '@modules/sync/services/api-prefix'
 
 const initialLocale = detectInitialLocale()
 
@@ -320,6 +331,7 @@ export default createI18n({
       ...SabbathSchoolPtBR,
       ...AnnouncementsPtBR,
       ...HomePtBR,
+      ...OnboardingPtBR,
       ...LiturgyPtBR,
       ...MediaPtBR,
       ...RandomPtBR,
@@ -340,6 +352,7 @@ export default createI18n({
       ...SabbathSchoolEn,
       ...AnnouncementsEn,
       ...HomeEn,
+      ...OnboardingEn,
       ...LiturgyEn,
       ...MediaEn,
       ...RandomEn,
@@ -360,6 +373,7 @@ export default createI18n({
       ...SabbathSchoolEs,
       ...AnnouncementsEs,
       ...HomeEs,
+      ...OnboardingEs,
       ...LiturgyEs,
       ...MediaEs,
       ...RandomEs,
@@ -380,6 +394,7 @@ export default createI18n({
       ...SabbathSchoolRu,
       ...AnnouncementsRu,
       ...HomeRu,
+      ...OnboardingRu,
       ...LiturgyRu,
       ...MediaRu,
       ...RandomRu,
@@ -400,6 +415,7 @@ export default createI18n({
       ...SabbathSchoolUk,
       ...AnnouncementsUk,
       ...HomeUk,
+      ...OnboardingUk,
       ...LiturgyUk,
       ...MediaUk,
       ...RandomUk,
@@ -420,6 +436,7 @@ export default createI18n({
       ...SabbathSchoolFr,
       ...AnnouncementsFr,
       ...HomeFr,
+      ...OnboardingFr,
       ...LiturgyFr,
       ...MediaFr,
       ...RandomFr,
@@ -440,6 +457,7 @@ export default createI18n({
       ...SabbathSchoolJa,
       ...AnnouncementsJa,
       ...HomeJa,
+      ...OnboardingJa,
       ...LiturgyJa,
       ...MediaJa,
       ...RandomJa,
@@ -460,6 +478,7 @@ export default createI18n({
       ...SabbathSchoolKo,
       ...AnnouncementsKo,
       ...HomeKo,
+      ...OnboardingKo,
       ...LiturgyKo,
       ...MediaKo,
       ...RandomKo,
@@ -480,6 +499,7 @@ export default createI18n({
       ...SabbathSchoolZh,
       ...AnnouncementsZh,
       ...HomeZh,
+      ...OnboardingZh,
       ...LiturgyZh,
       ...MediaZh,
       ...RandomZh,
@@ -500,6 +520,7 @@ export default createI18n({
       ...SabbathSchoolTr,
       ...AnnouncementsTr,
       ...HomeTr,
+      ...OnboardingTr,
       ...LiturgyTr,
       ...MediaTr,
       ...RandomTr,
@@ -520,6 +541,7 @@ export default createI18n({
       ...SabbathSchoolAr,
       ...AnnouncementsAr,
       ...HomeAr,
+      ...OnboardingAr,
       ...LiturgyAr,
       ...MediaAr,
       ...RandomAr,
@@ -540,6 +562,7 @@ export default createI18n({
       ...SabbathSchoolHi,
       ...AnnouncementsHi,
       ...HomeHi,
+      ...OnboardingHi,
       ...LiturgyHi,
       ...MediaHi,
       ...RandomHi,
@@ -560,6 +583,7 @@ export default createI18n({
       ...SabbathSchoolPl,
       ...AnnouncementsPl,
       ...HomePl,
+      ...OnboardingPl,
       ...LiturgyPl,
       ...MediaPl,
       ...RandomPl,
@@ -580,6 +604,7 @@ export default createI18n({
       ...SabbathSchoolNl,
       ...AnnouncementsNl,
       ...HomeNl,
+      ...OnboardingNl,
       ...LiturgyNl,
       ...MediaNl,
       ...RandomNl,
@@ -600,6 +625,7 @@ export default createI18n({
       ...SabbathSchoolIt,
       ...AnnouncementsIt,
       ...HomeIt,
+      ...OnboardingIt,
       ...LiturgyIt,
       ...MediaIt,
       ...RandomIt,

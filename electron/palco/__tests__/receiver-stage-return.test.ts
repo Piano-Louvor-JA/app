@@ -202,6 +202,19 @@ describe('retorno de palco no navegador', () => {
     })
   })
 
+  it('transições ligadas: slide novo com a mesma letra também anima', () => {
+    const { w, $ } = receiver('/retorno')
+    const same = { ...VERSE, current: 'Maranata, Maranata', next: 'Maranata, Maranata', transition: 'fade', transitionName: 'curtain', transitionMs: 250 }
+    w.handle({ ...same, slideIndex: 4 })
+    const lyric = $('.stage-return__lyric')!
+    lyric.classList.remove('rx-enter-curtain')
+    w.handle({ ...same, slideIndex: 4, progress: 0.6 })
+    expect(lyric.classList.contains('rx-enter-curtain')).toBe(false)
+    // Voltar um slide (mesma letra): também anima.
+    w.handle({ ...same, slideIndex: 3, progress: 0 })
+    expect($('.stage-return__lyric')!.classList.contains('rx-enter-curtain')).toBe(true)
+  })
+
   it('o espelho comum ignora o retorno de palco', () => {
     const { w, $ } = receiver('/')
     w.handle(VERSE)

@@ -28,6 +28,10 @@ vi.mock("../../components/YoutubeOfflineCard.vue", () => ({
   default: { name: "YoutubeOfflineCard", template: "<div class='stub-yt-offline' />" },
 }));
 
+vi.mock("@modules/albums/components/DisabledAlbumsCard.vue", () => ({
+  default: { name: "DisabledAlbumsCard", template: "<div class='stub-albums' />" },
+}));
+
 import MediaView from "../MediaView.vue";
 
 describe("MediaView", () => {
@@ -38,6 +42,12 @@ describe("MediaView", () => {
     expect(wrapper.find(".stub-yt-offline").exists()).toBe(true);
     expect(wrapper.find(".stub-ppt").exists()).toBe(true);
     expect(wrapper.find(".stub-ext").exists()).toBe(true);
+  });
+
+  it("álbuns ativos (desativar álbum, paridade Classic) vem por último", () => {
+    const html = mount(MediaView).html();
+    expect(html).toContain("stub-albums");
+    expect(html.indexOf("stub-ext")).toBeLessThan(html.indexOf("stub-albums"));
   });
 
   it("ordem: YoutubeAccount, YoutubeOffline, PptEngine, ExternalPlayer", () => {
