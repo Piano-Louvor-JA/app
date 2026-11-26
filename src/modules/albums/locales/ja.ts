@@ -73,7 +73,9 @@ export default {
       "close": "歌詞を閉じる"
     },
     "messages": {
-      "convite_catalogo": "音楽カタログはまだお使いの言語では利用できません。コミュニティに参加して、あなたの言語で LouvorJA のカタログ作りにご協力ください。",
+      convite_titulo: 'カタログ構築中',
+      convite_hint: '上のプレビューはポルトガル語のカタログです。あなたの助けで、もうすぐあなたの言語でも。',
+
       "catalogEmpty": "ローカルカタログにコレクションが見つかりません。",
       "catalogFailed": "アルバムカタログを読み込めませんでした。",
       "catalogSearchEmpty": "この検索に一致するコレクションはありません。",

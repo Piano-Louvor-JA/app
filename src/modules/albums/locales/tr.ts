@@ -73,7 +73,9 @@ export default {
       "close": "Sözleri kapat"
     },
     "messages": {
-      "convite_catalogo": "Müzik kataloğu henüz dilinizde mevcut değil. Topluluğa katılın ve LouvorJA kataloğunun dilinizde oluşmasına yardımcı olun.",
+      convite_titulo: 'Katalog yapım aşamasında',
+      convite_hint: 'Önizleme Portekizce kataloğu gösteriyor — yardımınızla yakında dilinizde.',
+
       "catalogEmpty": "Yerel katalogda koleksiyon bulunamadı.",
       "catalogFailed": "Albüm kataloğu yüklenemedi.",
       "catalogSearchEmpty": "Bu arama için koleksiyon bulunamadı.",

@@ -74,6 +74,7 @@ const playlistHintParts = computed(() => {
 
 const {
   categories,
+  previewCategories,
   hubSearchQuery,
   musicIndex,
   hubSearchResults,
@@ -921,9 +922,43 @@ async function runAction(
 
     <div
       v-else-if="!isLoadingCatalog && categories.length === 0 && !isHubSearching"
-      class="albums-view__state"
+      class="albums-view__convite"
     >
-      {{ t('albums.messages.convite_catalogo') }}
+      <!-- Preview pt-BR (não interativo) desfocado atrás do convite. -->
+      <div v-if="(previewCategories?.length ?? 0) > 0" aria-hidden="true" class="albums-view__convite-backdrop">
+        <section
+          v-for="category in previewCategories"
+          :key="`preview-${String(category.id)}`"
+          class="albums-view__category"
+        >
+          <header class="albums-view__category-header">
+            <div>
+              <h2 class="albums-view__category-title">{{ categoryTitle(category) }}</h2>
+              <p class="albums-view__category-subtitle">{{ categorySubtitle(category) }}</p>
+            </div>
+          </header>
+          <GlassCard class="albums-view__grid-wrap" :padding="false" elevated>
+            <div class="albums-view__grid">
+              <AlbumCollectionCard
+                v-for="collection in category.collections"
+                :key="`preview-${String(collection.id)}`"
+                :collection="collection"
+                :library-album="undefined"
+                :show-download-controls="false"
+                tabindex="-1"
+              />
+            </div>
+          </GlassCard>
+        </section>
+      </div>
+
+      <!-- Convite premium em cima do preview. -->
+      <div class="albums-view__convite-card">
+        <i class="ti ti-seedling" aria-hidden="true" />
+        <h2>{{ t('albums.messages.convite_titulo') }}</h2>
+        <p>{{ t('albums.messages.convite_catalogo') }}</p>
+        <span class="albums-view__convite-hint">{{ t('albums.messages.convite_hint') }}</span>
+      </div>
     </div>
 
     <div
@@ -1603,6 +1638,70 @@ async function runAction(
   border: none;
   border-radius: 0;
   background: transparent;
+}
+
+/* Convite a contribuir: preview pt-BR desfocado + card premium na frente. */
+.albums-view__convite {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--ds-radius-lg, 1rem 0 1rem 0);
+}
+
+.albums-view__convite-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  filter: blur(14px) saturate(.9);
+  opacity: .45;
+  pointer-events: none;
+  user-select: none;
+  transform: scale(1.04);
+}
+
+.albums-view__convite-card {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .75rem;
+  padding: 2rem;
+  text-align: center;
+  background: color-mix(in srgb, var(--ds-color-surface-card) 82%, transparent);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--ds-color-outline-strong);
+  border-radius: inherit;
+  max-width: 34rem;
+  margin: 0 auto;
+
+  i {
+    font-size: 2.5rem;
+    color: var(--ds-color-primary);
+  }
+
+  h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--ds-color-on-surface);
+  }
+
+  p {
+    margin: 0;
+    max-width: 26rem;
+    line-height: 1.55;
+    color: var(--ds-color-on-surface-variant);
+  }
+}
+
+.albums-view__convite-hint {
+  font-size: .8rem;
+  color: var(--ds-color-on-surface-variant);
+  opacity: .8;
 }
 
 .albums-view__alert {

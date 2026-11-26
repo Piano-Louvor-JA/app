@@ -70,7 +70,9 @@ export default {
       "close": "Fermer les paroles"
     },
     "messages": {
-      "convite_catalogo": "Le catalogue musical n'est pas encore disponible dans votre langue. Rejoignez la communauté et aidez à constituer le catalogue de LouvorJA dans votre langue.",
+      convite_titulo: 'Catalogue en construction',
+      convite_hint: "L'aperçu montre le catalogue en portugais — bientôt dans votre langue, avec votre aide.",
+
       "catalogEmpty": "Aucune compilation trouvée dans le catalogue local.",
       "catalogFailed": "Impossible de charger le catalogue d'albums.",
       "catalogSearchEmpty": "Aucune compilation trouvée pour cette recherche.",
