@@ -7,6 +7,17 @@
 import { ref, watch, onUnmounted, type Ref } from 'vue'
 import { getLibrasGloss } from '../services/libras-translate'
 import { applyRegionalism } from '../services/libras-preferences'
+import { prepareGlossForPlayback, type PlaybackGloss } from '../services/libras-trie'
+
+export type LibrasLiveResult = PlaybackGloss
+
+export async function prepareLibrasLivePlayback(gloss: string): Promise<LibrasLiveResult> {
+  return prepareGlossForPlayback(gloss)
+}
+
+export function formatFingerspellingCaption(fingerspelled: string[]): string {
+  return fingerspelled.map((token) => `soletrando: ${token}`).join(' · ')
+}
 
 const DEBOUNCE_MS = 600
 
