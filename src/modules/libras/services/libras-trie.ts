@@ -98,9 +98,14 @@ export async function loadLibrasTrie(): Promise<TrieNode> {
     memoryTrie = { children: cached.root.children }
     return memoryTrie
   }
-  // Asset local empacotado: cópia exata da Trie oficial no build (nunca depende de rede)
+  // Asset local empacotado: cópia exata da Trie oficial no build (nunca depende de rede).
+  // Race com timeout: asset pendente (servidor travado) não pode hang o prepare (AC-3).
   try {
-    const response = await fetch(PACKAGED_TRIE_URL)
+    const ASSET_TIMEOUT_MS = 3_000
+    const response = (await Promise.race([
+      fetch(PACKAGED_TRIE_URL),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('LibrasTrie asset: timeout')), ASSET_TIMEOUT_MS)),
+    ])) as Response
     if (!response.ok) throw new Error(`LibrasTrie asset: HTTP ${response.status}`)
     const doc = await response.json()
     const root = extractRoot(doc)
