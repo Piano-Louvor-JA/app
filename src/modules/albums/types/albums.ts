@@ -33,6 +33,13 @@ export type AlbumTrack = {
   hasInstrumental: boolean
 }
 
+export type AlbumSearchAlbumRef = {
+  /** Chave de desativar (`hymnal`, `hymnal_1996` ou id do álbum). */
+  key: string
+  track: number | null
+  hymnal: boolean
+}
+
 /** Resultado da busca global (home/álbuns), com subtítulo de álbuns. */
 export type AlbumSearchHit = AlbumTrack & {
   albumNames: string
@@ -44,6 +51,10 @@ export type AlbumSearchHit = AlbumTrack & {
   hymnalTracks: number[]
   /** Letra em texto corrido (minúsculas) p/ busca por trecho — só onde há letra local (custom / importadas). */
   lyricsText?: string
+  /** Álbuns da música (chave de desativar + número dela no álbum). */
+  albumRefs?: AlbumSearchAlbumRef[]
+  /** Resultado de busca que só casou por álbum desativado: aparece apagado e o seletor pula. */
+  disabled?: boolean
 }
 
 export type AlbumLyricLine = {

@@ -1,3 +1,10 @@
+import {
+  appendImportedLiturgy,
+  buildLiturgyExport,
+  hasLiturgyContent,
+  replaceWithImportedLiturgy,
+  type LiturgyExport,
+} from '../services/liturgy-transfer'
 import { defineStore } from 'pinia'
 import { getCurrentApiPrefix } from '@modules/sync/services/api-prefix'
 import { useScheduledStore } from './useScheduledStore'
@@ -68,12 +75,14 @@ import {
   type LiturgyItemDraft,
   type LiturgyItemType,
   type LiturgyMusicOption,
+  type LiturgyPersistedState,
   type LiturgyWeekday,
   type WeekdayLiturgies,
   type WeekdayNotes,
   type WeekdaySessionTimes,
 } from '../types/liturgy'
 import { pad2 } from '../services/liturgy-format'
+import { useAlbumsStore } from '@modules/albums/stores/useAlbumsStore'
 import {
   enqueueOperatorState,
   scheduleOutboxFlush,
@@ -320,6 +329,8 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       musicList.value,
       musicSearchQuery.value,
       itemDraft.value.musicId,
+      // Álbuns desativados na Central: músicas só deles vêm apagadas e não dá para escolher.
+      useAlbumsStore().disabledAlbums,
     ),
   )
 
@@ -499,6 +510,38 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     return result
   }
 
+  /** Estado atual da semana (dias, notas, avulsas, horários e cadeados). */
+  function currentState(): LiturgyPersistedState {
+    return {
+      weekdays: weekdays.value,
+      dayNotes: dayNotes.value,
+      daySessionTimes: daySessionTimes.value,
+      customLiturgies: customLiturgies.value,
+      deletionLocks: deletionLocks.value,
+    }
+  }
+
+  /** A semana tem algo (dia com itens ou avulsa): importar pergunta antes. */
+  const liturgyHasContent = computed(() => hasLiturgyContent(currentState()))
+
+  /** Arquivo de exportação da semana (Dom a Sáb + Avulsas + notas). */
+  function exportLiturgy(): LiturgyExport {
+    return buildLiturgyExport(currentState())
+  }
+
+  /** Importa a semana: substitui ou acrescenta no fim de cada dia; salva. */
+  function importLiturgy(data: LiturgyExport, mode: 'replace' | 'append') {
+    const next =
+      mode === 'replace'
+        ? replaceWithImportedLiturgy(currentState(), data)
+        : appendImportedLiturgy(currentState(), data)
+    weekdays.value = next.weekdays
+    dayNotes.value = next.dayNotes
+    customLiturgies.value = next.customLiturgies
+    selectedItemIndex.value = null
+    persist()
+  }
+
   function persist() {
     saveLiturgyState({
       weekdays: weekdays.value,
@@ -660,6 +703,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       durationMs: 0,
       categoryId: null,
     }
+    musicRemovedFrom = null
     itemDialogOpen.value = true
   }
 
@@ -673,6 +717,24 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       ...DEFAULT_LITURGY_ITEM_DRAFT,
       categoryId,
     }
+    musicRemovedFrom = null
+    itemDialogOpen.value = true
+  }
+
+  /**
+   * Arquivos soltos na liturgia: abre o diálogo com tipo detectado e path
+   * preenchidos; o operador confirma a categoria (e pode trocar o tipo).
+   */
+  function openDroppedFilesDialog(
+    draft: import('../types/liturgy').LiturgyItemDraft,
+    options?: { lockCategory?: boolean },
+  ) {
+    editingIndex.value = null
+    itemDialogLockedCategory.value = Boolean(options?.lockCategory && draft.categoryId)
+    itemDialogHideTypePicker.value = false
+    musicSearchQuery.value = ''
+    itemDraft.value = { ...draft }
+    musicRemovedFrom = null
     itemDialogOpen.value = true
   }
 
@@ -714,6 +776,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       })
     }
     musicSearchQuery.value = ''
+    musicRemovedFrom = null
     itemDialogOpen.value = true
   }
 
@@ -1002,6 +1065,33 @@ export const useLiturgyStore = defineStore('liturgy', () => {
 
     markItemDone(index)
     await router.push({ name: 'media' })
+    return true
+  }
+
+  /**
+   * Controles da linha de playlist: áudio, playback, sem áudio ou aleatório.
+   */
+  async function playPlaylistMode(
+    index: number,
+    mode: MediaPlaybackMode,
+    router: Router,
+    options?: { shuffled?: boolean },
+  ) {
+    const item = markItemStarted(index)
+    if (!item || item.type !== 'playlist') {
+      lastActionMessageKey.value = 'liturgy.messages.playlistMissing'
+      return false
+    }
+
+    const result = await executeLiturgyItem(item, router, {
+      day: selectedDay.value,
+      playbackMode: mode,
+      shuffled: options?.shuffled,
+    })
+    lastActionMessageKey.value = result.messageKey ?? null
+    if (!result.ok) return false
+
+    markItemDone(index)
     return true
   }
 
@@ -1328,6 +1418,9 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     window.removeEventListener('liturgy:imported', onLiturgyImported)
   })
 
+  /** Música removida (X) no diálogo: a próxima escolha conta como troca. */
+  let musicRemovedFrom: number | null = null
+
   function onMusicPick(musicId: number) {
     const music = musicList.value.find((entry) => entry.id === musicId)
     if (!music) {
@@ -1339,6 +1432,14 @@ export const useLiturgyStore = defineStore('liturgy', () => {
       return
     }
 
+    // Trocar a música (ao editar ou criar) força o título com o nome da
+    // música nova e limpa as anotações da anterior — o item antigo deixava
+    // título e anotações que não batiam mais (feedback 25/11). Escolher a
+    // mesma música de novo não mexe em nada; campo vazio recebe o nome.
+    const previous = itemDraft.value.musicId ?? musicRemovedFrom
+    musicRemovedFrom = null
+    const changed = previous != null && previous !== musicId
+    const fullName = music.displayLabel || music.name
     itemDraft.value = {
       ...itemDraft.value,
       musicId,
@@ -1346,14 +1447,14 @@ export const useLiturgyStore = defineStore('liturgy', () => {
         music.durationMs && music.durationMs > 0
           ? clampMomentDurationMs(music.durationMs)
           : 0,
-      // Título complementar herda o nome da música SE o campo estiver vazio
-      // (feedback Ezequias 02/10: ao editar item de música o título
-      // obrigatório ficava vazio e travava o salvar).
-      name: itemDraft.value.name.trim() || music.name,
+      // Nome completo do catálogo (com o número do hino: "571 - Tu És Digno").
+      name: changed ? fullName : itemDraft.value.name.trim() || fullName,
+      ...(changed ? { subtitle: '', notesHtml: '', notes: '' } : {}),
     }
   }
 
   function clearMusicPick() {
+    if (itemDraft.value.musicId != null) musicRemovedFrom = itemDraft.value.musicId
     itemDraft.value = {
       ...itemDraft.value,
       musicId: null,
@@ -1445,6 +1546,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     stopCountdown,
     openAddDialog,
     openAddSubItemDialog,
+    openDroppedFilesDialog,
     setItemDraft,
     setMusicSearchQuery,
     setItemType,
@@ -1459,6 +1561,7 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     reorderItems,
     selectItem,
     playMusicMode,
+    playPlaylistMode,
     playItemOnScreens,
     clearWebProjection,
     syncSiteProjectionState,
@@ -1470,6 +1573,9 @@ export const useLiturgyStore = defineStore('liturgy', () => {
     closeCloneDialog,
     cloneLiturgyFromSelected,
     onMusicPick,
+    exportLiturgy,
+    importLiturgy,
+    hasLiturgyContent: liturgyHasContent,
     refreshMusicCatalog,
     clearMusicPick,
     onBookPick,

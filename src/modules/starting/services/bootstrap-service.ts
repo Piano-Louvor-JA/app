@@ -150,7 +150,17 @@ export async function syncEssentialCatalogFromApi(
 
   for (let i = 0; i < pending.length; i++) {
     const file = pending[i]
-    const data = await fetchRemoteCatalogJson(file)
+    let data: unknown
+    try {
+      data = await fetchRemoteCatalogJson(file)
+    } catch (error) {
+      // Idioma sem catálogo no servidor (404 nos índices essenciais):
+      // não derruba o first-boot. Grava índice vazio; a UI mostra o
+      // convite a contribuir em vez de tela de erro.
+      const message = error instanceof Error ? error.message : String(error)
+      if (!message.includes('erro 404')) throw error
+      data = []
+    }
     const saved = await writeCatalogRecord(file, data)
     if (!saved && !getDesktopBridge()) {
       throw new Error('Bridge Electron indisponível')

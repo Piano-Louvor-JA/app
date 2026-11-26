@@ -1,0 +1,113 @@
+export default {
+  "announcements": {
+    "title": "Duyurular, uyarılar ve sunumlar",
+    "back": "Araçlara dön",
+    "defaultListName": "Özel liste",
+    "copySuffix": "(kopya)",
+    "lists": {
+      "label": "Duyuru listeleri",
+      "new": "Yeni liste",
+      "newTitle": "Yeni duyuru listesi",
+      "rename": "Listeyi yeniden adlandır",
+      "duplicate": "Listeyi çoğalt",
+      "remove": "Listeyi sil",
+      "removeTitle": "Listeyi sil",
+      "removeConfirm": "{count} duyuru içeren \"{name}\" listesi silinsin mi? Uygulamaya kopyalanan dosyalar da silinecek.",
+      "nameLabel": "Liste adı",
+      "actions": "Liste işlemleri"
+    },
+    "add": "Duyuru ekle",
+    "empty": "Bu listede duyuru yok",
+    "emptyHint": "İlk duyuruyu \"Duyuru ekle\" ile oluşturun.",
+    "kinds": {
+      "text": "Metin",
+      "images": "Görseller",
+      "video": "Video",
+      "presentation": "Sunum",
+      "url": "URL"
+    },
+    "kindHints": {
+      "text": "Başlık ve biçimlendirilmiş metin",
+      "images": "Bir veya daha fazla görsel",
+      "video": "Bu bilgisayardaki video",
+      "presentation": "PowerPoint veya PDF",
+      "url": "Web sitesi, YouTube veya Vimeo"
+    },
+    "untitled": "Başlıksız",
+    "imagesCount": "Görsel yok | 1 görsel | {count} görsel",
+    "noFile": "Dosya yok",
+    "missingBadge": "Dosya eksik",
+    "actions": {
+      "label": "Duyuru işlemleri",
+      "project": "Projeksiyon",
+      "stop": "Projeksiyonu durdur",
+      "edit": "Düzenle",
+      "duplicate": "Çoğalt",
+      "remove": "Sil",
+      "drag": "Sıralamak için sürükleyin",
+      "carouselOn": "Karo selinde (kaldırmak için tıkla)",
+      "carouselOff": "Karo selinde değil (eklemek için tıkla)"
+    },
+    "remove": "Sil",
+    "removeTitle": "Duyuruyu sil",
+    "removeConfirm": "\"{name}\" duyurusu silinsin mi? Uygulamaya kopyalanan dosyalar da silinecek.",
+    "cancel": "İptal",
+    "save": "Kaydet",
+    "dialog": {
+      "newTitle": "Yeni duyuru: {kind}",
+      "editTitle": "Duyuruyu düzenle: {kind}",
+      "title": "Başlık",
+      "titlePlaceholder": "Örn: Gelecek Şabat vaftiz",
+      "titleColor": "Başlık rengi",
+      "text": "Metin",
+      "addImages": "Görsel ekle",
+      "removeImage": "Görseli kaldır",
+      "moveImageUp": "Görseli yukarı taşı",
+      "moveImageDown": "Görseli aşağı taşı",
+      "chooseVideo": "Video seç",
+      "chooseFile": "PowerPoint veya PDF seç",
+      "replaceFile": "Dosyayı değiştir",
+      "emptyText": "Duyuru başlığını veya metnini yazın.",
+      "emptyFiles": "En az bir dosya seçin.",
+      "url": "Adres (URL)",
+      "urlHint": "YouTube ve Vimeo bağlantıları video oynatıcıda açılır; diğerleri web sitesi olarak açılır.",
+      "fetchingTitle": "Bağlantı başlığı alınıyor…",
+      "invalidUrl": "Geçerli bir adres girin (örn. https://…).",
+      "copying": "Dosyalar kopyalanıyor…"
+    },
+    "notices": {
+      "duplicateFailed": "Duyuru çoğaltılamadı: dosya kopyalama başarısız.",
+      "duplicateListPartial": "{count} duyuru yeni listeye kopyalanamadı.",
+      "rejected": "{count} dosya reddedildi: {names}",
+      "pickFailed": "Seçilen dosyalar kopyalanamadı.",
+      "missing": "Dosya bulunamadı: {names}",
+      "projectionFailed": "Bu duyuru projekte edilemedi.",
+      "desktopOnly": "Yalnızca masaüstü uygulamada kullanılabilir.",
+      "close": "Uyarıyı kapat"
+    },
+    "carousel": {
+      "title": "Karo seli",
+      "independent": "Bağımsız projeksiyon",
+      "start": "Karo seli olarak projeksiyon",
+      "pause": "Duraklat",
+      "resume": "Sürdür",
+      "next": "Sonraki",
+      "prev": "Önceki",
+      "stop": "Karo selini durdur",
+      "slideSeconds": "Slayt başına saniye",
+      "loop": "Yinele",
+      "empty": "Bu listede karo seli için metin veya görsel duyurusu yok.",
+      "skipped": "Videolar, sunumlar, URL'ler ve karo selinden çıkarılan duyurular dahil edilmez.",
+      "position": "{current} / {total}",
+      "help": {
+        "button": "Karo seli nasıl çalışır",
+        "what": "Karo seli duyuruları kendiliğinden, birbiri ardına gösterir.",
+        "which": "Açık listedeki metin duyurularını ve görsel duyurularının tüm görsellerini içerir; video, sunum ve URL'leri dışlar.",
+        "toggle": "Her duyurudaki karo seli düğmesiyle ekleyip çıkarın. Yeni duyurular otomatik eklenir.",
+        "timing": "Slayt başına saniye, her duyurunun ekranda kalma süresini belirler. Yinele açıkken sonuncudan sonra ilkine döner.",
+        "where": "Karo seli projeksiyonu, işaretlenen ekranları ve uzak bağlantıları kullanır.",
+        "independent": "Bağımsız projeksiyon, karo selini seçilen monitör veya bağlantılara, hâlihazırda projekte edilenlerin üzerine koyar."
+      }
+    }
+  }
+}

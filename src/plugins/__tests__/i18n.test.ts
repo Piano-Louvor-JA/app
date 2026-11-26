@@ -23,17 +23,17 @@ describe('i18n message merge', () => {
 })
 
 describe('SUPPORTED_LOCALES', () => {
-  it('contem pt-BR, en, es, ru, uk e fr', () => {
-    expect(SUPPORTED_LOCALES).toEqual(['pt-BR', 'en', 'es', 'ru', 'uk', 'fr'])
+  it('contem os 15 locales suportados', () => {
+    expect(SUPPORTED_LOCALES).toEqual(['pt-BR', 'en', 'es', 'ru', 'uk', 'fr', 'ja', 'ko', 'zh', 'tr', 'ar', 'hi', 'it', 'nl', 'pl'])
   })
 })
 
-// uk usa o fallback de catálogo pt: a interface troca mesmo sem catálogo uk.
+// Um locale sem catálogo mantém o próprio prefixo e exibe o convite.
 describe('locale sem catálogo', () => {
-  it('aceita uk salvo e mantém o catálogo no prefixo pt', () => {
+  it('aceita uk salvo e mantém o prefixo uk', () => {
     vi.mocked(getUserPreference).mockReturnValue('uk')
     expect(detectInitialLocale()).toBe('uk')
-    expect(localeToApiPrefix('uk')).toBe('pt')
+    expect(localeToApiPrefix('uk')).toBe('uk')
   })
 })
 
@@ -104,8 +104,8 @@ describe('localeToApiPrefix', () => {
     expect(localeToApiPrefix('pt-PT')).toBe('pt')
   })
 
-  it('retorna pt para idioma nao suportado (fr-FR)', () => {
-    expect(localeToApiPrefix('fr-FR')).toBe('pt')
+  it('mantém fr para idioma sem catálogo (fr-FR)', () => {
+    expect(localeToApiPrefix('fr-FR')).toBe('fr')
   })
 
   it('retorna pt para string vazia', () => {

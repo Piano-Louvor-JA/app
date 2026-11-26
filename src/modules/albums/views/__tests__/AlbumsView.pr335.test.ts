@@ -44,6 +44,7 @@ const flag = vi.hoisted(() => ({ SHOW_CUSTOM_COLLECTIONS: true }))
 vi.mock('../../constants', () => flag)
 vi.mock('vue-i18n', () => ({
   useI18n: () => ({ t: (k: string) => k, locale: { value: 'pt-BR' } }),
+  createI18n: () => ({ global: { locale: 'pt-BR', t: (k: string) => k } }),
 }))
 
 const replaceMock = vi.fn(async () => {})
@@ -87,12 +88,14 @@ vi.mock('@modules/sync/services/library-catalog', () => ({
 // Store state controlado por teste via globalThis.__albumsState.
 // Mock SYNC (a view chama useAlbums() sem await). `ref` vem do módulo já
 // importado abaixo — lazy via getter pra evitar TDZ no hoist do vi.mock.
+import { tPtBR } from '../../../../test/i18n-stub'
 import { ref as vueRef } from 'vue'
 function useAlbumsMockFactory() {
   const s = ((globalThis as AnyObj).__albumsState ?? {}) as AnyObj
   const r = <T>(v: T) => vueRef<T>(v)
   return {
       categories: r(s.categories ?? []),
+      previewCategories: r(s.previewCategories ?? []),
       activeCollection: r(null),
       tracks: r([]),
       searchQuery: r(''),
@@ -135,6 +138,8 @@ function useAlbumsMockFactory() {
       playAllInActiveCollection: vi.fn(async () => true),
       playAllInCategory: vi.fn(async () => true),
       openCollection: vi.fn(async () => true),
+      isAlbumDisabled: vi.fn(() => false),
+      setAlbumDisabled: vi.fn(),
     }
 }
 
@@ -294,15 +299,11 @@ describe('AlbumsView', () => {
     void w.find('.hr-lyric')
   })
 
-  it('toggle visibilidade de coletâneas custom persiste preferência', async () => {
+  it('adendo v1.1.0: olho de mostrar/ocultar custom não existe mais na Central', async () => {
     const w = await mountView()
-    const toggle = w.findAll('.albums-view__header-actions button').find((b) =>
+    const toggle = w.findAll('button').find((b) =>
       b.attributes('aria-label') === 'albums.custom.hide' || b.attributes('aria-label') === 'albums.custom.show')
-    expect(toggle).toBeDefined()
-    await toggle!.trigger('click')
-    // persistiu como hide (false)
-    expect(localStorage.getItem('louvorja-show-custom-collections') ?? localStorage.getItem('show-custom-collections')).toBeDefined()
-    void w
+    expect(toggle).toBeUndefined()
   })
 
   it('modal de playlists: abrir via botão do header, criar, listar, expandir e remover', async () => {
@@ -358,26 +359,10 @@ describe('AlbumsView', () => {
     expect(minimizeMock).toHaveBeenCalledOnce()
   })
 
-  it('flag desligada: sem o olho de mostrar/ocultar Minhas Coletâneas', async () => {
-    flag.SHOW_CUSTOM_COLLECTIONS = false
-    try {
-      const w = await mountView()
-      const toggle = w.findAll('.albums-view__header-actions button').find((b) =>
-        b.attributes('aria-label') === 'albums.custom.hide' || b.attributes('aria-label') === 'albums.custom.show')
-      expect(toggle).toBeUndefined()
-    } finally {
-      flag.SHOW_CUSTOM_COLLECTIONS = true
-    }
-  })
-
   it('sem botão "Minhas Coletâneas" no toolbar nem modal custom (criação saiu pra /community)', async () => {
     const w = await mountView()
     expect(w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.custom.title')).toBeUndefined()
     expect(body().querySelector('.albums-view__modal')).toBeNull()
-    // olho de visibilidade continua
-    const toggle = w.findAll('.albums-view__header-actions button').find((b) =>
-      b.attributes('aria-label') === 'albums.custom.hide' || b.attributes('aria-label') === 'albums.custom.show')
-    expect(toggle).toBeDefined()
   })
 
   it('remoção de coletânea: requestRemove abre confirm (teleport body); dismiss e confirm', async () => {
@@ -511,7 +496,7 @@ describe('AlbumsView', () => {
     Object.defineProperty(input, 'files', { value: [file], configurable: true })
     input.dispatchEvent(new Event('change', { bubbles: true }))
     await flushPromises()
-    expect(body().querySelector('.albums-view__playlists-feedback')!.textContent).toContain('inválido')
+    expect(body().querySelector('.albums-view__playlists-feedback')!.textContent).toContain('albums.playlists.importInvalid')
   })
 
   it('digitar/submitar não tem mais form de criação custom (createCustomCollection não é chamado)', async () => {
@@ -681,7 +666,8 @@ describe('AlbumsView', () => {
     await flushPromises()
     expect(pushMock).toHaveBeenCalledWith({ name: 'media' })
     // o nome da playlist vai para o título do player
-    expect(playQueueMock).toHaveBeenCalledWith(expect.any(Array), 0, undefined, 'Com faixas')
+    // Play = com áudio (explícito: não herda o modo da música anterior).
+    expect(playQueueMock).toHaveBeenCalledWith(expect.any(Array), 0, 'audio', 'Com faixas')
     // remover faixa: o X pede confirmação; só sai depois de confirmar
     ;((body().querySelector('.albums-view__playlist') as HTMLElement).querySelector('.albums-view__playlist-track-remove') as HTMLElement).click()
     await flushPromises()
@@ -693,6 +679,26 @@ describe('AlbumsView', () => {
     ;((body().querySelector('.albums-view__playlist') as HTMLElement).querySelector('.albums-view__playlist-toggle') as HTMLElement).click()
     await flushPromises()
     expect(body().querySelector('.albums-view__playlist-tracks')).toBeNull()
+    w.unmount()
+  })
+
+  it('playlist: tocar com playback (instrumental) e sem áudio (só os slides)', async () => {
+    savePlaylists([
+      { id: 'pl-m', name: 'Culto', createdAt: '2026-01-01', items: [{ musicId: 7, title: 'Santo', track: 1 }] },
+    ])
+    const w = await mountView()
+    const btn = w.findAll('button').find((b) => b.attributes('aria-label') === 'albums.playlists.title')!
+    await btn.trigger('click')
+    await flushPromises()
+    const row = body().querySelector('.albums-view__playlist') as HTMLElement
+    playQueueMock.mockClear()
+    ;(row.querySelector('[data-test="playlist-play-instrumental"]') as HTMLElement).click()
+    await flushPromises()
+    expect(playQueueMock).toHaveBeenLastCalledWith(expect.any(Array), 0, 'instrumental', 'Culto')
+    ;(row.querySelector('[data-test="playlist-play-no-audio"]') as HTMLElement).click()
+    await flushPromises()
+    expect(playQueueMock).toHaveBeenLastCalledWith(expect.any(Array), 0, 'no_audio', 'Culto')
+    expect(pushMock).toHaveBeenCalledWith({ name: 'media' })
     w.unmount()
   })
 
@@ -916,7 +922,7 @@ describe('AlbumsView', () => {
     Object.defineProperty(input, 'files', { value: [file], configurable: true })
     input.dispatchEvent(new Event('change', { bubbles: true }))
     await flushPromises()
-    expect(body().querySelector('.albums-view__playlists-feedback')?.textContent).toContain('faixa(s) adicionada(s)')
+    expect(body().querySelector('.albums-view__playlists-feedback')?.textContent).toContain('albums.playlists.importedList')
     const culto = listPlaylists().find((p) => p.name === 'Culto')!
     expect(culto.items).toHaveLength(2)
     w.unmount()
@@ -935,7 +941,7 @@ describe('AlbumsView', () => {
     Object.defineProperty(input, 'files', { value: [file], configurable: true })
     input.dispatchEvent(new Event('change', { bubbles: true }))
     await flushPromises()
-    expect(body().querySelector('.albums-view__playlists-feedback')?.textContent).toContain('Nada novo')
+    expect(body().querySelector('.albums-view__playlists-feedback')?.textContent).toContain('albums.playlists.importedNothingNew')
     w.unmount()
   })
 
@@ -987,10 +993,22 @@ describe('AlbumsView', () => {
     expect((globalThis as AnyObj).__albumsCancelMock).toHaveBeenCalled()
   })
 
+  it('catálogo vazio mostra convite sem catálogo português de fundo', async () => {
+    setState({ categories: [], isLoadingCatalog: false, previewCategories: [{
+      id: 'pt-preview', name: 'Catálogo em português', collections: [],
+    }] })
+    const wrapper = await mountView()
+    expect(wrapper.text()).toContain('albums.messages.convite_catalogo')
+    expect(wrapper.text()).not.toContain('Catálogo em português')
+    expect(wrapper.find('.albums-view__convite-backdrop').exists()).toBe(false)
+    expect(wrapper.find('.albums-view__convite-hint').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
   it('gaps onda1 2: catálogo vazio sem loading → catalogEmpty (689); cc-cancel (762); hydrate reentrante real (147)', async () => {
     setState({ categories: [], isLoadingCatalog: false })
     const w0 = await mountView()
-    expect(w0.text()).toContain('albums.messages.catalogEmpty')
+    expect(w0.text()).toContain('albums.messages.convite_catalogo')
     w0.unmount()
     // cc-cancel → cancelCollection (762) com cards presentes
     setState() // restaura categorias default (o w0 usou [])

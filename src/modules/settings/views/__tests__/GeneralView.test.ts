@@ -128,32 +128,36 @@ describe('GeneralView.vue', () => {
   it('renderiza a secao de idioma com GlassCard', () => {
     const wrapper = mountComponent()
     expect(wrapper.find('.glass-card-mock').exists()).toBe(true)
-    expect(wrapper.find('.general-settings__lang-options').exists()).toBe(true)
+    expect(wrapper.find('.general-settings__lang-select').exists()).toBe(true)
   })
 
-  it('renderiza 3 botoes de idioma (pt-BR, es, uk) -- EN/ru/fr desabilitados temporariamente', () => {
+  it('renderiza 15 opções de idioma (um por locale suportado)', async () => {
     const wrapper = mountComponent()
-    const buttons = wrapper.findAll('.general-settings__lang-btn')
-    expect(buttons).toHaveLength(3)
+    await wrapper.find('.general-settings__lang-select-trigger').trigger('click')
+    const options = wrapper.findAll('.general-settings__lang-option')
+    expect(options).toHaveLength(15)
   })
 
-  it('marca o botao pt-BR como ativo por padrao', () => {
+  it('marca a opção pt-BR como ativa por padrão', async () => {
     const wrapper = mountComponent()
-    const activeBtn = wrapper.find('.general-settings__lang-btn--active')
-    expect(activeBtn.exists()).toBe(true)
+    await wrapper.find('.general-settings__lang-select-trigger').trigger('click')
+    const activeOpt = wrapper.find('.general-settings__lang-option--active')
+    expect(activeOpt.exists()).toBe(true)
   })
 
-  it('chama setUserPreference ao clicar num botao de idioma', async () => {
+  it('chama setUserPreference ao escolher um idioma no select', async () => {
     const wrapper = mountComponent()
-    const esBtn = wrapper.findAll('.general-settings__lang-btn')[1]
-    await esBtn.trigger('click')
+    await wrapper.find('.general-settings__lang-select-trigger').trigger('click')
+    const esOpt = wrapper.findAll('.general-settings__lang-option')[2]
+    await esOpt.trigger('click')
     expect(setUserPreference).toHaveBeenCalledWith('language', 'es')
   })
 
-  it('troca locale.value ao clicar num botao de idioma', async () => {
+  it('troca locale.value ao escolher um idioma no select', async () => {
     const wrapper = mountComponent()
-    const esBtn = wrapper.findAll('.general-settings__lang-btn')[1]
-    await esBtn.trigger('click')
+    await wrapper.find('.general-settings__lang-select-trigger').trigger('click')
+    const esOpt = wrapper.findAll('.general-settings__lang-option')[2]
+    await esOpt.trigger('click')
     expect(mockLocale.value).toBe('es')
   })
 
@@ -163,7 +167,8 @@ describe('GeneralView.vue', () => {
   // preferência; persistir antes = early-return = download nunca roda.
   it('RED RAIZ-1: baixa catalogo ANTES de persistir o idioma', async () => {
     const wrapper = mountComponent()
-    const esBtn = wrapper.findAll('.general-settings__lang-btn')[1]
+    await wrapper.find('.general-settings__lang-select-trigger').trigger('click')
+    const esBtn = wrapper.findAll('.general-settings__lang-option')[2]
     await esBtn.trigger('click')
     expect(ensureCatalogForLocale).toHaveBeenCalledWith('es', expect.any(Function))
     expect(setUserPreference).toHaveBeenCalledWith('language', 'es')
@@ -182,7 +187,8 @@ describe('GeneralView.vue', () => {
     const wrapper = mountComponent()
     expect(wrapper.find('[data-testid="language-sync-progress"]').exists()).toBe(false)
 
-    await wrapper.findAll('.general-settings__lang-btn')[1].trigger('click')
+    await wrapper.find('.general-settings__lang-select-trigger').trigger('click')
+    await wrapper.findAll('.general-settings__lang-option')[2].trigger('click')
     const bar = wrapper.find('[data-testid="language-sync-progress"]')
     expect(bar.exists()).toBe(true)
     expect(bar.attributes('role')).toBe('progressbar')
@@ -202,7 +208,8 @@ describe('GeneralView.vue', () => {
   it('RED RAIZ-1: falha de download NAO persiste o idioma (rollback)', async () => {
     vi.mocked(ensureCatalogForLocale).mockRejectedValueOnce(new Error('rede'))
     const wrapper = mountComponent()
-    const esBtn = wrapper.findAll('.general-settings__lang-btn')[1]
+    await wrapper.find('.general-settings__lang-select-trigger').trigger('click')
+    const esBtn = wrapper.findAll('.general-settings__lang-option')[2]
     await esBtn.trigger('click')
     await vi.waitFor(() => {
       expect(ensureCatalogForLocale).toHaveBeenCalled()
@@ -448,7 +455,8 @@ describe('GeneralView.vue', () => {
 
     it('changeLanguage pt-BR: no-op no idioma ativo (D4 SPEC-locale-hot-reload)', async () => {
       const wrapper = mountComponent()
-      const ptBtn = wrapper.findAll('.general-settings__lang-btn')[0]
+      await wrapper.find('.general-settings__lang-select-trigger').trigger('click')
+      const ptBtn = wrapper.findAll('.general-settings__lang-option')[0]
       await ptBtn.trigger('click')
       expect(mockLocale.value).toBe('pt-BR')
       // idioma já ativo: sem persistir de novo, sem baixar catálogo

@@ -4,6 +4,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
 import UpdateBanner from "../UpdateBanner.vue";
 
+// Minimal i18n mock (padrão do repo)
+const mockT = vi.fn((key: string, params?: Record<string, unknown>) =>
+	params && "version" in params ? `${key} ${params.version}` : key,
+);
+
+vi.mock("vue-i18n", () => ({
+	useI18n: () => ({ t: mockT, locale: { value: "pt-BR" } }),
+	createI18n: () => ({ global: { locale: "pt-BR", t: mockT } }),
+}));
+
 // Mock do composable
 vi.mock("../../composables/useUpdateChecker", () => ({
 	useUpdateChecker: vi.fn(),
@@ -74,7 +84,7 @@ describe("UpdateBanner", () => {
 	it("botão principal diz Atualizar e emite viewNotes ao clicar", async () => {
 		mockComposable({ hasUpdate: ref(true), newVersion: ref("2.0.0") });
 		const wrapper = mount(UpdateBanner);
-		expect(wrapper.find('[data-test="notes-btn"]').text()).toBe("Atualizar");
+		expect(wrapper.find('[data-test="notes-btn"]').text()).toBe("updates.update");
 		await wrapper.find('[data-test="notes-btn"]').trigger("click");
 		expect(wrapper.emitted("viewNotes")).toBeTruthy();
 		expect(wrapper.emitted("viewNotes")![0]).toEqual(["2.0.0"]);

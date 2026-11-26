@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@modules/media/services/auth-client', () => ({
 	getAuthSession: mocks.getSession,
-	authHeaders: (token: string | null | undefined = mocks.getSession()?.token) =>
+	authHeadersAsync: async (token: string | null | undefined = mocks.getSession()?.token) =>
 		token ? { Authorization: `Bearer ${token}` } : {},
 }))
 
@@ -122,26 +122,28 @@ describe('updateCustomCollection — visibility no PATCH/PUT', () => {
 
 describe('listCustomCollections — visibility na listagem', () => {
 	it('mapeia visibility da API; ausente → public (legado)', async () => {
-		mocks.getSession.mockReturnValue({ token: 'tok' } as never)
+		mocks.getSession.mockReturnValue({ token: 'tok', user: { id_user: 1, email: 'me@t.com' } } as never)
 		vi.stubGlobal(
 			'fetch',
 			vi.fn(async () =>
 				jsonResponse({
 					data: [
-						{
-							id_collection: 1,
-							name: 'Pública legado',
-							description: null,
-							musics_count: 0,
-						},
-						{
-							id_collection: 2,
-							name: 'Privada',
-							description: null,
-							visibility: 'private',
-							musics_count: 0,
-						},
-					],
+										{
+											id_collection: 1,
+											name: 'Pública legado',
+											description: null,
+											owner_id: 1,
+											musics_count: 0,
+										},
+										{
+											id_collection: 2,
+											name: 'Privada',
+											description: null,
+											owner_id: 1,
+											visibility: 'private',
+											musics_count: 0,
+										},
+									],
 				}),
 			),
 		)

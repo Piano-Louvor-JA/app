@@ -210,14 +210,17 @@ describe("ramos restantes locais", () => {
 });
 
 describe("deleteLocalCollection remove músicas junto (145)", () => {
-	it("coletânea com músicas → tudo vai embora e true", () => {
+	it("coletânea com músicas → vai embora e músicas migram para Singles", () => {
 		const col = createLocalCollection("Com musicas");
 		createLocalMusic(col.id, { name: "M1" });
 		createLocalMusic(col.id, { name: "M2" });
 		expect(deleteLocalCollection(col.id)).toBe(true);
-		expect(listLocalCollections()).toHaveLength(0);
-		// músicas da coletânea removidas
-		expect(listAllMusics()).toHaveLength(0);
+		const remaining = listLocalCollections();
+		expect(remaining).toHaveLength(1);
+		expect(remaining[0].name).toBe("Singles");
+		// SPEC editor-ux: conteúdo não é apagado — músicas órfãs vão para Singles
+		expect(listAllMusics()).toHaveLength(2);
+		expect(listAllMusics().every((m) => m.collectionId === remaining[0].id)).toBe(true);
 	});
 
 	it("id inexistente → false", () => {

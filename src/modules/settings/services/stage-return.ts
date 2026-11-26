@@ -1,6 +1,34 @@
 import { isReturnCover, returnNextPhrase, returnPhrase } from '../../media/services/return-phrases'
 import type { MediaProjectionRuntime } from '../../media/types/media'
-import { resolveReturnScreen, returnNextFontSize, type StageSettings } from '../types/stage-settings'
+import {
+  bibleTransitionMs,
+  effectiveLyricTransition,
+  resolveReturnScreen,
+  returnNextFontSize,
+  type StageSettings,
+  type StageTransition,
+} from '../types/stage-settings'
+
+/** Subconjunto que o receiver anima no retorno (igual ao espelho). */
+function receiverReturnTransition(
+  t: StageTransition,
+): 'fade' | 'slide' | 'zoom' | undefined {
+  if (t === 'none') return undefined
+  if (
+    t === 'slide' ||
+    t === 'slide-down' ||
+    t === 'slide-left' ||
+    t === 'slide-right' ||
+    t === 'drop' ||
+    t === 'float'
+  ) {
+    return 'slide'
+  }
+  if (t === 'zoom' || t === 'zoom-out' || t === 'pop' || t === 'zoom-blur' || t === 'rotate') {
+    return 'zoom'
+  }
+  return 'fade'
+}
 
 export type StageReturnStyle = {
   color: string | null
@@ -29,6 +57,11 @@ export type StageReturnMessage =
       slideIndex: number
       progress: number
       background?: string
+      /** Presente só com transições de slides ligadas; senão o receiver usa o flyer. */
+      transition?: 'fade' | 'slide' | 'zoom'
+      /** Nome real da transição (catálogo inteiro); receivers antigos ignoram. */
+      transitionName?: StageTransition
+      transitionMs?: number
       style: StageReturnStyle
     }
 
@@ -42,6 +75,8 @@ export function buildStageReturn(runtime: MediaProjectionRuntime, stage: StageSe
   // Personalização própria do retorno; campo vazio = igual aos slides.
   const ret = resolveReturnScreen(stage)
   const baseSize = ret.fontSize ?? stage.lyricFontSize ?? stage.fontSize
+  const lyricTransition = effectiveLyricTransition(stage)
+  const transition = receiverReturnTransition(lyricTransition)
   return {
     v: 1,
     type: 'stageReturn',
@@ -55,6 +90,13 @@ export function buildStageReturn(runtime: MediaProjectionRuntime, stage: StageSe
     ...(ret.bgMode === 'slides' && background ? { background } : {}),
     // TVs só recebem a imagem enviada pelo usuário (data URL); fundo oficial fica na cor.
     ...(ret.bgMode === 'image' && ret.bgImage?.startsWith('data:') ? { background: ret.bgImage } : {}),
+    ...(transition
+      ? {
+          transition,
+          transitionName: lyricTransition,
+          transitionMs: bibleTransitionMs(stage.lyricTransitionSpeed),
+        }
+      : {}),
     style: {
       color: ret.textColor ?? stage.lyricTextColor ?? stage.textColor ?? null,
       fontSize: baseSize,

@@ -1,14 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
 import MediaSlideStage from '../components/MediaSlideStage.vue'
-import MediaAccountBar from '../components/MediaAccountBar.vue'
 import AppConfirm from '@shared/components/AppConfirm.vue'
 import { getAuthSession } from '../services/auth-client'
 import { getAuthReadiness } from '@modules/auth/services/firebase-client'
-import { useAuth } from '@modules/auth/composables/useAuth'
 import { startOutboxLoop } from '../services/outbox-loop'
 import {
   getLocalMusic as getLocalMusicById,
@@ -78,7 +76,6 @@ const route = useRoute()
 
 const { t } = useI18n()
 // Sessão principal (header) — feedback Ezequias: um login só no app.
-const { isLoggedIn } = useAuth()
 const collections = ref<CustomCollectionSummary[]>([])
 // Privacidade da NOVA coletânea (default PRIVADO — opt-in pra publicar).
 const newCollectionVisibility = ref<CollectionVisibility>('private')
@@ -87,16 +84,20 @@ const musics = ref<CustomMusicSummary[]>([])
 /** Estado de trabalho da música local selecionada (SPEC t_deed74b5). */
 const musicStatus = ref<'draft' | 'published'>('published')
 
+/** Publicar exige sessão (adendo 24/11: sem autenticação nada sai do rascunho). */
+const isSignedIn = computed(() => getAuthSession() != null)
+
 /** Publica a música local selecionada: draft → published. */
 async function onPublishMusic(): Promise<void> {
   const id = selectedMusicId.value
   if (id == null || !(id < 0)) return
+  if (getAuthSession() == null) return
   const { publishLocalMusic } = await import('../services/local-custom-store')
   if (publishLocalMusic(id)) {
     musicStatus.value = 'published'
     notify(`“${musicName.value}” publicada — disponível neste dispositivo`)
   } else {
-    notify('Falha ao publicar')
+    notify(t('media.editor.publishFailed'))
   }
 }
 const selectedMusicId = ref<number | null>(null)
@@ -110,7 +111,7 @@ const renameDraft = ref('')
 const renameBusy = ref(false)
 const canRenameMusic = computed(
   () =>
-    getAuthSession() != null &&
+    (getAuthSession() != null || (selectedMusicId.value ?? 0) < 0) &&
     selectedMusicId.value != null &&
     editOfficialId.value == null,
 )
@@ -159,7 +160,7 @@ async function loadOfficialForSuggestion(musicId: number): Promise<void> {
     const { resolveMediaTrack } = await import('@modules/media/services/custom-catalog')
     const track = await resolveMediaTrack(musicId)
     if (!track) {
-      notify('Música oficial não encontrada', true)
+      notify(t('media.editor.officialMusicNotFound'), true)
       editOfficialId.value = null
       return
     }
@@ -209,7 +210,7 @@ async function onSaveOfficialSuggestion(): Promise<void> {
     timing: null,
     status: 'draft',
   })
-  notify('Correção salva localmente — publique em Minhas Edições (Comunidade)')
+  notify(t('media.editor.editSavedLocal'))
 }
 
 /** statusMessage + snackbar juntos (toast). Mensagem vazia só limpa, sem abrir toast. */
@@ -241,6 +242,7 @@ function stanzaProgress(index: number): number {
 
 const newCollectionName = ref('')
 const newMusicName = ref('')
+const newSingleName = ref('')
 /** Assets de imagem upados no último import .slja (path → url) */
 const uploadedAssets = ref<Array<{ path: string; url: string; idFile: number }>>([])
 
@@ -251,6 +253,66 @@ const asideCollapsed = ref(false)
 
 /* ---------- Painel "Letra" (estilo playlist da /media) ---------- */
 const lyricPaneOpen = ref(true)
+
+/* ---------- SPEC-editor-ux-v1: único "+" com menu + menu ⋮ por coletânea ---------- */
+const addMenuOpen = ref(false)
+const kebabOpenId = ref<number | null>(null)
+const renamingId = ref<number | null>(null)
+const renameCollectionDraft = ref('')
+
+function onAddMenuAction(kind: 'collection' | 'single' | 'official'): void {
+  addMenuOpen.value = false
+  if (kind === 'collection') {
+    newCollectionName.value = ''
+    void nextTick(() =>
+      document.querySelector<HTMLInputElement>('[data-testid="new-collection-input"]')?.focus(),
+    )
+  } else if (kind === 'single') {
+    newSingleName.value = ''
+    void nextTick(() =>
+      document.querySelector<HTMLInputElement>('[data-testid="new-single-input"]')?.focus(),
+    )
+  } else {
+    officialSearch.value = ''
+    void nextTick(() =>
+      document.querySelector<HTMLInputElement>('[data-testid="official-search"]')?.focus(),
+    )
+  }
+}
+
+function onKebabAction(kind: 'cover' | 'rename' | 'delete', collectionId: number): void {
+  kebabOpenId.value = null
+  if (kind === 'cover') coverInput.value?.click()
+  else if (kind === 'rename') {
+    const c = collections.value.find((x) => x.id === collectionId)
+    renamingId.value = collectionId
+    renameCollectionDraft.value = c?.name ?? ''
+    void nextTick(() =>
+      document.querySelector<HTMLInputElement>('[data-testid="collection-rename-input"]')?.focus(),
+    )
+  } else {
+    requestDelete('collection')
+  }
+}
+
+async function onRenameCollection(): Promise<void> {
+  const id = renamingId.value
+  const name = renameCollectionDraft.value.trim()
+  if (id == null || !name) return
+  saving.value = true
+  try {
+    const updated = await updateCustomCollection(id, { name })
+    if (!updated) {
+      notify(t('media.editor.renameCollectionFailed'), true)
+      return
+    }
+    collections.value = collections.value.map((c) => (c.id === id ? updated : c))
+    renamingId.value = null
+    notify(t('media.editor.collectionRenamedToast'))
+  } finally {
+    saving.value = false
+  }
+}
 
 async function refreshCollections(): Promise<void> {
   loading.value = true
@@ -304,7 +366,7 @@ async function onCreateCollection(): Promise<void> {
       )
       newCollectionVisibility.value = 'private'
     } else {
-      notify('Falha ao criar coletânea (API indisponível?)', true)
+      notify(t('media.editor.createCollectionFailed'), true)
     }
   } finally {
     saving.value = false
@@ -323,14 +385,64 @@ async function onCreateMusic(): Promise<void> {
       selectedMusicId.value = result.id
       musicName.value = name
       lyrics.value = []
-      notify('Música criada')
+      notify(t('media.editor.musicCreated'))
     } else {
-      notify('Falha ao criar música')
+      notify(t('media.editor.createMusicFailed'))
     }
   } finally {
     saving.value = false
   }
 }
+
+/* ---------- Single (adendo 24/11): música avulsa sem coletânea visível ---------- */
+// O modelo exige música→coletânea; single = música na coletânea fixa "Singles",
+// criada localmente sob demanda (sem auth não sobe nada pra API).
+const SINGLES_COLLECTION_NAME = 'Singles'
+
+async function resolveSinglesCollection(): Promise<number | null> {
+  const { listLocalCollections, createLocalCollection } = await import(
+    '../services/local-custom-store'
+  )
+  let singles = listLocalCollections().find((c) => c.name === SINGLES_COLLECTION_NAME)
+  if (!singles) singles = createLocalCollection(SINGLES_COLLECTION_NAME)
+  if (getAuthSession()) {
+    // Autenticado: usa coletânea remota privada "Singles" (cria se não existir).
+    const remote = (await listCustomCollections()).find(
+      (c) => c.name === SINGLES_COLLECTION_NAME,
+    )
+    return remote?.id ?? singles.id
+  }
+  return singles.id
+}
+
+async function onCreateSingle(): Promise<void> {
+  const name = newSingleName.value.trim()
+  if (!name) return
+  saving.value = true
+  try {
+    const collectionId = await resolveSinglesCollection()
+    if (collectionId == null) {
+      notify(t('media.editor.singlesPrepareFailed'), true)
+      return
+    }
+    const result = await createCustomMusic(collectionId, { name })
+    if (result) {
+      newSingleName.value = ''
+      await refreshCollections()
+      selectedCollectionId.value = collectionId
+      await onCollectionChange()
+      selectedMusicId.value = result.id
+      musicName.value = name
+      lyrics.value = []
+      notify(`Single “${name}” criado${getAuthSession() ? '' : ' localmente'}`)
+    } else {
+      notify(t('media.editor.singleCreateFailed'))
+    }
+  } finally {
+    saving.value = false
+  }
+}
+
 
 /* ---------- Adicionar hino oficial à coletânea (busca no catálogo) ---------- */
 
@@ -360,7 +472,7 @@ async function onAddOfficial(officialMusicId: number, name: string): Promise<voi
       await onCollectionChange()
       notify(`“${name}” adicionada à coletânea`)
     } else {
-      notify('Falha ao adicionar hino')
+      notify(t('media.editor.addHymnFailed'))
     }
   } finally {
     saving.value = false
@@ -428,9 +540,9 @@ async function onReuseMusic(music: ReusableMusic): Promise<void> {
       await onCollectionChange()
       selectedMusicId.value = result.id
       await onSelectMusic(result.id)
-      notify(`“${music.name}” copiada com letra e áudio`)
+      notify(t('media.editor.copiedWithMedia', { name: music.name }))
     } else {
-      notify('Falha ao copiar música')
+      notify(t('media.editor.copyMusicFailed'))
     }
   } finally {
     saving.value = false
@@ -444,6 +556,52 @@ const coverInput = ref<HTMLInputElement | null>(null)
 const selectedCollection = computed(
   () => collections.value.find((c) => c.id === selectedCollectionId.value) ?? null,
 )
+
+/* ---------- SPEC v3.1 (Rafael 24/11): single ≠ coletânea ----------
+ * Música é single ATÉ entrar numa coletânea. A coletânea fixa "Singles" é
+ * apenas backing store invisível — na view de singles, as ferramentas de
+ * COMPOSIÇÃO (nova música/reutilizar/hino oficial) não fazem sentido e
+ * ficam ocultas (v-if, não disabled). Excluir música muda pro cabeçalho
+ * da edição (única ação de gestão que um single tem, além da capa). */
+const isSinglesView = computed(
+  () => selectedCollection.value?.name === SINGLES_COLLECTION_NAME,
+)
+
+/* ---------- Capa do SINGLE (v3.1): cover por música ---------- */
+const musicCoverInput = ref<HTMLInputElement | null>(null)
+
+async function onMusicCoverFile(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  const musicId = selectedMusicId.value
+  if (!file || musicId == null) return
+  saving.value = true
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer())
+    if (isLocalId(musicId)) {
+      // Local: blob no IndexedDB (coverMediaId) — offline-first, nunca sobe.
+      const mediaId = `local-music-${musicId}-cover`
+      await putMedia(mediaId, bytes)
+      updateLocalMusic(musicId, { coverMediaId: mediaId })
+      notify(t('media.editor.singleCoverUpdated'))
+    } else {
+      const uploaded = await uploadCustomFile(bytes, file.name, 'imagens')
+      if (!uploaded) {
+        notify(t('media.editor.coverUploadFailed'), true)
+        return
+      }
+      const ok = await updateCustomMusic(musicId, { id_file_image: uploaded.idFile })
+      if (!ok) {
+        notify(t('media.editor.coverSaveFailed'), true)
+        return
+      }
+      notify(t('media.editor.singleCoverUpdated'))
+    }
+  } finally {
+    saving.value = false
+  }
+}
 
 /* ---------- Privacidade da coletânea selecionada (t_35e4d3ea) ---------- */
 
@@ -514,20 +672,20 @@ async function onCoverFile(event: Event): Promise<void> {
     const bytes = new Uint8Array(await file.arrayBuffer())
     const uploaded = await uploadCustomFile(bytes, file.name, 'imagens')
     if (!uploaded) {
-      notify('Falha no upload da capa')
+      notify(t('media.editor.coverUploadFailed'))
       return
     }
     const updated = await updateCustomCollection(selectedCollectionId.value, {
       cover_url: uploaded.url,
     })
     if (!updated) {
-      notify('Falha ao salvar capa')
+      notify(t('media.editor.coverSaveFailed'))
       return
     }
     collections.value = collections.value.map((c) =>
       c.id === selectedCollectionId.value ? updated : c,
     )
-    notify('Capa atualizada')
+    notify(t('media.editor.coverUpdated'))
   } finally {
     saving.value = false
   }
@@ -541,13 +699,13 @@ async function onRemoveCover(): Promise<void> {
       cover_url: null,
     })
     if (!updated) {
-      notify('Falha ao remover capa')
+      notify(t('media.editor.coverRemoveFailed'))
       return
     }
     collections.value = collections.value.map((c) =>
       c.id === selectedCollectionId.value ? updated : c,
     )
-    notify('Capa removida')
+    notify(t('media.editor.coverRemoved'))
   } finally {
     saving.value = false
   }
@@ -563,9 +721,9 @@ async function onAddStanza(): Promise<void> {
     })
     if (result) {
       lyrics.value.push({ id: result.id, lyric: 'Nova estrofe', time: '00:00', imageUrl: '' })
-      notify('Estrofe adicionada')
+      notify(t('media.editor.stanzaAdded'))
     } else {
-      notify('Falha ao adicionar estrofe')
+      notify(t('media.editor.addStanzaFailed'))
     }
   } finally {
     saving.value = false
@@ -596,7 +754,7 @@ async function onSelectMusic(id: number): Promise<void> {
     try {
       const local = getLocalMusicById(id)
       if (!local) {
-        notify('Esta música não existe mais')
+        notify(t('media.editor.musicMissing'))
         selectedMusicId.value = null
         musicName.value = ''
         lyrics.value = []
@@ -625,7 +783,7 @@ async function onSelectMusic(id: number): Promise<void> {
       }))
       loadAudioForMusic(local.audioBase64 || local.audioMediaId ? `local:${local.id}` : null)
       if (local.officialMusicId != null) {
-        notify('Hino oficial vinculado — a letra/áudio são gerenciados no catálogo oficial')
+        notify(t('media.editor.officialLinked'))
       }
     } finally {
       loading.value = false
@@ -648,7 +806,7 @@ async function onSelectMusic(id: number): Promise<void> {
       }
       // Link p/ hino oficial: editor mostra aviso (edição de letra fica no hinário oficial)
       if (typeof data.official_music_id === 'number' && data.official_music_id > 0) {
-        notify('Hino oficial vinculado — a letra/áudio são gerenciados no catálogo oficial')
+        notify(t('media.editor.officialLinked'))
       }
       musicName.value = data.name
       lyrics.value = (data.lyrics ?? []).map((row) => ({
@@ -661,17 +819,17 @@ async function onSelectMusic(id: number): Promise<void> {
     } else if (response.status === 404) {
       // Música não existe mais (apagada em outra sessão/coletânea):
       // limpa a seleção em vez de deixar a tela em estado quebrado.
-      notify('Esta música não existe mais')
+      notify(t('media.editor.musicMissing'))
       selectedMusicId.value = null
       musicName.value = ''
       lyrics.value = []
       loadAudioForMusic(null)
       await refreshCollections()
     } else {
-      notify('Falha ao carregar música')
+      notify(t('media.editor.loadMusicFailed'))
     }
   } catch {
-    notify('API indisponível')
+    notify(t('media.editor.apiUnavailable'))
   } finally {
     loading.value = false
   }
@@ -727,17 +885,25 @@ async function importSingleSlja(file: File): Promise<void> {
       ? (innerName ?? file.name).replace(/\.slja(\.zip)?$/i, '')
       : archive.title.trim()
 
-    // RF-02 (SPEC-crud-comunidade-hub v1.0.0): import .slja = 1 coletânea
-    // por arquivo. Nome = título do conteúdo (sem fallback genérico — os
-    // fallbacks já resolvidos acima); colisão com coletânea do usuário →
-    // sufixo (2), (3)... Nunca agrupa numa "Importações .slja" nova.
+    // RF-02 (SPEC-editor-ux-v2): import .slja = 1 música órfã (collectionId=null)
+    // por arquivo. Não cria coletânea "Singles" se não houver colisão.
     const importBaseName = name
     const importCollectionName = collectionNameForImport(
       importBaseName,
       collections.value,
     )
     let collectionId = selectedCollectionId.value
-    if (collectionId == null || importCollectionName !== importBaseName) {
+    if (collectionId == null) { // MÚSICA SEM COLETÂNEA (ÓRFÃ)
+      // RF-02 v2 + v3.1 (UI): single = música na coletânea fixa "Singles"
+      // (invisível na UI — isSinglesView); modelo exige música→coletânea.
+      collectionId = await resolveSinglesCollection()
+      if (collectionId == null) {
+        notify(t('media.editor.singlesPrepareFailed'), true)
+        return
+      }
+    } else if (importCollectionName !== importBaseName) {
+      // Colisão: usa a existente ou cria uma (mantém o comportamento antigo para
+      // evitar perda de dados de usuário, mas não cria 'Singles' aqui)
       const existing = collections.value.find(
         (c) => c.name === importCollectionName,
       )
@@ -746,7 +912,7 @@ async function importSingleSlja(file: File): Promise<void> {
       } else {
         const created = await createCustomCollection(importCollectionName)
         if (!created) {
-          notify('Falha ao criar coletânea de importação')
+          notify(t('media.editor.importCollectionFailed'))
           return
         }
         collectionId = created.id
@@ -757,7 +923,7 @@ async function importSingleSlja(file: File): Promise<void> {
 
     const createdMusic = await createCustomMusic(collectionId, { name })
     if (!createdMusic) {
-      notify('Falha ao criar música a partir do .slja — verifique conexão/login', true)
+      notify(t('media.editor.sljaMusicFailed'), true)
       return
     }
     selectedMusicId.value = createdMusic.id
@@ -822,7 +988,7 @@ async function importSingleSlja(file: File): Promise<void> {
       }
     }
     if (!isLocalMusic && !hasSession && (archive.audio?.bytes?.length || archive.assets?.length)) {
-      notify('Sem conta conectada: áudio e fundo não sobem — entre para incluí-los', true)
+      notify(t('media.editor.noAccountMedia'), true)
     }
 
     /** imageUrl → id_file (remoto) ou data: URL (local) */
@@ -901,7 +1067,7 @@ async function importSingleSlja(file: File): Promise<void> {
     loadAudioForMusic(localAudioPath ?? uploadedAudio?.url ?? null)
   } catch (error) {
     console.error('Falha ao importar .slja', error)
-    notify('Arquivo .slja inválido')
+    notify(t('media.editor.invalidSlja'))
   } finally {
     loading.value = false
   }
@@ -943,10 +1109,10 @@ async function onExportSlja(): Promise<void> {
     anchor.download = `${musicName.value || 'apresentacao'}.slja`
     anchor.click()
     URL.revokeObjectURL(url)
-    notify('Exportado com sucesso')
+    notify(t('media.editor.exportSuccess'))
   } catch (error) {
     console.error('Falha ao exportar .slja', error)
-    notify('Falha ao exportar .slja')
+    notify(t('media.editor.exportFailed'))
   } finally {
     saving.value = false
   }
@@ -1014,7 +1180,7 @@ async function doDeleteCollection(): Promise<void> {
       await refreshCollections()
       notify(`Coletânea "${current.name}" excluída`)
     } else {
-      notify('Falha ao excluir coletânea', true)
+      notify(t('media.editor.deleteCollectionFailed'), true)
     }
   } finally {
     saving.value = false
@@ -1034,9 +1200,9 @@ async function doDeleteMusic(): Promise<void> {
       if (selectedCollectionId.value != null) {
         musics.value = await listCustomMusics(selectedCollectionId.value)
       }
-      notify('Música excluída')
+      notify(t('media.editor.musicDeleted'))
     } else {
-      notify('Falha ao excluir música', true)
+      notify(t('media.editor.deleteMusicFailed'), true)
     }
   } finally {
     saving.value = false
@@ -1049,11 +1215,11 @@ async function doDeleteStanza(index: number): Promise<void> {
   saving.value = true
   try {
     if (stanza.id != null && !(await deleteCustomLyric(stanza.id))) {
-      notify('Falha ao excluir estrofe', true)
+      notify(t('media.editor.deleteStanzaFailed'), true)
       return
     }
     lyrics.value.splice(index, 1)
-    notify('Estrofe excluída')
+    notify(t('media.editor.stanzaDeleted'))
   } finally {
     saving.value = false
   }
@@ -1201,12 +1367,12 @@ async function onAudioFile(event: Event): Promise<void> {
 
     const uploaded = await uploadCustomFile(bytes, file.name, 'audio')
     if (!uploaded) {
-      notify('Falha no upload do áudio', true)
+      notify(t('media.editor.audioUploadFailed'), true)
       return
     }
     const ok = await updateCustomMusic(musicId, { id_file_audio: uploaded.idFile })
     if (!ok) {
-      notify('Falha ao vincular o áudio à música', true)
+      notify(t('media.editor.linkAudioFailed'), true)
       return
     }
     loadAudioForMusic(uploaded.url)
@@ -1227,12 +1393,12 @@ async function onRemoveAudio(): Promise<void> {
     } else {
       const ok = await updateCustomMusic(musicId, { id_file_audio: null })
       if (!ok) {
-        notify('Falha ao remover o áudio', true)
+        notify(t('media.editor.audioRemoveFailed'), true)
         return
       }
     }
     loadAudioForMusic(null)
-    notify('Áudio removido')
+    notify(t('media.editor.audioRemoved'))
   } finally {
     saving.value = false
   }
@@ -1370,70 +1536,81 @@ onMounted(async () => {
         :class="{ 'editor__aside--collapsed': asideCollapsed }"
         v-show="!asideCollapsed"
       >
-        <h2 class="editor__section-title">
-          Coletâneas
-        </h2>
-        <!-- Feedback Ezequias (02/10): um login só. A barra de login legacy das
-             coletâneas só aparece SEM sessão principal (Firebase/legacy unificado
-             do header). Logado, o token da sessão principal serve pra tudo
-             (mesma chave localStorage — bridge firebase-session na API). -->
-        <MediaAccountBar
-          v-if="!isLoggedIn"
-          :notify="notify"
-        />
-        <!-- Capa da coletânea selecionada (upload/remoção) -->
-        <div
-          v-if="selectedCollection"
-          class="editor__cover"
-        >
-          <button
-            type="button"
-            class="editor__cover-thumb"
-            :class="{ 'editor__cover-thumb--empty': !selectedCollection.coverUrl }"
-            :style="selectedCollection.coverUrl
-              ? { backgroundImage: `url(${customFileUrl(selectedCollection.coverUrl)})` }
-              : undefined"
-            :title="t('media.editor.changeCover')"
-            @click="coverInput?.click()"
-          >
-            <i
-              v-if="!selectedCollection.coverUrl"
-              class="ti ti-camera"
-              aria-hidden="true"
-            />
-          </button>
-          <button
-            v-if="selectedCollection.coverUrl"
-            type="button"
-            class="editor__btn editor__btn--danger editor__btn--icon"
-            :title="t('media.editor.removeCover')"
-            @click="onRemoveCover"
-          >
-            <i
-              class="ti ti-trash"
-              aria-hidden="true"
-            />
-          </button>
-          <input
-            ref="coverInput"
-            type="file"
-            accept="image/*"
-            class="editor__file-input"
-            :aria-label="t('media.editor.changeCover')"
-            @change="onCoverFile"
-          >
+        <div class="editor__aside-head">
+          <h2 class="editor__section-title">
+            Coletâneas
+          </h2>
+          <!-- SPEC AC3: ÚNICO "+" do editor — menu com 3 ações nomeadas -->
+          <div class="editor__add-wrap">
+            <button
+              type="button"
+              class="editor__btn editor__btn--icon"
+              data-testid="add-menu-btn"
+              title="Adicionar…"
+              @click="addMenuOpen = !addMenuOpen"
+            >
+              <i
+                class="ti ti-plus"
+                aria-hidden="true"
+              />
+            </button>
+            <div
+              v-if="addMenuOpen"
+              class="editor__menu"
+              data-testid="add-menu"
+            >
+              <button
+                type="button"
+                class="editor__menu-item"
+                data-testid="add-menu-collection"
+                @click="onAddMenuAction('collection')"
+              >
+                <i
+                  class="ti ti-disc"
+                  aria-hidden="true"
+                />Nova coletânea
+              </button>
+              <button
+                type="button"
+                class="editor__menu-item"
+                data-testid="add-menu-single"
+                @click="onAddMenuAction('single')"
+              >
+                <i
+                  class="ti ti-music"
+                  aria-hidden="true"
+                />Novo single
+              </button>
+              <button
+                type="button"
+                class="editor__menu-item"
+                data-testid="add-menu-official"
+                @click="onAddMenuAction('official')"
+              >
+                <i
+                  class="ti ti-book"
+                  aria-hidden="true"
+                />Hino oficial
+              </button>
+            </div>
+          </div>
         </div>
+        <!-- SPEC AC1: zero UI de rede/login deslogado. MediaAccountBar removida
+             do editor (login unificado só no avatar do header global). -->
+        <!-- Form de nova coletânea (aberto pelo menu "+") -->
         <div class="editor__row">
           <input
             v-model="newCollectionName"
             type="text"
             class="editor__input"
+            data-testid="new-collection-input"
             :placeholder="t('media.editor.newCollection')"
             @keyup.enter="onCreateCollection"
           >
           <button
             type="button"
             class="editor__btn"
+            data-testid="new-collection-btn"
             :disabled="saving || !newCollectionName.trim()"
             @click="onCreateCollection"
           >
@@ -1443,48 +1620,30 @@ onMounted(async () => {
             />
           </button>
         </div>
-        <div
-          class="editor__visibility"
-          role="radiogroup"
-          :aria-label="t('media.visibility.label')"
-        >
+        <!-- Form de novo single (SPEC: single sempre disponível) -->
+        <div class="editor__row">
+          <input
+            v-model="newSingleName"
+            type="text"
+            class="editor__input"
+            data-testid="new-single-input"
+            placeholder="Nome do single"
+            @keyup.enter="onCreateSingle"
+          >
           <button
             type="button"
-            class="editor__visibility-btn"
-            :class="{ 'editor__visibility-btn--active': newCollectionVisibility === 'private' }"
-            :aria-pressed="newCollectionVisibility === 'private'"
-            :disabled="saving"
-            @click="newCollectionVisibility = 'private'"
+            class="editor__btn"
+            data-testid="new-single-btn"
+            :disabled="saving || !newSingleName.trim()"
+            title="Cria um single (música avulsa)"
+            @click="onCreateSingle"
           >
             <i
-              class="ti ti-lock"
+              class="ti ti-music-plus"
               aria-hidden="true"
             />
-            {{ t('media.visibility.private') }}
-          </button>
-          <button
-            type="button"
-            class="editor__visibility-btn"
-            :class="{ 'editor__visibility-btn--active': newCollectionVisibility === 'public' }"
-            :aria-pressed="newCollectionVisibility === 'public'"
-            :disabled="saving"
-            @click="newCollectionVisibility = 'public'"
-          >
-            <i
-              class="ti ti-broadcast"
-              aria-hidden="true"
-            />
-            {{ t('media.visibility.public') }}
           </button>
         </div>
-        <button
-          type="button"
-          class="editor__btn editor__btn--rules"
-          @click="rulesOpen = true"
-        >
-          <i class="ti ti-info-circle" aria-hidden="true" />
-          {{ t('media.publishRules.linkLabel') }}
-        </button>
         <ul class="editor__list">
           <li
             v-for="collection in collections"
@@ -1499,94 +1658,153 @@ onMounted(async () => {
               {{ collection.name }}
               <span class="editor__count">{{ collection.musicsCount }}</span>
             </button>
+            <button
+              type="button"
+              class="editor__btn editor__btn--icon editor__kebab"
+              data-testid="collection-kebab"
+              :title="`Ações para ${collection.name}`"
+              @click.stop="kebabOpenId = kebabOpenId === collection.id ? null : collection.id"
+            >
+              <i
+                class="ti ti-dots-vertical"
+                aria-hidden="true"
+              />
+            </button>
+            <div
+              v-if="kebabOpenId === collection.id"
+              class="editor__menu"
+              data-testid="collection-kebab-menu"
+            >
+              <button
+                type="button"
+                class="editor__menu-item"
+                data-testid="kebab-cover"
+                @click="onKebabAction('cover', collection.id)"
+              >
+                <i
+                  class="ti ti-photo"
+                  aria-hidden="true"
+                />Editar capa
+              </button>
+              <button
+                type="button"
+                class="editor__menu-item"
+                data-testid="kebab-rename"
+                @click="onKebabAction('rename', collection.id)"
+              >
+                <i
+                  class="ti ti-pencil"
+                  aria-hidden="true"
+                />Renomear
+              </button>
+              <!-- Visibilidade: só logado (SPEC AC1: deslogado zero UI de rede)
+                   e só na coletânea selecionada -->
+              <div
+                v-if="isSignedIn && collection.id === selectedCollectionId"
+                class="editor__visibility editor__visibility--menu"
+                role="radiogroup"
+                :aria-label="t('media.visibility.label')"
+              >
+                <button
+                  type="button"
+                  class="editor__visibility-btn"
+                  :class="{ 'editor__visibility-btn--active': (selectedCollection?.visibility ?? 'public') === 'private' }"
+                  :aria-pressed="(selectedCollection?.visibility ?? 'public') === 'private'"
+                  :disabled="saving || visibilityBusy"
+                  @click="onChangeVisibilityWithRules('private')"
+                >
+                  <i
+                    class="ti ti-lock"
+                    aria-hidden="true"
+                  />
+                  {{ t('media.visibility.private') }}
+                </button>
+                <button
+                  type="button"
+                  class="editor__visibility-btn"
+                  :class="{ 'editor__visibility-btn--active': (selectedCollection?.visibility ?? 'public') === 'public' }"
+                  :aria-pressed="(selectedCollection?.visibility ?? 'public') === 'public'"
+                  :disabled="saving || visibilityBusy"
+                  @click="onChangeVisibilityWithRules('public')"
+                >
+                  <i
+                    class="ti ti-broadcast"
+                    aria-hidden="true"
+                  />
+                  {{ t('media.visibility.public') }}
+                </button>
+              </div>
+              <button
+                type="button"
+                class="editor__menu-item"
+                data-testid="kebab-delete"
+                @click="onKebabAction('delete', collection.id)"
+              >
+                <i
+                  class="ti ti-trash"
+                  aria-hidden="true"
+                />Excluir
+              </button>
+            </div>
+            <!-- Inline rename (aberto pelo menu ⋮ → Renomear) -->
+            <div
+              v-if="renamingId === collection.id"
+              class="editor__row"
+            >
+              <input
+                v-model="renameCollectionDraft"
+                type="text"
+                class="editor__input"
+                data-testid="collection-rename-input"
+                placeholder="Novo nome"
+                @keyup.enter="onRenameCollection"
+              >
+              <button
+                type="button"
+                class="editor__btn"
+                :disabled="saving || !renameCollectionDraft.trim()"
+                title="Salvar nome"
+                @click="onRenameCollection"
+              >
+                <i
+                  class="ti ti-device-floppy"
+                  aria-hidden="true"
+                />
+              </button>
+            </div>
           </li>
         </ul>
-        <template v-if="selectedCollection">
-          <div
-            class="editor__visibility"
-            role="radiogroup"
-            :aria-label="t('media.visibility.label')"
-          >
-            <button
-              type="button"
-              class="editor__visibility-btn"
-              :class="{ 'editor__visibility-btn--active': (selectedCollection.visibility ?? 'public') === 'private' }"
-              :aria-pressed="(selectedCollection.visibility ?? 'public') === 'private'"
-              :disabled="saving || visibilityBusy"
-              @click="onChangeVisibilityWithRules('private')"
-            >
-              <i
-                class="ti ti-lock"
-                aria-hidden="true"
-              />
-              {{ t('media.visibility.private') }}
-            </button>
-            <button
-              type="button"
-              class="editor__visibility-btn"
-              :class="{ 'editor__visibility-btn--active': (selectedCollection.visibility ?? 'public') === 'public' }"
-              :aria-pressed="(selectedCollection.visibility ?? 'public') === 'public'"
-              :disabled="saving || visibilityBusy"
-              @click="onChangeVisibilityWithRules('public')"
-            >
-              <i
-                class="ti ti-broadcast"
-                aria-hidden="true"
-              />
-              {{ t('media.visibility.public') }}
-            </button>
-          </div>
-          <p class="editor__hint">
-            {{ (selectedCollection.visibility ?? 'public') === 'public'
-              ? t('media.visibility.publicHint')
-              : t('media.visibility.privateHint') }}
-          </p>
-          <button
-            v-if="(selectedCollection.visibility ?? 'public') === 'public'"
-            type="button"
-            class="editor__btn editor__btn--rules"
-            :title="t('media.publishRules.title')"
-            @click="rulesOpen = true"
-          >
-            <i
-              class="ti ti-info-circle"
-              aria-hidden="true"
-            />
-            {{ t('media.publishRules.showRules') }}
-          </button>
-        </template>
-        <button
-          v-if="selectedCollectionId != null"
-          type="button"
-          class="editor__btn editor__btn--danger"
-          :disabled="saving"
-          :title="t('media.editor.deleteCollection')"
-          @click="requestDelete('collection')"
+        <!-- Input de capa do KEbab "Editar capa" (hidden, acionado via coverInput) -->
+        <input
+          ref="coverInput"
+          type="file"
+          accept="image/*"
+          class="editor__file-input"
+          :aria-label="t('media.editor.changeCover')"
+          @change="onCoverFile"
         >
-          <i
-            class="ti ti-trash"
-            aria-hidden="true"
-          />
-          Excluir coletânea
-        </button>
-        <p
-          v-if="!loading && collections.length === 0"
-          class="editor__hint"
-        >
-          Nenhuma coletânea ainda. Crie a primeira acima.
-        </p>
       </aside>
 
+      <!-- v3.1: coluna oculta quando não tem NADA a renderizar —
+           sem coletânea selecionada, ou view Singles vazia (sem
+           composição por ser single + sem músicas para listar). -->
       <aside
+        v-if="selectedCollectionId != null && (!isSinglesView || musics.length > 0)"
         class="editor__aside editor__aside--musics"
         :class="{ 'editor__aside--collapsed': asideCollapsed }"
         v-show="!asideCollapsed"
       >
+        <!-- SPEC v3.1: view de singles (backing "Singles" oculto) = sem
+             ferramentas de COMPOSIÇÃO (novo/reutilizar/hino oficial) —
+             single já É a música completa. Lista permanece (seleção p/ edição). -->
         <template v-if="selectedCollectionId != null">
           <h2 class="editor__section-title">
-            Músicas
+            {{ isSinglesView ? 'Singles' : 'Músicas' }}
           </h2>
-          <div class="editor__row">
+          <div
+            v-if="!isSinglesView"
+            class="editor__row"
+          >
             <input
               v-model="newMusicName"
               type="text"
@@ -1608,7 +1826,10 @@ onMounted(async () => {
           </div>
 
           <!-- Reutilizar música custom já criada/importada (copia com letra e áudio) -->
-          <div class="editor__add-official">
+          <div
+            v-if="!isSinglesView"
+            class="editor__add-official"
+          >
             <input
               v-model="reuseSearch"
               type="text"
@@ -1655,13 +1876,17 @@ onMounted(async () => {
           </div>
 
           <!-- Adicionar hino OFICIAL da API à coletânea (busca no catálogo) -->
-          <div class="editor__add-official">
+          <div
+            v-if="!isSinglesView"
+            class="editor__add-official"
+          >
             <div class="editor__row">
               <input
                 v-model="officialSearch"
                 type="text"
                 class="editor__input"
-                :placeholder="t('media.editor.searchOfficial')"
+                data-testid="official-search"
+                placeholder="Buscar hino oficial (nº ou nome)"
                 @input="onOfficialSearchInput"
                 @keyup.enter="onAddOfficialFromSearch"
               >
@@ -1730,8 +1955,10 @@ onMounted(async () => {
               </button>
             </li>
           </ul>
+          <!-- v3.1: Publicar fica na coluna; Excluir música REALOCADO para o
+               cabeçalho da edição (funciona p/ single e música de coletânea). -->
           <button
-            v-if="selectedMusicId != null && musicStatus === 'draft'"
+            v-if="isSignedIn && selectedMusicId != null && musicStatus === 'draft'"
             type="button"
             class="editor__btn editor__btn--publish"
             :disabled="saving"
@@ -1744,20 +1971,6 @@ onMounted(async () => {
             />
             Publicar
           </button>
-          <button
-            v-if="selectedMusicId != null"
-            type="button"
-            class="editor__btn editor__btn--danger"
-            :disabled="saving"
-            :title="t('media.editor.deleteMusic')"
-            @click="requestDelete('music')"
-          >
-            <i
-              class="ti ti-trash"
-              aria-hidden="true"
-            />
-            Excluir música
-          </button>
           <p
             v-if="!loading && musics.length === 0"
             class="editor__hint"
@@ -1765,12 +1978,6 @@ onMounted(async () => {
             Nenhuma música nesta coletânea. Crie ou adicione acima.
           </p>
         </template>
-        <p
-          v-else
-          class="editor__hint editor__hint--column"
-        >
-          Selecione uma coletânea à esquerda para ver as músicas.
-        </p>
       </aside>
 
       <div class="editor__main">
@@ -1779,6 +1986,48 @@ onMounted(async () => {
             <h2 class="editor__section-title">
               {{ musicName || 'Música' }}
             </h2>
+            <!-- v3.1: ações da MÚSICA no cabeçalho da edição — é aqui que o
+                 usuário trabalha. Single tem excluir (realocado da coluna) e
+                 capa própria; coletânea mantém os mesmos controles. -->
+            <div class="editor__music-head-actions">
+              <input
+                ref="musicCoverInput"
+                type="file"
+                accept="image/*"
+                class="editor__file-input"
+                data-testid="music-cover-input"
+                aria-label="Alterar capa do single"
+                @change="onMusicCoverFile"
+              >
+              <button
+                v-if="selectedMusicId != null"
+                type="button"
+                class="editor__btn editor__btn--icon"
+                data-testid="music-cover-btn"
+                :disabled="saving"
+                title="Capa desta música (aparece na projeção e nas listas)"
+                @click="musicCoverInput?.click()"
+              >
+                <i
+                  class="ti ti-photo"
+                  aria-hidden="true"
+                />
+              </button>
+              <button
+                v-if="selectedMusicId != null"
+                type="button"
+                class="editor__btn editor__btn--danger editor__btn--icon"
+                data-testid="music-delete-btn"
+                :disabled="saving"
+                :title="t('media.editor.deleteMusic')"
+                @click="requestDelete('music')"
+              >
+                <i
+                  class="ti ti-trash"
+                  aria-hidden="true"
+                />
+              </button>
+            </div>
             <div
               v-if="canRenameMusic"
               class="editor__rename"
@@ -2034,12 +2283,54 @@ onMounted(async () => {
             Nova estrofe
           </button>
         </template>
-        <p
+        <div
           v-else
-          class="editor__empty"
+          class="editor__onboarding"
+          data-testid="editor-onboarding"
         >
-          Selecione uma música à esquerda para editar as estrofes, timing e background.
-        </p>
+          <h2 class="editor__onboarding-title">Comece por aqui</h2>
+          <p class="editor__onboarding-sub">
+            Escolha uma das opções — funciona mesmo sem conta (fica salvo neste dispositivo).
+          </p>
+          <div class="editor__onboarding-actions">
+            <button
+              type="button"
+              class="editor__btn editor__onboarding-cta"
+              data-testid="onboarding-collection"
+              @click="onAddMenuAction('collection')"
+            >
+              <i
+                class="ti ti-disc"
+                aria-hidden="true"
+              />
+              Criar coletânea
+            </button>
+            <button
+              type="button"
+              class="editor__btn editor__onboarding-cta"
+              data-testid="onboarding-single"
+              @click="onAddMenuAction('single')"
+            >
+              <i
+                class="ti ti-music"
+                aria-hidden="true"
+              />
+              Novo single
+            </button>
+            <button
+              type="button"
+              class="editor__btn editor__onboarding-cta"
+              data-testid="onboarding-import"
+              @click="onImportSlja"
+            >
+              <i
+                class="ti ti-file-import"
+                aria-hidden="true"
+              />
+              Importar .slja
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Painel "Letra" (estilo playlist da /media): a letra PRONTA, é ela que anda -->
@@ -2136,6 +2427,114 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+
+.editor__aside-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.editor__add-wrap {
+  position: relative;
+}
+
+.editor__menu {
+  position: absolute;
+  top: calc(100% + 0.3rem);
+  right: 0;
+  z-index: 30;
+  min-width: 172px;
+  padding: 0.3rem;
+  border-radius: 10px;
+  background: var(--surface-2, #26262e);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.2));
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+}
+
+.editor__menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font-size: 0.8rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.editor__menu-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.editor__kebab {
+  opacity: 0.55;
+}
+
+.editor__list li {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.editor__list li .editor__kebab {
+  flex: 0 0 auto;
+}
+
+.editor__list li .editor__menu {
+  top: auto;
+  bottom: calc(100% + 0.2rem);
+}
+
+.editor__onboarding {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  text-align: center;
+  padding: 2rem;
+}
+
+.editor__onboarding-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.editor__onboarding-sub {
+  margin: 0;
+  opacity: 0.7;
+  font-size: 0.82rem;
+  max-width: 340px;
+}
+
+.editor__onboarding-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 0.4rem;
+  min-width: 220px;
+}
+
+.editor__onboarding-cta {
+  justify-content: center;
+  padding: 0.6rem 1rem;
+  font-size: 0.9rem;
+}
+
+.editor__visibility--menu {
+  flex-direction: column;
+  padding: 0.25rem 0.4rem;
+  border-top: 1px solid var(--glass-border, rgba(255, 255, 255, 0.15));
+}
 
 .editor__visibility {
   display: flex;
@@ -2781,6 +3180,17 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 0.25rem;
+}
+
+/* v3.1: ações da música no cabeçalho (capa/excluir) */
+.editor__music-head-actions {
+  display: flex;
+  gap: 0.375rem;
+  flex-shrink: 0;
+}
+
+.editor__file-input {
+  display: none;
 }
 
 .editor__rename-input {

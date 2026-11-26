@@ -39,6 +39,10 @@ export function normalizeMediaRuntime(raw: unknown): MediaProjectionRuntime {
     imagePosition: asNullableString(source.imagePosition),
     frameDataUrl: asNullableString(source.frameDataUrl),
     isCover: source.isCover === true,
+    hymnNumber:
+      typeof source.hymnNumber === 'number' && Number.isInteger(source.hymnNumber) && source.hymnNumber > 0
+        ? source.hymnNumber
+        : null,
     slideIndex: asNumber(source.slideIndex, 0),
     slideCount: asNumber(source.slideCount, 0),
     nextLyric: asString(source.nextLyric, ''),

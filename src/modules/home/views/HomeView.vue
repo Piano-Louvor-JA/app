@@ -2,6 +2,8 @@
 import logoUrl from "@assets/brand/logo-louvor-ja.svg";
 import { useI18n } from "vue-i18n";
 
+import HomeLocationReminder from "@modules/onboarding/components/HomeLocationReminder.vue";
+
 import HomeLocationField from "../components/HomeLocationField.vue";
 import { useHomeClock } from "../composables/useHomeClock";
 import { useHomeLocation } from "../composables/useHomeLocation";
@@ -46,6 +48,7 @@ const { formattedTime } = useHomeClock();
           {{ formattedTime }}
         </div>
       </div>
+      <HomeLocationReminder />
     </div>
   </section>
 </template>

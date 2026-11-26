@@ -216,7 +216,7 @@ test.describe('Liturgia — CRUD com integridade offline-first', () => {
       .locator('.moment-dialog__submit', { hasText: 'Adicionar' })
       .click()
     await expect(
-      page.locator('.liturgy-item__name', { hasText: MUSIC_NAME }),
+      page.locator('.liturgy-item__name', { hasText: MUSIC_COMPLEMENTARY }),
     ).toBeVisible({ timeout: 10000 })
 
     // ── 4. Sub-item: Vídeo local (file picker mockado) ──
@@ -289,7 +289,7 @@ test.describe('Liturgia — CRUD com integridade offline-first', () => {
       page.locator('.liturgy-item__name', { hasText: CATEGORY_NAME }),
     ).toBeVisible({ timeout: 15000 })
     await expect(
-      page.locator('.liturgy-item__name', { hasText: MUSIC_NAME }),
+      page.locator('.liturgy-item__name', { hasText: MUSIC_COMPLEMENTARY }),
     ).toBeVisible({ timeout: 15000 })
     await expect(
       page.locator('.liturgy-item__name', { hasText: VIDEO_NAME }),

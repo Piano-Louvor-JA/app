@@ -21,6 +21,7 @@ export function useAlbums() {
 
   const {
     categories,
+    previewCategories,
     activeCollection,
     tracks,
     searchQuery,
@@ -182,6 +183,7 @@ export function useAlbums() {
 
   return {
     categories,
+    previewCategories,
     activeCollection,
     tracks,
     searchQuery,
@@ -204,6 +206,8 @@ export function useAlbums() {
     downloadErrorKey,
     downloadFailure,
     findLibraryAlbum,
+    isAlbumDisabled: store.isAlbumDisabled,
+    setAlbumDisabled: store.setAlbumDisabled,
     hydrateCatalog: store.hydrateCatalog,
     hydrateMusicIndex: store.hydrateMusicIndex,
     openCollection: store.openCollection,

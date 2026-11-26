@@ -308,7 +308,7 @@ describe('MediaView — sessão com conteúdo', () => {
       { musicId: 2, title: 'B' },
     ]
     const w = await mountView()
-    expect(w.text()).toContain('Fila de reprodução')
+    expect(w.text()).toContain('media.queueTitle')
     await w.findAll('.media-window__playlist-item')[1]!.trigger('click')
     expect(P().fns.jumpToQueue).toHaveBeenCalledWith(1)
   })

@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@modules/media/services/auth-client", () => ({
 	getAuthSession: mocks.getSession,
-	authHeaders: vi.fn(() => ({})),
+	authHeadersAsync: vi.fn(() => ({})),
 }));
 
 vi.mock("@modules/media/services/outbox", () => ({

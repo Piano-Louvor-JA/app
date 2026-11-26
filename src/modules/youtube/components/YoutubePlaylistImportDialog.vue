@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 
 import type { YoutubeSearchItem } from '@shared/types/desktop-bridge'
 
+import { isPlaylistLink } from '../services/youtube-links'
 import { fetchYoutubePlaylist } from '../services/youtube-player'
 
 /**
@@ -43,10 +44,21 @@ watch(() => props.open, (open) => {
 async function pasteFromClipboard() {
   try {
     const text = await navigator.clipboard.readText()
-    if (text) url.value = text.trim()
+    if (!text) return
+    url.value = text.trim()
+    if (isPlaylistLink(url.value)) void load()
   } catch {
     // sem permissão de leitura: a pessoa cola com Ctrl+V
   }
+}
+
+/** Colou um link de playlist (Ctrl+V): já lê, sem precisar de "Continuar". */
+function onUrlPaste(event: ClipboardEvent) {
+  const pasted = event.clipboardData?.getData('text')?.trim() ?? ''
+  if (!isPlaylistLink(pasted) || step.value === 'loading') return
+  event.preventDefault()
+  url.value = pasted
+  void load()
 }
 
 async function load() {
@@ -117,6 +129,7 @@ function close() {
             :placeholder="t('youtube.playlist.urlPlaceholder')"
             :disabled="step === 'loading'"
             data-testid="youtube-playlist-url"
+            @paste="onUrlPaste"
           >
           <button type="button" class="yt-pl__btn" :disabled="step === 'loading'" :title="t('youtube.playlist.paste')" @click="pasteFromClipboard">
             <i class="ti ti-clipboard" aria-hidden="true" />

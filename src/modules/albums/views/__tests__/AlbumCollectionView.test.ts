@@ -103,6 +103,7 @@ vi.mock('../../composables/useAlbums', async () => {
         appendActiveCollectionToQueue: mocks.appendActiveCollectionToQueue ?? (async () => true),
         openLyric: vi.fn(async () => true),
         closeLyric: vi.fn(),
+        isAlbumDisabled: (key: unknown) => ((mocks.disabledAlbums as unknown[]) ?? []).includes(String(key)),
       }
     },
   }
@@ -148,9 +149,9 @@ vi.mock('../../components/AlbumLyricDialog.vue', () => ({
 vi.mock('../../components/AlbumTrackRow.vue', () => ({
   default: {
     name: 'AlbumTrackRow',
-    props: ['track', 'collectionName', 'artworkUrl', 'busy', 'selected'],
+    props: ['track', 'collectionName', 'artworkUrl', 'busy', 'selected', 'albumDisabled'],
     emits: ['sung', 'instrumental', 'slides', 'lyric', 'playlist'],
-    template: `<div class="track-row-stub" :data-id="track.musicId" :data-busy="String(busy)">
+    template: `<div class="track-row-stub" :data-id="track.musicId" :data-busy="String(busy)" :data-album-disabled="String(albumDisabled)">
       <button class="row-sung" @click="$emit('sung')" />
       <button class="row-playlist" @click="$emit('playlist')" />
     </div>`,
@@ -207,6 +208,20 @@ describe('AlbumCollectionView', () => {
     savePlaylists([
       { id: 'pl-1', name: 'Culto', items: [] },
     ])
+  })
+
+  it('álbum desativado: aviso no topo e todas as linhas marcadas (o clique continua tocando)', async () => {
+    setupMocks({ disabledAlbums: ['10'] })
+    const w = await mountView()
+    expect(w.find('.album-collection-view__disabled-note').exists()).toBe(true)
+    const rows = w.findAll('.track-row-stub')
+    expect(rows.map((row) => row.attributes('data-album-disabled'))).toEqual(['true', 'true'])
+  })
+
+  it('álbum ativo: sem aviso e linhas normais', async () => {
+    const w = await mountView()
+    expect(w.find('.album-collection-view__disabled-note').exists()).toBe(false)
+    expect(w.findAll('.track-row-stub').map((row) => row.attributes('data-album-disabled'))).toEqual(['false', 'false'])
   })
 
   it('carrega a coletânea no mount (openCollection com o id da rota) e mostra título', async () => {
@@ -283,12 +298,12 @@ describe('AlbumCollectionView', () => {
     await flushPromises()
     expect(pickerInBody()).toBeNull()
     expect(document.body.querySelector('.playlist-toast')).not.toBeNull()
-    expect(document.body.querySelector('.playlist-toast')!.textContent).toContain('adicionada')
+    expect(document.body.querySelector('.playlist-toast')!.textContent).toContain('albums.playlists.addedTo')
     // duplicado
     await w.findAll('.track-row-stub')[0]!.find('.row-playlist').trigger('click')
     ;(pickerInBody()!.querySelector('.playlist-picker__option') as HTMLElement).click()
     await flushPromises()
-    expect(document.body.querySelector('.playlist-toast')!.textContent).toContain('já está')
+    expect(document.body.querySelector('.playlist-toast')!.textContent).toContain('albums.playlists.alreadyIn')
   })
 
   it('picker sem playlists mostra estado vazio; esc/overlay/cancelar fecham', async () => {

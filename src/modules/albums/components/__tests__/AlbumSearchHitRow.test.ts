@@ -52,6 +52,23 @@ describe('AlbumSearchHitRow', () => {
     expect(w.find('.album-search-hit__duration').text()).toBe('3:10')
   })
 
+  it('álbum desativado: linha apagada, fora do Tab, nem Enter nem clique tocam', async () => {
+    const w = mountRow({ hit: { ...hit, disabled: true } })
+    expect(w.classes()).toContain('album-search-hit--disabled')
+    expect(w.attributes('tabindex')).toBe('-1')
+    expect(w.attributes('aria-disabled')).toBe('true')
+    expect(w.find('.album-search-hit__disabled-badge').exists()).toBe(true)
+    await w.trigger('keydown', { key: 'Enter' })
+    expect(w.emitted('sung')).toBeUndefined()
+    await w.trigger('click')
+    for (const action of ['.mta-sung', '.mta-inst', '.mta-slides', '.mta-lyric']) await w.get(action).trigger('click')
+    expect(w.emitted('sung')).toBeUndefined()
+    expect(w.emitted('instrumental')).toBeUndefined()
+    expect(w.emitted('slides')).toBeUndefined()
+    expect(w.emitted('lyric')).toBeUndefined()
+    expect(w.get('.album-search-hit__playlist').attributes('disabled')).toBeDefined()
+  })
+
   it('esconde número quando não é hinário ou não tem track', () => {
     const w = mountRow({ hit: { ...hit, isHymnal: false, track: null } })
     expect(w.find('.album-search-hit__number').exists()).toBe(false)

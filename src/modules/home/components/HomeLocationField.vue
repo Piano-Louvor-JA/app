@@ -31,6 +31,12 @@ watch(
 		if (!editing.value) {
 			draft.value = next;
 		}
+		// Preenchido por fora (assistente de primeira execução) enquanto o
+		// campo vazio aguardava digitação: mostra o valor salvo.
+		if (editing.value && draft.value.trim().length === 0 && next.trim().length > 0) {
+			draft.value = next;
+			editing.value = false;
+		}
 		if (next.trim().length === 0) {
 			editing.value = true;
 			draft.value = "";

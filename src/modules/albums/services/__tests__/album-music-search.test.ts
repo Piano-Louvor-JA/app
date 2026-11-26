@@ -452,3 +452,56 @@ describe('filterAlbumMusicIndex — relevância da busca (apk#127)', () => {
   })
 })
 })
+
+describe('álbuns desativados e número do hinário', () => {
+  const ATUAL = (track: number) => ({ id_album: 900, name: 'Hinário Adventista', type: 'hymnal', track })
+  const ANTIGO = (track: number) => ({ id_album: 901, name: 'Hinário Adventista 1996', type: 'hymnal_1996', track })
+
+  async function index(rows: Row[]) {
+    mockRead.mockResolvedValueOnce(rows)
+    return loadAlbumMusicIndex()
+  }
+
+  beforeEach(() => vi.clearAllMocks())
+
+  // Caso real de usuário: digitou o número do hino e o Enter pegou o do hinário antigo.
+  it('número digitado: o hino do hinário atual vem antes do de 1996 com o mesmo número', async () => {
+    const hits = await index([
+      baseHit({ id_music: 2, name: 'Do antigo', albums: [ATUAL(12), ANTIGO(45)] }),
+      baseHit({ id_music: 1, name: 'Do atual', albums: [ATUAL(45), ANTIGO(60)] }),
+    ])
+    expect(filterAlbumMusicIndex(hits, '45').map((h) => h.musicId)).toEqual([1, 2])
+  })
+
+  it('número só de álbum desativado: aparece no fim, desativado', async () => {
+    const hits = await index([
+      baseHit({ id_music: 2, name: 'Do antigo', albums: [ATUAL(12), ANTIGO(45)] }),
+      baseHit({ id_music: 1, name: 'Do atual', albums: [ATUAL(45), ANTIGO(60)] }),
+    ])
+    const found = filterAlbumMusicIndex(hits, '45', new Set(['hymnal_1996']))
+    expect(found.map((h) => [h.musicId, h.disabled === true])).toEqual([[1, false], [2, true]])
+  })
+
+  it('música só em álbum desativado: desativada também na busca por texto, depois das ativas', async () => {
+    const hits = await index([
+      baseHit({ id_music: 3, name: 'Santo antigo', albums: [{ id_album: 77, name: 'CD Jovem 2004', track: 3 }] }),
+      baseHit({ id_music: 4, name: 'Santo novo', albums: [{ id_album: 78, name: 'CD Jovem 2024', track: 1 }] }),
+    ])
+    const found = filterAlbumMusicIndex(hits, 'santo', new Set(['77']))
+    expect(found.map((h) => [h.musicId, h.disabled === true])).toEqual([[4, false], [3, true]])
+  })
+
+  it('música em álbum ativo e desativado: segue ativa, com o número do álbum ativo', async () => {
+    const hits = await index([
+      baseHit({ id_music: 5, name: 'Castelo forte', albums: [ATUAL(30), ANTIGO(25)] }),
+    ])
+    const [hit] = filterAlbumMusicIndex(hits, 'castelo', new Set(['hymnal']))
+    expect(hit!.disabled).toBeFalsy()
+    expect(hit!.track).toBe(25)
+  })
+
+  it('sem nada desativado, nada vem desativado', async () => {
+    const hits = await index([baseHit({ id_music: 6, name: 'Santo', albums: [ANTIGO(9)] })])
+    expect(filterAlbumMusicIndex(hits, 'santo')[0]!.disabled).toBeFalsy()
+  })
+})

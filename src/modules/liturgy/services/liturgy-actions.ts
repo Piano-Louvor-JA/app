@@ -1,5 +1,7 @@
+import { listPlaylists } from '@modules/albums/services/playlist-storage'
 import { useBibleStore } from '@modules/bible/stores/useBibleStore'
 import { openMusicPlayer } from '@modules/media/services/open-music-player'
+import { useMediaStore } from '@modules/media/stores/useMediaStore'
 import type { MediaPlaybackMode } from '@modules/media/types/media'
 import { getDesktopBridge } from '@shared/services/desktop-bridge'
 import type { ExternalPlayerPreference } from '@shared/types/desktop-bridge'
@@ -8,6 +10,7 @@ import type { Router } from 'vue-router'
 import type { LiturgyItem, LiturgyMusicMode } from '../types/liturgy'
 import { isExecutableItem } from './liturgy-item-helpers'
 import { useScheduledStore } from '../stores/useScheduledStore'
+import i18n from '@plugins/i18n'
 import { activeDateISO, todayISO } from './liturgy-preferences'
 import { getLiturgyVideoObjectUrl } from './liturgy-local-video'
 import {
@@ -210,11 +213,20 @@ function legacyContentFromFile(
   return { kind: 'file', filePath }
 }
 
+export type ExecuteLiturgyOptions = {
+  dateISO?: string
+  day?: import('../types/liturgy').LiturgyDayKey
+  /** Playlist: modo de reprodução (áudio / playback / sem áudio). */
+  playbackMode?: MediaPlaybackMode
+  /** Playlist: embaralha a fila antes de tocar. */
+  shuffled?: boolean
+}
+
 /** Abre o item (música já projeta nas telas configuradas). */
 export async function executeLiturgyItem(
   item: LiturgyItem,
   router: Router,
-  options?: { dateISO?: string; day?: import('../types/liturgy').LiturgyDayKey },
+  options?: ExecuteLiturgyOptions,
 ): Promise<LiturgyActionResult> {
   // scheduled = placeholder: resolve a entrada da data e EXECUTA como o tipo dela.
   // A liturgia inteira de um dia pode ser agendada (Rafael: "a programação toda
@@ -236,6 +248,40 @@ export async function executeLiturgyItem(
         await router.push({ name: 'media' })
       }
       return result
+    }
+
+    case 'playlist': {
+      const playlistId = item.playlistId?.trim()
+      if (!playlistId) {
+        return { ok: false, messageKey: 'liturgy.messages.playlistMissing' }
+      }
+      const playlist = listPlaylists().find((entry) => entry.id === playlistId)
+      if (!playlist) {
+        return { ok: false, messageKey: 'liturgy.messages.playlistMissing' }
+      }
+      if (playlist.items.length === 0) {
+        return { ok: false, messageKey: 'liturgy.messages.playlistEmpty' }
+      }
+      const mode = options?.playbackMode ?? 'audio'
+      let queueItems = playlist.items
+      let originalOrder = playlist.items
+      let shuffled = false
+      if (options?.shuffled) {
+        queueItems = [...playlist.items]
+        for (let i = queueItems.length - 1; i > 0; i -= 1) {
+          const j = Math.floor(Math.random() * (i + 1))
+          ;[queueItems[i], queueItems[j]] = [queueItems[j]!, queueItems[i]!]
+        }
+        originalOrder = playlist.items
+        shuffled = true
+      }
+      const mediaStore = useMediaStore()
+      await mediaStore.playQueue(queueItems, 0, mode, playlist.name, {
+        originalOrder,
+        shuffled,
+      })
+      await router.push({ name: 'media' })
+      return { ok: true }
     }
 
     case 'verse': {
@@ -317,7 +363,9 @@ export async function executeLiturgyItem(
         }
       }
 
-      const fallbackLabel = item.type === 'audio' ? 'Áudio' : 'Vídeo'
+      const fallbackLabel = item.type === 'audio'
+        ? i18n.global.t('liturgy.fallback.audio')
+        : i18n.global.t('liturgy.fallback.video')
       const opened = await openLiturgyLocalVideoControl(
         filePath || item.name?.trim() || fallbackLabel,
         item.name?.trim() || filePath || fallbackLabel,

@@ -14,6 +14,7 @@ import {
   ensureAlbumCovers,
   startCoverBackgroundSync,
 } from '@modules/starting/services/cover-background-sync'
+import { markFreshInstall } from '@modules/onboarding/services/onboarding-preferences'
 import { startCatalogBackgroundRefresh } from '@modules/starting/services/catalog-refresh'
 import {
   getDesktopBridge,
@@ -93,6 +94,9 @@ export function useAppBootstrap() {
     store.revealOverlay()
     store.phase = 'preparing'
     store.isFirstBoot = true
+    // O first boot termina com reload: deixa gravado que é instalação nova
+    // para o assistente abrir completo (cor e animação) depois do reload.
+    markFreshInstall()
     store.resetError()
     store.setProgress(0)
     store.setStatus('starting.status.preparingInstall')
