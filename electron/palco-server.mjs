@@ -421,13 +421,18 @@ class PalcoSlot {
             if (message.type === 'caps' && PAGES.has(message.page) && this.#clientInfo.has(ws)) {
               this.#clientInfo.set(ws, { ...this.#clientInfo.get(ws), page: message.page })
               this.#notifyClients()
-              // Espelho/OBS/retorno: se a aba ficou com HTML antigo após o app
-              // reiniciar, força 1 reload (WS reconecta sem recarregar a página).
+              // Espelho/retorno (receiver.html): se a aba ficou com HTML antigo
+              // após o app reiniciar, força 1 reload (WS reconecta sem recarregar
+              // a página). A legenda é o overlay.html, sem carimbo: fora daqui,
+              // senão recarrega em loop.
+              const servedByReceiver = message.page === 'espelho' || message.page === 'retorno'
               // Relê o carimbo: receiver.html trocado com o app aberto (dev/update).
-              try {
-                this.#receiverBuild = String(Math.trunc(statSync(path.join(__dirname, 'palco', 'receiver.html')).mtimeMs))
-              } catch { /* sem receiver: mantém o carimbo */ }
-              if (this.#receiverBuild && message.rxBuild !== this.#receiverBuild && !this.#reloadAsked.has(ws)) {
+              if (servedByReceiver) {
+                try {
+                  this.#receiverBuild = String(Math.trunc(statSync(path.join(__dirname, 'palco', 'receiver.html')).mtimeMs))
+                } catch { /* sem receiver: mantém o carimbo */ }
+              }
+              if (servedByReceiver && this.#receiverBuild && message.rxBuild !== this.#receiverBuild && !this.#reloadAsked.has(ws)) {
                 this.#reloadAsked.add(ws)
                 this.#sendTo(ws, { v: 2, type: 'obsControl', action: 'reload', requestId: this.#receiverBuild })
               }
