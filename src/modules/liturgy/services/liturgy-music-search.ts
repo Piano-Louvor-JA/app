@@ -172,6 +172,7 @@ export interface MusicSearchEntry extends LiturgyMusicOption {
 export function searchLiturgyMusic(
   options: Array<LiturgyMusicOption | MusicSearchEntry>,
   query: string,
+  disabledAlbums: ReadonlySet<string> = new Set(),
 ): MusicSearchEntry[] {
   const normalizedQuery = normalizeSearchText(query)
   if (!normalizedQuery) return []
@@ -180,13 +181,18 @@ export function searchLiturgyMusic(
   const trackQuery = parseTrackQuery(normalizedQuery)
   const context = { words, normalizedQuery, trackQuery }
 
-  const scored: Array<{ entry: MusicSearchEntry; score: SearchScore; index: number }> = []
+  const scored: Array<{ entry: MusicSearchEntry; score: SearchScore; index: number; disabled: boolean }> = []
   options.forEach((entry, index) => {
     const score = scoreEntry(entry, context)
-    if (score != null) scored.push({ entry, score, index })
+    if (score == null) return
+    // Álbum desativado (paridade Central/Classic): só se TODOS os álbuns da música estão desligados.
+    const keys = entry.albumKeys ?? []
+    const disabled = keys.length > 0 && keys.every((key) => disabledAlbums.has(key))
+    scored.push({ entry, score, index, disabled })
   })
 
   scored.sort((a, b) => {
+    if (a.disabled !== b.disabled) return a.disabled ? 1 : -1
     if (a.score !== b.score) return a.score - b.score
     const hymnA = hymnalPreference(a.entry, trackQuery)
     const hymnB = hymnalPreference(b.entry, trackQuery)
@@ -197,5 +203,5 @@ export function searchLiturgyMusic(
     return a.index - b.index
   })
 
-  return scored.slice(0, MAX_RESULTS).map((hit) => hit.entry)
+  return scored.slice(0, MAX_RESULTS).map((hit) => (hit.disabled ? { ...hit.entry, disabled: true } : hit.entry))
 }

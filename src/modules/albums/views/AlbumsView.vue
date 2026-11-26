@@ -5,15 +5,16 @@ import { usePlaylistPanelStore } from '../stores/usePlaylistPanelStore'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useMediaStore } from '@modules/media/stores/useMediaStore'
+import type { MediaPlaybackMode } from '@modules/media/types/media'
 
 import { GlassCard } from '@design-system/index'
 import { useMinimizablePage } from '@shared/composables/useMinimizablePage'
 import type { LibraryAlbum } from '@modules/sync/types/library'
-import { SHOW_CUSTOM_COLLECTIONS } from '../constants'
-import { getShowCustomCollections, setShowCustomCollections } from '../visibility'
 import AlbumCollectionCard from '../components/AlbumCollectionCard.vue'
 import AppConfirm from '@shared/components/AppConfirm.vue'
 import AlbumHymnalCard from '../components/AlbumHymnalCard.vue'
+import { isYoutubeSearchAvailable } from '@modules/youtube/services/youtube-player'
+import { cachedCpbLogo, refreshCpbLogo } from '@modules/youtube/services/youtube-cpb-logo'
 import AlbumLyricDialog from '../components/AlbumLyricDialog.vue'
 import AlbumPlaylistPickerDialog from '../components/AlbumPlaylistPickerDialog.vue'
 import AlbumSearchHitRow from '../components/AlbumSearchHitRow.vue'
@@ -72,14 +73,6 @@ const playlistHintParts = computed(() => {
     ? { label: text, description: '' }
     : { label: text.slice(0, separator + 1), description: text.slice(separator + 1).trim() }
 })
-// Visibilidade de Minhas Coletâneas (preferência do usuário, persistida).
-const showCustomCollections = ref(getShowCustomCollections())
-
-function toggleCustomCollectionsVisibility(): void {
-  const next = !showCustomCollections.value
-  setShowCustomCollections(next)
-  showCustomCollections.value = next
-}
 
 
 const {
@@ -115,6 +108,8 @@ const {
   playSlides,
   openLyric,
   closeLyric,
+  isAlbumDisabled,
+  setAlbumDisabled,
 } = useAlbums()
 
 const addingPlaylist = ref<Playlist | null>(null)
@@ -138,8 +133,23 @@ function addPlaylistSearchHit(hit: AlbumSearchHit) {
   addSearchTrackToPlaylist(addingPlaylist.value.id)
 }
 
-const selectedSearchIndex = ref(0)
-watch(hubSearchResults, () => { selectedSearchIndex.value = 0 })
+// Álbum desativado: a música aparece apagada e o seletor pula (paridade Classic).
+function isSearchHitEnabled(index: number): boolean {
+  const hit = hubSearchResults.value[index]
+  return Boolean(hit) && hit!.disabled !== true
+}
+function firstEnabledSearchIndex(): number {
+  const index = hubSearchResults.value.findIndex((hit) => hit.disabled !== true)
+  return index >= 0 ? index : 0
+}
+function stepEnabledSearchIndex(from: number, direction: 1 | -1): number {
+  for (let index = from + direction; index >= 0 && index < hubSearchResults.value.length; index += direction) {
+    if (isSearchHitEnabled(index)) return index
+  }
+  return from
+}
+const selectedSearchIndex = ref(firstEnabledSearchIndex())
+watch(hubSearchResults, () => { selectedSearchIndex.value = firstEnabledSearchIndex() })
 async function onSearchKeydown(event: KeyboardEvent) {
   if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
   if (!['ArrowDown', 'ArrowUp', 'Enter'].includes(event.key) || !hubSearchResults.value.length) return
@@ -149,11 +159,10 @@ async function onSearchKeydown(event: KeyboardEvent) {
   event.stopPropagation()
   if (event.key === 'Enter') {
     const hit = hubSearchResults.value[selectedSearchIndex.value]
-    if (hit) await runAction(hit.musicId, () => playSung(hit.musicId))
+    if (hit && hit.disabled !== true) await runAction(hit.musicId, () => playSung(hit.musicId))
     return
   }
-  selectedSearchIndex.value = Math.max(0, Math.min(hubSearchResults.value.length - 1,
-    selectedSearchIndex.value + (event.key === 'ArrowDown' ? 1 : -1)))
+  selectedSearchIndex.value = stepEnabledSearchIndex(selectedSearchIndex.value, event.key === 'ArrowDown' ? 1 : -1)
   await nextTick()
   document.getElementById(`album-search-result-${hubSearchResults.value[selectedSearchIndex.value]?.musicId}`)?.scrollIntoView?.({ block: 'nearest' })
 }
@@ -162,6 +171,8 @@ const busyMusicId = ref<number | null>(null)
 const playlistItem = ref<PlaylistItem | null>(null)
 const playlistFeedback = ref('')
 const albumPendingRemoval = ref<LibraryAlbum | null>(null)
+/** Confirmação ao desativar álbum/coletânea pelo olho do card. */
+const albumPendingDisable = ref<AlbumCollection | null>(null)
 
 let playlistFeedbackTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -185,13 +196,42 @@ function addToPlaylist(id: string) {
   playlists.value = listPlaylists()
   playlistItem.value = null
   playlistFeedback.value = result?.added
-    ? `“${item.title}” adicionada a “${target?.name ?? 'playlist'}”`
-    : `“${item.title}” já está em “${target?.name ?? 'playlist'}”`
+    ? t('albums.playlists.addedTo', { title: item.title, name: target?.name ?? t('albums.collectionFallback') })
+    : t('albums.playlists.alreadyIn', { title: item.title, name: target?.name ?? t('albums.collectionFallback') })
   if (playlistFeedbackTimer) clearTimeout(playlistFeedbackTimer)
   playlistFeedbackTimer = setTimeout(() => { playlistFeedback.value = '' }, 2600)
 }
 
 const showDownloadControls = computed(() => isDesktop)
+
+/**
+ * Hinário Adventista da Casa Publicadora Brasileira no YouTube: fica na linha
+ * dos hinários e abre a lista unificada dos hinos no módulo YouTube (canal
+ * CPB). Logo = foto oficial do canal (guardada; atualizada ao abrir).
+ */
+const cpbLogo = ref(cachedCpbLogo())
+const youtubeHymnal = computed<AlbumCollection | null>(() =>
+  isYoutubeSearchAvailable()
+    ? {
+        id: 'youtube_cpb',
+        kind: 'hymnal',
+        name: t('sync.hymnal.cpbYoutubeName'),
+        subtitle: t('sync.hymnal.cpbYoutubeSubtitle'),
+        coverUrl: cpbLogo.value || null,
+        trackCount: null,
+        catalogKey: 'youtube_cpb',
+      }
+    : null,
+)
+if (youtubeHymnal.value) {
+  void refreshCpbLogo().then((logo) => {
+    if (logo) cpbLogo.value = logo
+  })
+}
+
+function openCpbYoutube() {
+  void router.push({ name: 'albums-youtube', query: { channel: 'cpb' } })
+}
 
 function isHymnalsCategory(category: AlbumCategory) {
   return String(category.id) === 'hymnals'
@@ -296,7 +336,7 @@ function onImportFile(event: Event) {
   void file.text().then((raw) => {
     const result = parsePlaylistsImport(raw)
     if (!result.ok) {
-      showImportFeedback('Arquivo de playlists inválido.')
+      showImportFeedback(t('albums.playlists.importInvalid'))
       return
     }
     // Merge por nome: playlist nova entra; existente ganha só faixas novas.
@@ -324,15 +364,16 @@ function onImportFile(event: Event) {
     savePlaylists(current)
     playlists.value = listPlaylists()
     const parts = []
-    if (newLists > 0) parts.push(`${newLists} playlist(s) nova(s)`)
-    if (addedTracks > 0) parts.push(`${addedTracks} faixa(s) adicionada(s)`)
-    showImportFeedback(parts.length > 0 ? `Importado: ${parts.join(', ')}.` : 'Nada novo para importar.')
+    if (newLists > 0) parts.push(t('albums.playlists.importedNewPlaylists', { count: newLists }))
+    if (addedTracks > 0) parts.push(t('albums.playlists.importedAddedTracks', { count: addedTracks }))
+    showImportFeedback(parts.length > 0 ? t('albums.playlists.importedList', { parts: parts.join(', ') }) : t('albums.playlists.importedNothingNew'))
   })
 }
 
-async function playPlaylist(playlist: Playlist) {
+/** Toca a playlist: com áudio, playback (instrumental) ou sem áudio (só os slides). */
+async function playPlaylist(playlist: Playlist, mode: MediaPlaybackMode = 'audio') {
   if (playlist.items.length === 0) return
-  await mediaStore.playQueue(playlist.items, 0, undefined, playlist.name)
+  await mediaStore.playQueue(playlist.items, 0, mode, playlist.name)
   await router.push({ name: 'media' })
 }
 
@@ -493,6 +534,27 @@ async function confirmRemove() {
   await removeCollection(album.id)
 }
 
+function albumDisableLabel(collection: AlbumCollection): string {
+  if (collection.id === 'hymnal_1996') return t('sync.hymnal.edition1996Name')
+  return collection.name
+}
+
+/** Desativar pede confirmação; reativar é direto. */
+function requestToggleDisabled(collection: AlbumCollection) {
+  if (isAlbumDisabled(collection.id)) {
+    setAlbumDisabled(collection.id, false)
+    return
+  }
+  albumPendingDisable.value = collection
+}
+
+function confirmDisableAlbum() {
+  const collection = albumPendingDisable.value
+  albumPendingDisable.value = null
+  if (!collection) return
+  setAlbumDisabled(collection.id, true)
+}
+
 async function runAction(
   musicId: number,
   action: () => Promise<boolean | void>,
@@ -551,21 +613,8 @@ async function runAction(
             class="albums-view__toolbar-count"
           >{{ playlists.length }}</span>
         </button>
-        <!-- TODO(minhas-coletaneas): botão oculto junto com a seção (ver constants.ts). -->
-        <button
-          v-if="SHOW_CUSTOM_COLLECTIONS"
-          type="button"
-          class="albums-view__toolbar-btn"
-          :aria-label="showCustomCollections ? t('albums.custom.hide') : t('albums.custom.show')"
-          :title="showCustomCollections ? t('albums.custom.hide') : t('albums.custom.show')"
-          @click="toggleCustomCollectionsVisibility"
-        >
-          <i
-            class="ti"
-            :class="showCustomCollections ? 'ti-eye' : 'ti-eye-off'"
-            aria-hidden="true"
-          />
-        </button>
+        <!-- Adendo v1.1.0: categoria custom removida da Central — o botão de
+             mostrar/ocultar "Minhas Coletâneas" saiu junto (vive na Comunidade). -->
         <button
           type="button"
           class="albums-view__toolbar-btn"
@@ -696,7 +745,7 @@ async function runAction(
           aria-hidden="true"
           @click="minimizePlaylists"
         />
-        <GlassCard class="albums-view__modal-panel">
+        <GlassCard class="albums-view__modal-panel albums-view__modal-panel--playlists">
           <header class="albums-view__playlists-header">
             <div class="albums-view__playlists-heading">
               <i class="ti ti-playlist" aria-hidden="true" />
@@ -767,7 +816,7 @@ async function runAction(
                   </span>
                   <span class="albums-view__playlist-name">
                     <strong>{{ playlist.name }}</strong>
-                    <small>{{ playlist.items.length }} faixa(s)</small>
+                    <small>{{ t('albums.playlists.trackCount', { count: playlist.items.length }) }}</small>
                   </span>
                   <i
                     class="ti albums-view__playlist-chevron"
@@ -815,6 +864,34 @@ async function runAction(
                     @click="playPlaylist(playlist)"
                   >
                     <i class="ti ti-player-play" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    class="albums-view__playlist-play"
+                    data-test="playlist-play-instrumental"
+                    :disabled="playlist.items.length === 0"
+                    :aria-label="t('albums.playlists.playInstrumental', { name: playlist.name })"
+                    @mouseenter="playlistHint = { playlistId: playlist.id, key: 'albums.playlists.playInstrumentalHint' }"
+                    @mouseleave="playlistHint = null"
+                    @focus="playlistHint = { playlistId: playlist.id, key: 'albums.playlists.playInstrumentalHint' }"
+                    @blur="playlistHint = null"
+                    @click="playPlaylist(playlist, 'instrumental')"
+                  >
+                    <i class="ti ti-piano" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    class="albums-view__playlist-play"
+                    data-test="playlist-play-no-audio"
+                    :disabled="playlist.items.length === 0"
+                    :aria-label="t('albums.playlists.playNoAudio', { name: playlist.name })"
+                    @mouseenter="playlistHint = { playlistId: playlist.id, key: 'albums.playlists.playNoAudioHint' }"
+                    @mouseleave="playlistHint = null"
+                    @focus="playlistHint = { playlistId: playlist.id, key: 'albums.playlists.playNoAudioHint' }"
+                    @blur="playlistHint = null"
+                    @click="playPlaylist(playlist, 'no_audio')"
+                  >
+                    <i class="ti ti-volume-off" aria-hidden="true" />
                   </button>
 
                   <button type="button"
@@ -944,9 +1021,14 @@ async function runAction(
 
     <div
       v-else-if="!isLoadingCatalog && categories.length === 0 && !isHubSearching"
-      class="albums-view__state"
+      class="albums-view__convite"
     >
-      {{ t('albums.messages.catalogEmpty') }}
+      <!-- Convite premium em cima do preview. -->
+      <div class="albums-view__convite-card">
+        <i class="ti ti-seedling" aria-hidden="true" />
+        <h2>{{ t('albums.messages.convite_titulo') }}</h2>
+        <p>{{ t('albums.messages.convite_catalogo') }}</p>
+      </div>
     </div>
 
     <div
@@ -982,10 +1064,20 @@ async function runAction(
             :collection="collection"
             :library-album="findLibraryAlbum(collection.id)"
             :show-download-controls="showDownloadControls"
+            :disabled="isAlbumDisabled(collection.id)"
+            can-disable
             @open="openCollection(collection.id)"
             @download="downloadCollection(collection.id)"
             @cancel="cancelCollection(collection.id)"
             @remove="requestRemove(collection)"
+            @toggle-disabled="requestToggleDisabled(collection)"
+          />
+          <AlbumHymnalCard
+            v-if="youtubeHymnal"
+            :key="'youtube_cpb'"
+            :collection="youtubeHymnal"
+            :show-download-controls="false"
+            @open="openCpbYoutube"
           />
         </div>
 
@@ -1002,10 +1094,13 @@ async function runAction(
               :collection="collection"
               :library-album="findLibraryAlbum(collection.id)"
               :show-download-controls="showDownloadControls"
+              :disabled="!collection.isCustom && isAlbumDisabled(collection.id)"
+              :can-disable="!collection.isCustom"
               @open="openCollection(collection.id)"
               @download="downloadCollection(collection.id)"
               @cancel="cancelCollection(collection.id)"
               @remove="requestRemove(collection)"
+              @toggle-disabled="requestToggleDisabled(collection)"
             />
           </div>
         </GlassCard>
@@ -1128,6 +1223,17 @@ async function runAction(
       :message="t('albums.playlists.removeTrackMessage', { title: pendingTrackRemoval?.title ?? '', name: pendingTrackRemoval?.name ?? '' })"
       :confirm-label="t('albums.playlists.removeTrackConfirm')" :cancel-label="t('common.cancel')"
       @cancel="pendingTrackRemoval = null" @confirm="confirmTrackRemoval" />
+    <AppConfirm
+      :open="albumPendingDisable !== null"
+      :z-index="150"
+      danger
+      :title="t('albums.disabledAlbums.disableConfirmTitle', { name: albumPendingDisable ? albumDisableLabel(albumPendingDisable) : '' })"
+      :message="t('albums.disabledAlbums.disableConfirmMessage')"
+      :confirm-label="t('albums.disabledAlbums.disableConfirmYes')"
+      :cancel-label="t('common.cancel')"
+      @cancel="albumPendingDisable = null"
+      @confirm="confirmDisableAlbum"
+    />
   </section>
 </template>
 
@@ -1460,6 +1566,11 @@ async function runAction(
   padding: 1.5rem;
 }
 
+/* Playlists: mais largo (botões de modo de reprodução em cada linha). */
+.albums-view__modal-panel.albums-view__modal-panel--playlists {
+  width: min(68rem, 92vw);
+}
+
 .albums-view__modal-backdrop {
   position: absolute;
   inset: 0;
@@ -1547,10 +1658,16 @@ async function runAction(
 .albums-view__hymnal-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 1.25rem;
+  gap: 0.75rem;
+  align-items: stretch;
 
   @media (min-width: 768px) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Três hinários na mesma linha (o 3º é o da CPB no YouTube). */
+  @media (min-width: 1200px) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -1626,6 +1743,101 @@ async function runAction(
   border: none;
   border-radius: 0;
   background: transparent;
+}
+
+/* Convite a contribuir: preview pt-BR desfocado + card premium na frente. */
+.albums-view__convite {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--ds-radius-lg, 1rem 0 1rem 0);
+}
+
+.albums-view__convite-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  filter: blur(5px) saturate(.85);
+  opacity: .8;
+  pointer-events: none;
+  user-select: none;
+  transform: scale(1.03);
+}
+
+.albums-view__convite-card {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .75rem;
+  padding: 2rem;
+  text-align: center;
+  background: color-mix(in srgb, var(--ds-color-surface-card) 82%, transparent);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--ds-color-outline-strong);
+  border-radius: inherit;
+  max-width: 34rem;
+  margin: 0 auto;
+
+  i {
+    font-size: 2.5rem;
+    color: var(--ds-color-primary);
+  }
+
+  h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--ds-color-on-surface);
+  }
+
+  p {
+    margin: 0;
+    max-width: 26rem;
+    line-height: 1.55;
+    color: var(--ds-color-on-surface-variant);
+  }
+}
+
+.albums-view__convite-hint {
+  font-size: .8rem;
+  color: var(--ds-color-on-surface-variant);
+  opacity: .8;
+}
+
+/* Mockup de catálogo (fallback do preview pt-BR). */
+.albums-view__mock-card {
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+}
+
+.albums-view__mock-cover {
+  aspect-ratio: 1;
+  border-radius: var(--ds-radius-md, .75rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  i { font-size: 2rem; opacity: .5; }
+}
+
+.albums-view__mock-cover--0 { background: linear-gradient(135deg, #b45309, #7c2d12); }
+.albums-view__mock-cover--1 { background: linear-gradient(135deg, #1d4ed8, #172554); }
+.albums-view__mock-cover--2 { background: linear-gradient(135deg, #047857, #064e3b); }
+.albums-view__mock-cover--3 { background: linear-gradient(135deg, #6d28d9, #3b0764); }
+
+.albums-view__mock-line {
+  height: .55rem;
+  border-radius: .25rem;
+  background: color-mix(in srgb, var(--ds-color-on-surface-variant) 30%, transparent);
+}
+
+.albums-view__mock-line--short {
+  width: 60%;
 }
 
 .albums-view__alert {

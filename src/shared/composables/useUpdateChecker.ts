@@ -1,3 +1,5 @@
+import i18n from '@plugins/i18n'
+const t = (k: string, p?: Record<string, unknown>) => i18n.global.t(k, p ?? {})
 import { ref } from 'vue'
 
 export interface UpdateInfo {
@@ -127,7 +129,7 @@ export function useUpdateChecker() {
       }
     } catch {
       state.hasChecked.value = true
-      state.error.value = 'Falha ao verificar atualizações'
+      state.error.value = t('updates.checkFailed')
     } finally {
       state.isChecking.value = false
     }
@@ -157,7 +159,7 @@ export function useUpdateChecker() {
           state.releaseNotes.value = null
           state.dismissed.value = true
         } else {
-          state.error.value = 'Não foi possível baixar a atualização. Tente novamente mais tarde.'
+          state.error.value = t('updates.downloadFailedRetry')
         }
         state.isDownloading.value = false
       }
@@ -210,13 +212,13 @@ export function useUpdateChecker() {
 
       // Traduz erros comuns do electron-updater
       if (msg.includes('Cannot download') || msg.includes('net::ERR')) {
-        state.error.value = 'Não foi possível baixar a atualização. Verifique sua conexão com a internet.'
+        state.error.value = t('updates.downloadFailedConnection')
       } else if (msg.includes('signature') || msg.includes('verification')) {
-        state.error.value = 'A atualização não pôde ser verificada. Tente novamente mais tarde.'
+        state.error.value = t('updates.verifyFailed')
       } else if (msg.includes('permission') || msg.includes('EACCES')) {
         state.error.value = 'Permissão negada. Execute o aplicativo como administrador.'
       } else {
-        state.error.value = 'Falha na atualização. Tente novamente mais tarde.'
+        state.error.value = t('updates.updateFailed')
       }
 
       state.isDownloading.value = false

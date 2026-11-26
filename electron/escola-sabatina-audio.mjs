@@ -3,7 +3,7 @@ import path from 'node:path'
 import { app } from 'electron'
 
 /** Pastas por idioma das narrações oficiais (Media/modulos/escola-sabatina/<lang>). */
-export const ESCOLA_SABATINA_LANGS = ['pt', 'es', 'en', 'fr']
+export const ESCOLA_SABATINA_LANGS = ['pt', 'es', 'en', 'fr', 'ja', 'ko', 'zh', 'ru', 'uk', 'tr', 'ar', 'hi', 'it', 'nl', 'pl']
 
 export const ESCOLA_SABATINA_AUDIO_FILES = ['abertura.mp3', '5minutos.mp3', '1minuto.mp3']
 

@@ -212,9 +212,38 @@ export type YoutubeSearchApi = {
   more: (continuation: YoutubeSearchContinuation) => Promise<YoutubeSearchResult>
   /** Vídeos de uma playlist (link com `list=` ou o id). */
   playlist?: (text: string) => Promise<YoutubePlaylistResult>
+  /** Canal (link, @handle ou id `UC…`) e as playlists da aba "Playlists". */
+  channel?: (text: string) => Promise<YoutubeChannelResult>
+  /** Busca canais sobre o tema, puxando para os adventistas. */
+  channels?: (query: string) => Promise<YoutubeChannelSearchResult>
+  /** Logo do canal como imagem embutida (data URL), buscado no main. */
+  channelLogo?: (text: string) => Promise<{ dataUrl: string; error?: string }>
 }
 
 export type YoutubePlaylistResult = { title: string; items: YoutubeSearchItem[]; error?: string }
+
+/** Playlist da aba "Playlists" de um canal. */
+export type YoutubeChannelPlaylistInfo = { id: string; title: string; thumbnail: string; videoCount: number }
+
+/** Dados do canal: `url` é o link curto (@handle) quando existe. */
+export type YoutubeChannelInfo = { id: string; name: string; url: string; avatar: string }
+
+/** `error`: `invalid`, `empty`, `parse`, `network` ou `http-<status>`. */
+export type YoutubeChannelResult = { channel: YoutubeChannelInfo | null; playlists: YoutubeChannelPlaylistInfo[]; error?: string }
+
+/** Canal achado na busca. `handle`: "@nome" (pode vir vazio); `subscribers`: texto do YouTube ("12 mil inscritos"). */
+export type YoutubeChannelSearchItem = {
+  id: string
+  name: string
+  handle: string
+  subscribers: string
+  avatar: string
+  description: string
+  url: string
+}
+
+/** `error`: `empty`, `parse`, `network` ou `http-<status>`. */
+export type YoutubeChannelSearchResult = { items: YoutubeChannelSearchItem[]; error?: string }
 
 export type SitePageInfo = {
   title: string
@@ -243,6 +272,8 @@ export type LegacyMediaAnalyzeResult = {
   totalBytes: number
   missingBytes: number
   counts: LegacyMediaCounts
+  /** Arquivo compactado do site: contagens só saem ao importar. */
+  archive?: boolean
 }
 
 export type LegacyMediaImportProgress = {
@@ -250,6 +281,11 @@ export type LegacyMediaImportProgress = {
   total: number
   relativePath: string
   mediaType: MediaFolderType
+  /** 'bytes': lendo um arquivo compactado (current/total em bytes). */
+  unit?: 'bytes'
+  /** Contagem ao vivo: mídias gravadas e que já existiam. */
+  imported?: number
+  skipped?: number
 }
 
 export type LegacyMediaImportResult = {
@@ -265,6 +301,12 @@ export type LegacyMediaApi = {
   analyze: (selectedPath?: string) => Promise<LegacyMediaAnalyzeResult>
   import: (selectedPath?: string) => Promise<LegacyMediaImportResult>
   pickFolder: () => Promise<string | null>
+  /** Escolhe o arquivo compactado de mídias (.tar.gz). Ausente em builds antigos. */
+  pickArchive?: () => Promise<string | null>
+  /** Importação em andamento (entre um arquivo e outro). Ausentes em builds antigos. */
+  pause?: () => Promise<boolean>
+  resume?: () => Promise<boolean>
+  cancel?: () => Promise<boolean>
   onImportProgress: (
     callback: (progress: LegacyMediaImportProgress) => void,
   ) => () => void
@@ -445,6 +487,11 @@ export type DialogApi = {
   openFile: (
     options?: OpenFileDialogOptions,
   ) => Promise<string | string[] | null>
+  /**
+   * Path absoluto de um File solto no renderer (Electron webUtils).
+   * Necessário para persistir o arquivo na liturgia após drag-and-drop.
+   */
+  getPathForFile?: (file: File) => string | null
 }
 
 export type ExternalPlayerPreference =
@@ -498,10 +545,15 @@ export type PresentationApi = {
   /** Engine de conversão: auto (padrão) até o usuário escolher outro. */
   getEngine?: () => Promise<PresentationEngine>
   setEngine?: (engine: PresentationEngine) => Promise<boolean>
-  /** Abre o .pptx no aplicativo externo (PowerPoint/Impress) em modo slideshow. */
+  /**
+   * Abre o .pptx no aplicativo externo (PowerPoint/Impress) em modo slideshow.
+   * `monitorIds`: telas de projeção; o LibreOffice abre na 1ª e o app espelha
+   * nas demais.
+   */
   openExternal?: (
     filePath: string,
     engine: Exclude<PresentationEngine, 'auto'>,
+    options?: { monitorIds?: number[] },
   ) => Promise<{ ok: boolean; error?: string }>
   /** Define o app externo custom de apresentação (executável escolhido). */
   setCustomApp?: (appPath: string) => Promise<boolean>
@@ -540,6 +592,8 @@ export type ProjectionPlaybackState = {
   volume?: number
   /** Telas estendidas espelhando o popup. */
   projecting?: boolean
+  /** Título do vídeo aberto (liturgia ou módulo YouTube). */
+  title?: string
 }
 
 export type ProjectionNavigationState = {
@@ -721,9 +775,18 @@ export type DiagnosticsApi = {
   reportJank?: (snapshot: unknown) => void
 }
 
+/** SO legível para a telemetria de dispositivos (IPC `system:info`). */
+export type SystemInfo = {
+  platform: string
+  name: string
+  release: string
+  arch: string
+}
+
 export type LouvorJaBridge = {
   platform: string
   isElectron: boolean
+  systemInfo?: () => Promise<SystemInfo>
   fonts?: FontsApi
   diagnostics?: DiagnosticsApi
   window?: WindowApi

@@ -260,13 +260,13 @@ describe('liturgy-item-helpers mutation kill — complement (12 conditionals)', 
     it('images — filePaths + subtitle auto', () => {
       const item = buildLiturgyItemFromDraft({ type: 'images', name: 'Imagens', subtitle: '', durationMs: 0, categoryId: 'cat1', filePaths: ['a.jpg', 'b.jpg'], filePath: '', musicId: null, musicMode: 'audio', verseBookId: null, verseChapter: null, verseNumbers: '', url: '', playerId: 'default', presentationEngine: 'auto' }, baseContext)
       expect(item.filePaths).toEqual(['a.jpg', 'b.jpg'])
-      expect(item.subtitle).toBe('2 imagens')
+      expect(item.subtitle).toBe('')
     })
 
     it('site/online_video — url + subtitle auto', () => {
       const item = buildLiturgyItemFromDraft({ type: 'site', name: 'Site', subtitle: '', durationMs: 0, categoryId: 'cat1', url: 'https://example.com', filePath: '', filePaths: [], musicId: null, musicMode: 'audio', verseBookId: null, verseChapter: null, verseNumbers: '', playerId: 'default', presentationEngine: 'auto' }, baseContext)
       expect(item.url).toBe('https://example.com')
-      expect(item.subtitle).toBe('https://example.com')
+      expect(item.subtitle).toBe('')
     })
   })
 

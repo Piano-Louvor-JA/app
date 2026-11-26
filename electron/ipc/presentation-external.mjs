@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
+import { startLibreOfficeMirror } from './presentation-libreoffice-mirror.mjs'
 import {
   readWorkspaceRecord,
   writeWorkspaceRecord,
@@ -328,12 +329,28 @@ export function setCustomPresentationApp(appPath) {
 }
 
 /**
+ * Argumentos para o app custom já abrir em modo apresentação, quando o
+ * executável é reconhecido (LibreOffice `--show`, PowerPoint `/S` no Windows).
+ * App desconhecido não recebe argumento extra.
+ * @param {string} bin
+ * @returns {string} argumentos seguidos de espaço, ou ''
+ */
+export function slideshowArgsForBinary(bin) {
+  const name = path.basename(String(bin ?? '')).toLowerCase()
+  if (/^(soffice|libreoffice|simpress)/.test(name)) return '--show --norestore --nologo '
+  if (process.platform === 'win32' && name.startsWith('powerpnt')) return '/S '
+  return ''
+}
+
+/**
  * Abre o arquivo no aplicativo externo, em modo apresentação.
  * @param {string} filePath caminho absoluto do .pptx
  * @param {string} engine
+ * @param {{ monitorIds?: unknown }} [options] monitores de projeção (LibreOffice
+ *   abre no 1º e o app espelha nos demais)
  * @returns {Promise<{ok: boolean, error?: string}>}
  */
-export async function openPresentationExternal(filePath, engine) {
+export async function openPresentationExternal(filePath, engine, options = {}) {
   const absolute = path.resolve(String(filePath ?? '').trim())
   if (!absolute || !existsSync(absolute)) {
     return { ok: false, error: 'file-missing' }
@@ -342,7 +359,7 @@ export async function openPresentationExternal(filePath, engine) {
   if (engine === 'custom') {
     const bin = getCustomPresentationApp()
     if (!bin) return { ok: false, error: 'custom-app-missing' }
-    exec(`"${bin}" "${absolute}"`, (err) => {
+    exec(`"${bin}" ${slideshowArgsForBinary(bin)}"${absolute}"`, (err) => {
       if (err) console.error('[external-presentation] custom', err.message)
     })
     return { ok: true }
@@ -370,11 +387,13 @@ export async function openPresentationExternal(filePath, engine) {
       findBinary(SOFFICE_CANDIDATES) ??
       (known ? await resolvePresentationApp(known) : null)
     if (!soffice) return { ok: false, error: 'libreoffice-not-installed' }
-    const cmd = `"${soffice}" --show --norestore "${absolute}"`
-    exec(cmd, (err) => {
-      if (err) console.error('[external-presentation] libreoffice', err.message)
+    const { app } = await import('electron')
+    return startLibreOfficeMirror({
+      soffice,
+      filePath: absolute,
+      monitorIds: options?.monitorIds,
+      userDataDir: app.getPath('userData'),
     })
-    return { ok: true }
   }
 
   const app = KNOWN_PRESENTATION_APPS.find((entry) => entry.id === engine)

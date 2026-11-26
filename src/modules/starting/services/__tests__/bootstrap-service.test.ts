@@ -23,6 +23,8 @@ vi.mock("@shared/services/remote-catalog", () => ({
 	fetchRemoteCatalogJson: vi.fn(async (key: string) => {
 		const v = mocks.state.remote.get(key);
 		if (v === undefined) throw new Error("Failed to fetch");
+		// Função armazenada = simula erro do fetch real (ex.: 404).
+		if (typeof v === "function") return v();
 		return v;
 	}),
 }));
@@ -161,6 +163,24 @@ describe("syncEssentialCatalogFromApi", () => {
 		expect(progress).toEqual([17, 33, 50, 67, 83, 100]);
 		expect(mocks.state.catalog.get("pt_categories")).toEqual({ ok: true });
 		expect(mocks.state.catalog.get("pt_bible_version")).toEqual({ ok: true });
+	});
+
+	it("idioma sem catálogo (404 nos essenciais) completa vazio p/ convite, sem throw", async () => {
+		mocks.state.lang = "ru";
+		const err404 = () => {
+			throw new Error("Servidor retornou erro 404");
+		};
+		mocks.state.remote.set("ru_categories", err404);
+		mocks.state.remote.set("ru_hymnal", err404);
+		mocks.state.remote.set("ru_hymnal_1996", err404);
+		mocks.state.remote.set("ru_musics", err404);
+		mocks.state.remote.set("ru_bible_book", err404);
+		mocks.state.remote.set("ru_bible_version", err404);
+		const progress: number[] = [];
+		await syncEssentialCatalogFromApi((p) => progress.push(p));
+		expect(progress).toEqual([17, 33, 50, 67, 83, 100]);
+		expect(mocks.state.catalog.get("ru_categories")).toEqual([]);
+		expect(mocks.state.catalog.get("ru_musics")).toEqual([]);
 	});
 
 	it("falha de rede propaga erro mapeável", async () => {

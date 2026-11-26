@@ -11,6 +11,8 @@ export const BROWSER_STORAGE_KEYS = {
   youtubeFavorites: 'louvorja-youtube-favorites-v1',
   /** Coletâneas online (listas de vídeos do YouTube montadas pelo operador). */
   youtubeCollections: 'louvorja-youtube-collections-v1',
+  /** Canais do YouTube cadastrados pelo operador (os padrão vêm no código). */
+  youtubeChannels: 'louvorja-youtube-channels-v1',
   /** Ordem que o operador deu à aba "Baixados" do módulo YouTube (lista de IDs). */
   youtubeDownloadsOrder: 'louvorja-youtube-downloads-order-v1',
   /** Últimas buscas feitas no módulo YouTube. */
@@ -34,6 +36,12 @@ export const USER_PREFERENCE_KEYS = {
   bibleSelectedVersion: 'bible.selectedVersionId',
   projectionSettings: 'projection.settings',
   homeLocation: 'home.location',
+  /** Último distrito/igreja não vazios já digitados (por campo). Local: não sincroniza; usado no envio de telemetria quando o campo for apagado. */
+  homeLocationLastKnown: 'home.locationLastKnown',
+  /** Telemetria de dispositivos: UUID anônimo desta instalação. Local: não sincroniza. */
+  telemetryInstallId: 'telemetry.installId',
+  /** Assistente de primeira execução e lembrete de distrito/igreja. Local por instalação: não sincroniza. */
+  onboarding: 'onboarding.state',
   /** Zoom da UI do operador (fator 0.7–1.5). */
   uiZoom: 'ui.zoom',
   clockConfig: 'clock.config',
@@ -46,6 +54,10 @@ export const USER_PREFERENCE_KEYS = {
   randomConfig: 'random.config',
   randomSession: 'random.session',
   liturgyState: 'liturgy.state',
+  /** Aparência da lista da liturgia (linha da categoria e cor de cada tipo). */
+  liturgyAppearance: 'liturgy.appearance',
+  /** Logo da Casa Publicadora Brasileira (foto do canal no YouTube). */
+  youtubeCpbLogo: 'youtube.cpbLogo',
   scheduledState: 'scheduled.state',
   language: 'language',
   /** Posição (left/top em px) do player minimizado arrastado; ausente = canto padrão. */

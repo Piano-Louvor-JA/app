@@ -10,6 +10,7 @@ import MediaPlayerPill from '../components/MediaPlayerPill.vue'
 import MediaSlideStage from '../components/MediaSlideStage.vue'
 import { useMediaPlayer } from '../composables/useMediaPlayer'
 import { revealItemInAside } from '../services/media-aside-scroll'
+import { isLibrasEnabled } from '@modules/libras/services/libras-preferences'
 import { stripHtmlBreaks } from '../services/media-slides'
 import type { MediaPlaybackMode } from '../types/media'
 
@@ -155,6 +156,7 @@ function queueItemKey(index: number) {
 }
 
 const playlistAsideEl = ref<HTMLElement | null>(null)
+const librasEnabled = isLibrasEnabled()
 let autoFullscreenAttempted = false
 
 // Mesmo critério da projeção interna: estendidos conectados mas desmarcados
@@ -403,6 +405,7 @@ async function onToggleFullscreen() {
           :subtitle="session?.subtitle || ''"
           :image-url="stageImage"
           :is-cover="isCover"
+          :hymn-number="session?.hymnNumber ?? null"
         />
 
         <div v-show="controlsVisible" class="media-window__pill-wrap">
@@ -480,7 +483,7 @@ async function onToggleFullscreen() {
         class="media-window__playlist"
       >
         <template v-if="queue.length > 1">
-          <h2 class="media-window__playlist-title">Fila de reprodução</h2>
+          <h2 class="media-window__playlist-title">{{ t('media.queueTitle') }}</h2>
           <TransitionGroup name="queue-reorder" tag="ul" class="media-window__playlist-list">
             <li v-for="(item, index) in queue" :key="queueItemKey(index)" class="media-window__queue-row"
               :class="{
@@ -541,6 +544,10 @@ async function onToggleFullscreen() {
         </template>
       </aside>
     </div>
+
+    <!-- Intérprete de sinais v2.1 (avatar 3D keyframes) — visível quando Libras ativo -->
+    <!-- F-B.2: demo Libras removido da tela de mídia (era painel de validação;
+         intérprete vive na projeção, config em Geral → Libras). -->
 
     <MediaCloseDialog
       :open="closeConfirmOpen"

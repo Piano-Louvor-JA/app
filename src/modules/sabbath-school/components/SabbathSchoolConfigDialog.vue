@@ -57,6 +57,7 @@ const sabbathAudioLang = computed<SabbathAudioLang>(() =>
 
 const toneLibrary = ref<CustomTone[]>([])
 const toneError = ref('')
+const libraryFileInput = ref<HTMLInputElement | null>(null)
 const expandedToneId = ref<string | null>(null)
 
 function refreshLibrary(): void {
@@ -423,7 +424,7 @@ function onRemoveTone(tone: CustomTone): void {
                         :key="p.key"
                         :value="p.key"
                       >
-                        {{ p.label }}
+                        {{ t(p.label) }}
                       </option>
                     </optgroup>
                     <optgroup
@@ -486,13 +487,27 @@ function onRemoveTone(tone: CustomTone): void {
                   {{ t('sabbathSchool.libraryHint') }}
                 </p>
                 <label class="countdown-config__tone-file">
+                  <!-- input escondido: strings nativas do Chromium ficam em pt-BR
+                       independem do locale da UI — botão custom traduzível no lugar. -->
                   <input
+                    ref="libraryFileInput"
                     type="file"
                     accept="audio/*"
                     data-testid="library-upload"
+                    class="countdown-config__tone-file-input"
                     @change="onLibraryFile"
                   >
-                  <span>{{ t('sabbathSchool.libraryUpload') }}</span>
+                  <span
+                    class="countdown-config__tone-file-btn"
+                    role="button"
+                    tabindex="0"
+                    @click="libraryFileInput?.click()"
+                    @keydown.enter.prevent="libraryFileInput?.click()"
+                    @keydown.space.prevent="libraryFileInput?.click()"
+                  >
+                    <i class="ti ti-upload" aria-hidden="true" />
+                    {{ t('sabbathSchool.libraryUpload') }}
+                  </span>
                 </label>
                 <ul
                   v-if="toneLibrary.length > 0"
@@ -721,9 +736,39 @@ function onRemoveTone(tone: CustomTone): void {
   font-size: 0.85rem;
   color: var(--ds-color-on-surface-variant);
 
-  input[type='file'] {
-    max-width: 320px;
+  input[type='file'].countdown-config__tone-file-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .countdown-config__tone-file-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.4rem 0.875rem;
+    border: 1px solid color-mix(in srgb, var(--ds-color-primary) 55%, transparent);
+    border-radius: var(--ds-radius-full, 999px);
+    background: color-mix(in srgb, var(--ds-color-primary) 12%, transparent);
+    color: var(--ds-color-primary);
     font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 150ms ease;
+
+    &:hover {
+      background: color-mix(in srgb, var(--ds-color-primary) 20%, transparent);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--ds-color-primary);
+      outline-offset: 2px;
+    }
   }
 }
 

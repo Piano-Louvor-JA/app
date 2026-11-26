@@ -376,6 +376,38 @@ describe('palco-bridge — projeção por módulo (owner)', () => {
     expect((proj!.msg as { input: { isCover: boolean } }).input.isCover).toBe(true)
   })
 
+  it('media: o número do slide vai para o palco (letra repetida também anima)', async () => {
+    startPalcoBridge()
+    publish(MEDIA_CH, mediaPayload({ slideIndex: 4, slideCount: 8 }))
+    await settle()
+    const proj = sendBuf.buf.find((s) => s.msg.type === 'projection')
+    expect((proj!.msg as { input: { slideIndex?: number } }).input.slideIndex).toBe(4)
+  })
+
+  it('media capa do hinário: o número do hino vai para o palco', async () => {
+    startPalcoBridge()
+    publish(MEDIA_CH, mediaPayload({ isCover: true, lyric: '', hymnNumber: 45 }))
+    await settle()
+    const proj = sendBuf.buf.find((s) => s.msg.type === 'projection')
+    expect((proj!.msg as { input: { hymnNumber?: number } }).input.hymnNumber).toBe(45)
+  })
+
+  it('media capa: o nome do hinário (subtítulo) vai para o palco', async () => {
+    startPalcoBridge()
+    publish(MEDIA_CH, mediaPayload({ isCover: true, lyric: '', subtitle: 'Hinário Adventista' }))
+    await settle()
+    const proj = sendBuf.buf.find((s) => s.msg.type === 'projection')
+    expect((proj!.msg as { input: { hymnalName?: string } }).input.hymnalName).toBe('Hinário Adventista')
+  })
+
+  it('media capa: nome igual ao título não repete (mesma regra dos monitores)', async () => {
+    startPalcoBridge()
+    publish(MEDIA_CH, mediaPayload({ isCover: true, lyric: '', title: 'Maranata', subtitle: 'maranata' }))
+    await settle()
+    const proj = sendBuf.buf.find((s) => s.msg.type === 'projection')
+    expect((proj!.msg as { input: { hymnalName?: string } }).input.hymnalName).toBeUndefined()
+  })
+
   it('media sem conteúdo (title vazio, active true): intent false, sem projeção', async () => {
     startPalcoBridge()
     publish(MEDIA_CH, mediaPayload({ title: '', lyric: '' }))

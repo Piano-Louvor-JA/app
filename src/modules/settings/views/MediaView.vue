@@ -3,6 +3,7 @@ import PptEngineCard from '../components/PptEngineCard.vue'
 import ExternalPlayerCard from '../components/ExternalPlayerCard.vue'
 import YoutubeAccountCard from '../components/YoutubeAccountCard.vue'
 import YoutubeOfflineCard from '../components/YoutubeOfflineCard.vue'
+import DisabledAlbumsCard from '@modules/albums/components/DisabledAlbumsCard.vue'
 </script>
 
 <template>
@@ -19,6 +20,9 @@ import YoutubeOfflineCard from '../components/YoutubeOfflineCard.vue'
     </div>
     <div class="media-view__block media-view__block--player">
       <ExternalPlayerCard />
+    </div>
+    <div class="media-view__block media-view__block--albums">
+      <DisabledAlbumsCard />
     </div>
   </div>
 </template>

@@ -14,8 +14,13 @@
  *
  * O FTP/API do PIANO grava music com prefixo pt|es; o legado não tem
  * esse nível — precisamos injetar no import.
+ *
+ * Também aceita a pasta de dados do PIANO baixada do site (ex.: no Linux):
+ *   …/LouvorJA-PIANO/Media/{covers,images,music/pt|es/…}
+ * Já está no formato do destino: copia como está (fontes/modulos ficam de fora).
  */
 import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'node:fs'
+import { copyFile, mkdir } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, join, relative, win32 } from 'node:path'
 
@@ -28,6 +33,13 @@ const FOLDER_TO_TYPE = /** @type {const} */ ({
   capas: 'covers',
   imagens: 'slides',
   musicas: 'music',
+})
+
+/** Pasta Media do PIANO (formato do destino). */
+const PIANO_FOLDER_TO_TYPE = /** @type {const} */ ({
+  covers: 'covers',
+  images: 'slides',
+  music: 'music',
 })
 
 const IMAGE_EXTS = new Set([
@@ -106,19 +118,38 @@ export function looksLikeLegacyMediaConfig(
   stat = statSync,
   joinPath = join,
 ) {
-  for (const folder of Object.keys(FOLDER_TO_TYPE)) {
-    const full = joinPath(configDir, folder)
-    if (!exists(full)) continue
-    try {
-      if (stat(full).isDirectory()) return true
-    } catch {
-      // ignora
-    }
-  }
-  return false
+  return mediaLayoutOf(configDir, exists, stat, joinPath) !== null
 }
 
-const MEDIA_SUBFOLDER_NAMES = new Set(['capas', 'imagens', 'musicas'])
+/** @param {string} p */
+function isDir(p, exists, stat) {
+  if (!exists(p)) return false
+  try {
+    return stat(p).isDirectory()
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Formato da pasta de mídia: 'legacy' (config do Louvor JA: capas/imagens/
+ * musicas), 'piano' (Media do PIANO: covers/images/music) ou null.
+ * Media do PIANO exige music/pt|es ou duas das três pastas — uma pasta
+ * qualquer com só "images" não conta.
+ * @returns {'legacy' | 'piano' | null}
+ */
+export function mediaLayoutOf(dir, exists = existsSync, stat = statSync, joinPath = join) {
+  for (const folder of Object.keys(FOLDER_TO_TYPE)) {
+    if (isDir(joinPath(dir, folder), exists, stat)) return 'legacy'
+  }
+  const found = Object.keys(PIANO_FOLDER_TO_TYPE).filter((folder) =>
+    isDir(joinPath(dir, folder), exists, stat),
+  )
+  const musicByLang = ['pt', 'es'].some((lang) => isDir(joinPath(dir, 'music', lang), exists, stat))
+  return found.length >= 2 || musicByLang ? 'piano' : null
+}
+
+const MEDIA_SUBFOLDER_NAMES = new Set(['capas', 'imagens', 'musicas', 'covers', 'images', 'music'])
 const MAX_MANUAL_WALK_DEPTH = 3
 const MAX_MANUAL_WALK_DIRS = 80
 
@@ -166,6 +197,10 @@ export function resolveLegacyMediaConfigFromSelection(selectedPath, io = {}) {
   if (MEDIA_SUBFOLDER_NAMES.has(name)) add(dirnameFn(trimmed))
   add(trimmed)
   add(joinPath(trimmed, 'config'))
+  // Pasta de dados do PIANO baixada do site: a Media fica logo abaixo, no
+  // meio de muitas pastas do Electron — vem antes da varredura.
+  add(joinPath(trimmed, 'Media'))
+  add(joinPath(trimmed, 'media'))
 
   let visited = 0
   const walk = (dir, depthLeft) => {
@@ -277,6 +312,9 @@ export function scanLegacyMediaConfig(configDir, io = {}) {
   const joinPath = io.join ?? join
   const exists = io.exists ?? existsSync
   const lang = io.lang === 'es' ? 'es' : 'pt'
+  if (mediaLayoutOf(configDir, exists, io.stat ?? statSync, joinPath) === 'piano') {
+    return scanPianoMedia(configDir, { ...io, lang })
+  }
 
   /** @type {{ mediaType: LegacyMediaType, relativePath: string, absolutePath: string, bytes: number }[]} */
   const items = []
@@ -309,6 +347,35 @@ export function scanLegacyMediaConfig(configDir, io = {}) {
     }
   }
 
+  return { items, totalBytes, counts, lang }
+}
+
+/**
+ * Media do PIANO (covers/images/music): já no formato do destino. Música
+ * mantém a pasta de idioma; sem ela, recebe `{lang}/`.
+ */
+function scanPianoMedia(mediaDir, io) {
+  const joinPath = io.join ?? join
+  const exists = io.exists ?? existsSync
+  const lang = io.lang
+  const items = []
+  const counts = { covers: 0, music: 0, slides: 0 }
+  let totalBytes = 0
+  for (const [folder, mediaType] of Object.entries(PIANO_FOLDER_TO_TYPE)) {
+    const full = joinPath(mediaDir, folder)
+    if (!exists(full)) continue
+    const allowed = mediaType === 'music' ? AUDIO_EXTS : IMAGE_EXTS
+    for (const file of listMediaFilesUnder(full, allowed, io)) {
+      const first = file.relativePath.split('/')[0]
+      const relativePath =
+        mediaType === 'music' && first !== 'pt' && first !== 'es'
+          ? `${lang}/${file.relativePath}`
+          : file.relativePath
+      items.push({ mediaType, relativePath, absolutePath: file.absolutePath, bytes: file.bytes })
+      counts[mediaType] += 1
+      totalBytes += file.bytes
+    }
+  }
   return { items, totalBytes, counts, lang }
 }
 
@@ -464,35 +531,105 @@ export function analyzeLegacyMediaImport(opts = {}) {
 }
 
 /**
- * Executa a cópia dos itens faltantes com callback de progresso.
- * @param {{ mediaType: LegacyMediaType, relativePath: string, absolutePath: string, bytes: number }[]} items
- * @param {(progress: { current: number, total: number, relativePath: string, mediaType: LegacyMediaType }) => void} [onProgress]
+ * Controle da importação em andamento: pausar, continuar e parar.
+ * A verificação acontece entre um arquivo e outro — nunca deixa arquivo
+ * copiado pela metade.
  */
-export function importLegacyMediaItems(items, onProgress) {
+export function createImportControl() {
+  /** @type {'running' | 'paused' | 'cancelled'} */
+  let state = 'running'
+  /** @type {(() => void)[]} */
+  let waiting = []
+  const wake = () => {
+    const pending = waiting
+    waiting = []
+    for (const fn of pending) fn()
+  }
+  return {
+    get state() {
+      return state
+    },
+    pause() {
+      if (state !== 'running') return false
+      state = 'paused'
+      return true
+    },
+    resume() {
+      if (state !== 'paused') return false
+      state = 'running'
+      wake()
+      return true
+    },
+    cancel() {
+      if (state === 'cancelled') return false
+      state = 'cancelled'
+      wake()
+      return true
+    },
+    /** Espera enquanto pausado; false = parado. */
+    async checkpoint() {
+      while (state === 'paused') {
+        await new Promise((resolve) => waiting.push(resolve))
+      }
+      return state !== 'cancelled'
+    },
+  }
+}
+
+/**
+ * Copia (assíncrono) um arquivo para o workspace, sem travar o processo
+ * principal durante importações grandes.
+ * @returns {Promise<{ ok: boolean, skipped: boolean, error?: string }>}
+ */
+export async function copyLegacyMediaFileAsync(mediaType, relativePath, sourcePath) {
+  try {
+    const dest = join(resolveMediaDirectory(mediaType), relativePath)
+    await mkdir(dirname(dest), { recursive: true })
+    if (existsSync(dest)) return { ok: true, skipped: true }
+    if (!existsSync(sourcePath)) return { ok: false, skipped: false, error: 'source-missing' }
+    await copyFile(sourcePath, dest)
+    return { ok: true, skipped: false }
+  } catch (error) {
+    return { ok: false, skipped: false, error: error instanceof Error ? error.message : String(error) }
+  }
+}
+
+/**
+ * Importa os itens um a um, com progresso e controle (pausar/continuar/parar).
+ * @param {{ mediaType: LegacyMediaType, relativePath: string, absolutePath: string }[]} items
+ * @param {(p: { current: number, total: number, relativePath: string, mediaType: LegacyMediaType }) => void} [onProgress]
+ * @param {{ control?: ReturnType<typeof createImportControl>, copy?: typeof copyLegacyMediaFileAsync }} [opts]
+ */
+export async function importLegacyMediaItems(items, onProgress, opts = {}) {
+  const control = opts.control ?? createImportControl()
+  const copy = opts.copy ?? copyLegacyMediaFileAsync
   let imported = 0
   let skipped = 0
   let failed = 0
+  let cancelled = false
   const total = items.length
 
   for (let i = 0; i < items.length; i += 1) {
+    if (!(await control.checkpoint())) {
+      cancelled = true
+      break
+    }
     const item = items[i]
     onProgress?.({
       current: i + 1,
       total,
       relativePath: item.relativePath,
       mediaType: item.mediaType,
+      imported,
+      skipped,
     })
-    const result = copyLegacyMediaFile(
-      item.mediaType,
-      item.relativePath,
-      item.absolutePath,
-    )
+    const result = await copy(item.mediaType, item.relativePath, item.absolutePath)
     if (result.skipped) skipped += 1
     else if (result.ok) imported += 1
     else failed += 1
   }
 
-  return { imported, skipped, failed, total }
+  return { imported, skipped, failed, total, cancelled }
 }
 
 /** Utilitário exportado para testes de path relativo. */

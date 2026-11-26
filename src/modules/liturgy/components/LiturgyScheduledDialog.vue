@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { loadDisabledAlbums } from '@modules/albums/services/disabled-albums'
 import { useI18n } from 'vue-i18n'
 
 import { GlassCard } from '@design-system/index'
@@ -77,13 +78,16 @@ const entryFilePath = ref('')
 
 // Busca de música — mesmo catálogo do item de música (API + comunidade + .slja local)
 const musicCatalog = ref<LiturgyMusicOption[]>([])
+// Álbuns desativados na Central: relidos a cada abertura (o diálogo fica montado).
+const disabledAlbums = ref<ReadonlySet<string>>(new Set(loadDisabledAlbums()))
 const musicQuery = ref('')
 const pickedMusic = ref<LiturgyMusicOption | null>(null)
 const musicResults = computed(() =>
-  filterLiturgyMusicOptions(musicCatalog.value, musicQuery.value, null).slice(0, 8),
+  filterLiturgyMusicOptions(musicCatalog.value, musicQuery.value, null, disabledAlbums.value).slice(0, 8),
 )
 
 function onPickMusic(option: LiturgyMusicOption) {
+  if (option.disabled) return
   pickedMusic.value = option
   musicQuery.value = option.name
 }
@@ -95,8 +99,8 @@ async function onPickLocalVideo() {
   const picked = await bridge.dialog.openFile({
     title: t('liturgy.fields.selectVideoButton'),
     filters: [
-      { name: 'Vídeos', extensions: ['mp4', 'mkv', 'avi', 'mov', 'wmv', 'webm'] },
-      { name: 'Todos', extensions: ['*'] },
+      { name: t('liturgy.fileFilters.video'), extensions: ['mp4', 'mkv', 'avi', 'mov', 'wmv', 'webm'] },
+      { name: t('liturgy.fileFilters.all'), extensions: ['*'] },
     ],
     multiple: false,
   })
@@ -111,6 +115,7 @@ async function onPickLocalVideo() {
 watch(
   () => props.open,
   (open) => {
+    if (open) disabledAlbums.value = new Set(loadDisabledAlbums())
     if (open && musicCatalog.value.length === 0) {
       void loadLiturgyMusicOptions().then((options) => {
         musicCatalog.value = options
@@ -310,7 +315,7 @@ function onAddSong() {
     dlg.addEntry(rotationId, {
       dateISO: entryDate.value,
       content: { kind: 'file', filePath },
-      name: entryName.value.trim() || filePath.split(/[\\/]/).pop() || 'Vídeo',
+      name: entryName.value.trim() || filePath.split(/[\\/]/).pop() || t('liturgy.fallback.video'),
     })
     entryFilePath.value = ''
   } else {
@@ -319,7 +324,7 @@ function onAddSong() {
     dlg.addEntry(rotationId, {
       dateISO: entryDate.value,
       content: { kind: 'online_video', url },
-      name: entryName.value.trim() || 'Vídeo',
+      name: entryName.value.trim() || t('liturgy.fallback.video'),
     })
     entryUrl.value = ''
   }
@@ -533,10 +538,17 @@ const dateFmt = (iso: string) => {
                       <button
                         type="button"
                         class="scheduled-dialog__music-option"
+                        :class="{ 'scheduled-dialog__music-option--disabled': option.disabled }"
+                        :disabled="option.disabled"
+                        :aria-disabled="option.disabled ? 'true' : undefined"
                         @click="onPickMusic(option)"
                       >
                         {{ option.name }}
                         <small>{{ option.albumNames }}</small>
+                        <small v-if="option.disabled" class="scheduled-dialog__music-option-disabled">
+                          <i class="ti ti-eye-off" aria-hidden="true" />
+                          {{ t('liturgy.fields.albumDisabled') }}
+                        </small>
                       </button>
                     </li>
                   </ul>
@@ -722,6 +734,19 @@ const dateFmt = (iso: string) => {
 </template>
 
 <style scoped>
+.scheduled-dialog__music-option--disabled {
+  opacity: 0.45;
+  filter: grayscale(0.8);
+  cursor: not-allowed;
+}
+
+.scheduled-dialog__music-option-disabled {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-weight: 600;
+}
+
 .liturgy-dialog-backdrop {
   position: fixed;
   inset: 0;

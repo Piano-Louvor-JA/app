@@ -6,9 +6,11 @@ import { app, BrowserWindow, dialog, ipcMain, net } from 'electron'
 import { detectClassoInstallation, probeClassoRegistry } from '../classo-detect.mjs'
 import {
   analyzeLegacyMediaImport,
+  createImportControl,
   importLegacyMediaItems,
   resolveLegacyMediaConfigFromSelection,
 } from '../legacy-media-import.mjs'
+import { importMediaArchive, isMediaArchive, peekMediaArchive } from '../media-archive.mjs'
 import {
   getWindowsMediaFolderStatus,
   migrateWindowsMediaFolder,
@@ -203,9 +205,12 @@ export function registerWorkspaceIpc() {
 
   // Abre a apresentação no aplicativo externo (PowerPoint/Impress) em
   // modo slideshow — escolha explícita do usuário no item da liturgia.
-  ipcMain.handle('presentation:open-external', async (_event, filePath, engine) => {
+  ipcMain.handle('presentation:open-external', async (_event, filePath, engine, options) => {
     try {
-      return await openPresentationExternal(String(filePath ?? ''), engine)
+      const monitorIds = Array.isArray(options?.monitorIds)
+        ? options.monitorIds.filter((id) => typeof id === 'number' && Number.isFinite(id))
+        : []
+      return await openPresentationExternal(String(filePath ?? ''), engine, { monitorIds })
     } catch (error) {
       console.error('[ipc] presentation:open-external', error)
       return { ok: false, error: 'unexpected' }
@@ -933,6 +938,9 @@ export function registerWorkspaceIpc() {
     }
   })
 
+  /** Importação de mídia em andamento (pausar/continuar/parar). */
+  let activeLegacyImport = null
+
   function legacyMediaAnalyzeOpts(selectedPath) {
     const picked =
       typeof selectedPath === 'string' && selectedPath.trim()
@@ -954,12 +962,31 @@ export function registerWorkspaceIpc() {
     }
   }
 
+  // Arquivo compactado de mídias baixado do site (LouvorJA-PIANO.tar.gz).
+  ipcMain.handle('legacy-media:pick-archive', async (event) => {
+    try {
+      const win = BrowserWindow.fromWebContents(event.sender)
+      const result = await dialog.showOpenDialog(win ?? undefined, {
+        title: 'Selecione o arquivo de mídias baixado do site (.tar.gz)',
+        properties: ['openFile'],
+        filters: [{ name: 'Arquivo de mídias', extensions: ['gz', 'tgz', 'tar'] }],
+      })
+      if (result.canceled || !result.filePaths?.[0]) return null
+      return result.filePaths[0]
+    } catch (error) {
+      console.error('[ipc] legacy-media:pick-archive', error)
+      return null
+    }
+  })
+
   ipcMain.handle('legacy-media:pick-folder', async (event) => {
     try {
       const win = BrowserWindow.fromWebContents(event.sender)
       const result = await dialog.showOpenDialog(win ?? undefined, {
         title:
-          'Selecione a pasta raiz do Louvor JA legado ou a pasta de mídia (config)',
+          process.platform === 'linux'
+            ? 'Selecione a pasta extraída do arquivo de mídias do site'
+            : 'Selecione a pasta raiz do Louvor JA legado ou a pasta de mídia (config)',
         properties: ['openDirectory'],
       })
       if (result.canceled || !result.filePaths?.[0]) return null
@@ -1124,8 +1151,25 @@ export function registerWorkspaceIpc() {
   })
 
   // Importação de mídia do Louvor JA legado (Windows: config/capas|imagens|musicas)
-  ipcMain.handle('legacy-media:analyze', (_event, selectedPath) => {
+  ipcMain.handle('legacy-media:analyze', async (_event, selectedPath) => {
     try {
+      // Arquivo compactado do site: confere se tem mídias sem ler tudo; as
+      // contagens só saem ao importar (lido uma vez, em fluxo).
+      if (isMediaArchive(selectedPath)) {
+        const peek = await peekMediaArchive(selectedPath.trim())
+        return {
+          found: peek.found,
+          archive: true,
+          configDir: peek.found ? selectedPath.trim() : null,
+          lang: 'pt',
+          scanned: 0,
+          missing: peek.found ? 1 : 0,
+          present: 0,
+          totalBytes: peek.totalBytes,
+          missingBytes: peek.totalBytes,
+          counts: { covers: 0, music: 0, slides: 0 },
+        }
+      }
       const analysis = analyzeLegacyMediaImport(legacyMediaAnalyzeOpts(selectedPath))
       // Não serializa absolutePath de todos os itens na resposta leve — só
       // contagens. O import reanalisa no main.
@@ -1158,6 +1202,22 @@ export function registerWorkspaceIpc() {
 
   ipcMain.handle('legacy-media:import', async (event, selectedPath) => {
     try {
+      if (isMediaArchive(selectedPath)) {
+        const control = createImportControl()
+        activeLegacyImport = control
+        try {
+          const { cancelled, ...result } = await importMediaArchive(
+            selectedPath.trim(),
+            (progress) => {
+              if (!event.sender.isDestroyed()) event.sender.send('legacy-media:import-progress', progress)
+            },
+            { control, lang: 'pt' },
+          )
+          return { ok: true, ...result, reason: cancelled ? 'cancelled' : 'done' }
+        } finally {
+          if (activeLegacyImport === control) activeLegacyImport = null
+        }
+      }
       const analysis = analyzeLegacyMediaImport(legacyMediaAnalyzeOpts(selectedPath))
       if (!analysis.found) {
         return { ok: false, imported: 0, skipped: 0, failed: 0, total: 0, reason: 'not-found' }
@@ -1166,15 +1226,30 @@ export function registerWorkspaceIpc() {
         return { ok: true, imported: 0, skipped: analysis.present, failed: 0, total: 0, reason: 'nothing-to-import' }
       }
 
-      const result = importLegacyMediaItems(analysis.itemsToImport, (progress) => {
-        event.sender.send('legacy-media:import-progress', progress)
-      })
-      return { ok: true, ...result, reason: 'done' }
+      const control = createImportControl()
+      activeLegacyImport = control
+      try {
+        const { cancelled, ...result } = await importLegacyMediaItems(
+          analysis.itemsToImport,
+          (progress) => {
+            if (!event.sender.isDestroyed()) event.sender.send('legacy-media:import-progress', progress)
+          },
+          { control },
+        )
+        return { ok: true, ...result, reason: cancelled ? 'cancelled' : 'done' }
+      } finally {
+        if (activeLegacyImport === control) activeLegacyImport = null
+      }
     } catch (error) {
       console.error('[ipc] legacy-media:import', error)
       return { ok: false, imported: 0, skipped: 0, failed: 0, total: 0, reason: 'error' }
     }
   })
+
+  // Importação em andamento: pausar, continuar e parar (entre um arquivo e outro).
+  ipcMain.handle('legacy-media:pause', () => activeLegacyImport?.pause() ?? false)
+  ipcMain.handle('legacy-media:resume', () => activeLegacyImport?.resume() ?? false)
+  ipcMain.handle('legacy-media:cancel', () => activeLegacyImport?.cancel() ?? false)
 
   ipcMain.handle('media:download', async (_event, url, mediaType, filename) => {
     try {

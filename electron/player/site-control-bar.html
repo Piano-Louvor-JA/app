@@ -179,30 +179,42 @@
         letter-spacing: 0.02em;
         white-space: nowrap;
       }
-      /* Mesmo visual do botão de projetar da liturgia */
+      /* Projetar: no fim da barra, laranja e pulsando (igual às outras barras e à seta do APK). */
       #projectScreens {
-        margin-left: 0.25rem;
-        width: 2.05rem;
-        height: 2.05rem;
-        border-radius: 0.4rem;
+        margin-left: auto;
+        width: 2.6rem;
+        height: 2.6rem;
+        flex-shrink: 0;
+        border-radius: 999px;
         background: #E0895A;
-        color: #000;
-        box-shadow: 0 0 14px color-mix(in srgb, #E0895A 38%, transparent);
-      }
-      #projectScreens:hover {
-        background: #E9A782;
-      }
-      #projectScreens.is-active {
-        background: #E0895A;
-        color: #111827;
-        box-shadow: 0 0 14px rgba(252, 165, 165, 0.5);
-      }
-      #projectScreens.is-active:hover {
-        background: #E9A782;
-        color: #111827;
+        color: #2a1406;
+        border: 2px solid rgba(255, 214, 190, 0.55);
+        animation: project-pulse 1.8s ease-out infinite;
       }
       #projectScreens svg {
         display: block;
+        width: 1.35rem;
+        height: 1.35rem;
+      }
+      #projectScreens:hover:not(:disabled) {
+        background: #f0a072;
+      }
+      #projectScreens.is-active {
+        background: rgba(234, 88, 12, 0.28);
+        color: #fb923c;
+        border-color: #fb923c;
+        animation: none;
+      }
+      #projectScreens:disabled {
+        animation: none;
+      }
+      @keyframes project-pulse {
+        0% { box-shadow: 0 0 0 0 rgba(224, 137, 90, 0.65); }
+        70% { box-shadow: 0 0 0 12px rgba(224, 137, 90, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(224, 137, 90, 0); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #projectScreens { animation: none; }
       }
       /* Clone do MonitorTargetSelect dense */
       .monitor-wrap {
@@ -310,24 +322,6 @@
         <select id="audioOutput" title="Destino do áudio" aria-label="Destino do áudio" style="max-width:120px;background:#222;color:#eee;border:1px solid #555;border-radius:6px;padding:4px;font-size:11px">
           <option value="player">Som: só player</option><option value="connections">Som: só conexões</option><option value="both">Som: ambos</option>
         </select>
-        <button
-          id="projectScreens"
-          type="button"
-          title="Projetar site nas telas estendidas"
-          aria-label="Projetar site nas telas estendidas"
-          aria-pressed="false"
-        >
-          <svg
-            id="projectIcon"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            aria-hidden="true"
-          >
-            <path d="M5 19V5h2v12h12v2H5zm4.7-3.3 1.4-1.4L8.85 12H19v-2H8.85l2.25-2.25-1.4-1.4L5 11l4.7 4.7z" />
-          </svg>
-        </button>
         <div class="monitor-wrap">
           <button
             id="monitorSelect"
@@ -351,6 +345,25 @@
           </button>
           <span id="monitorBadge" class="monitor-badge is-empty">0</span>
         </div>
+        <!-- Projetar: no fim da barra, em destaque (igual às outras barras). -->
+        <button
+          id="projectScreens"
+          type="button"
+          title="Projetar em telas e transmitir para conexões remotas"
+          aria-label="Projetar em telas e transmitir para conexões remotas"
+          aria-pressed="false"
+        >
+          <svg
+            id="projectIcon"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path d="M5 19V5h2v12h12v2H5zm4.7-3.3 1.4-1.4L8.85 12H19v-2H8.85l2.25-2.25-1.4-1.4L5 11l4.7 4.7z" />
+          </svg>
+        </button>
       </div>
     </div>
     <script src="../palco/network-mirror.js"></script>
@@ -514,7 +527,7 @@
           } else {
             projectBtn.classList.remove('is-active')
             var label = canProject
-              ? 'Projetar site nas telas estendidas'
+              ? 'Projetar em telas e transmitir para conexões remotas'
               : 'Nenhuma tela disponível para projeção'
             projectBtn.title = label
             projectBtn.setAttribute('aria-label', label)

@@ -14,6 +14,12 @@ import AlbumTrackRow from '../components/AlbumTrackRow.vue'
 import StageCustomizationDialog from '@modules/settings/components/StageCustomizationDialog.vue'
 import { useAlbums } from '../composables/useAlbums'
 import {
+  deleteCustomCollection,
+  isCustomCollectionId,
+  fromCustomCollectionId,
+} from '@modules/media/services/custom-catalog'
+import { appConfirm } from '@shared/composables/useAppConfirm'
+import {
   addPlaylistItem,
   listPlaylists,
   type PlaylistItem,
@@ -46,7 +52,13 @@ const {
   appendActiveCollectionToQueue,
   openLyric,
   closeLyric,
+  isAlbumDisabled,
 } = useAlbums()
+
+/** Álbum desativado: aviso no topo e linhas marcadas (tocam no clique). */
+const collectionDisabled = computed(() =>
+  Boolean(activeCollection.value && !activeCollection.value.isCustom && isAlbumDisabled(activeCollection.value.id)),
+)
 
 const selectedSearchIndex = ref(0)
 watch(filteredTracks, () => { selectedSearchIndex.value = 0 })
@@ -87,6 +99,46 @@ onBeforeUnmount(() => {
 })
 
 const collectionId = computed(() => String(route.params.collectionId ?? ''))
+
+/** RF-03: cópias da Comunidade são customs (ID com offset) — podem ser excluídas. */
+const isCustomCopy = computed(() => {
+  const id = Number(collectionId.value)
+  return Number.isFinite(id) && isCustomCollectionId(id)
+})
+const isDeletingCollection = ref(false)
+/** D3: rota atual é de cópia da Comunidade (community/copies/:id)? */
+const isCommunityCopyRoute = computed(() => route.name === 'community-copy')
+/** Adendo v1.1.0: rota de coletânea custom própria na Comunidade? */
+const isCommunityCustomRoute = computed(() => route.name === 'community-custom')
+
+async function removeCollection() {
+  if (!activeCollection.value || !isCustomCopy.value || isDeletingCollection.value) return
+  const name = activeCollection.value.name
+  const ok = await appConfirm({
+    title: t('albums.messages.deleteCollectionTitle', { name }),
+    message: t('albums.messages.deleteCollectionText'),
+    danger: true,
+    confirmLabel: t('sync.deleteConfirmYes'),
+    cancelLabel: t('sync.deleteConfirmNo'),
+  })
+  if (!ok) return
+  isDeletingCollection.value = true
+  try {
+    const removed = await deleteCustomCollection(fromCustomCollectionId(collectionId.value))
+    if (removed) {
+      // D3/adendo v1.1.0: cópia e custom própria vivem na aba Comunidade —
+      // voltam pra lá; custom própria aberta pela Central volta pra Central.
+      void router.push({
+        name:
+          isCommunityCopyRoute.value || isCommunityCustomRoute.value
+            ? 'community'
+            : 'albums',
+      })
+    }
+  } finally {
+    isDeletingCollection.value = false
+  }
+}
 
 // Hinário: 610 hinos — desenhar tudo de uma vez travava a tela por ~1,7 s
 const { visible: renderedTracks } = useProgressiveList(filteredTracks)
@@ -148,7 +200,10 @@ watch(collectionId, () => {
 })
 
 function goBack() {
-  void router.push({ name: 'albums' })
+  // D3: cópia da Comunidade volta pro hub dela; custom próprio volta pra Central.
+  void router.push({
+    name: isCommunityCopyRoute.value ? 'community' : 'albums',
+  })
 }
 
 function closePlaylistPicker() {
@@ -172,9 +227,9 @@ function addToPlaylist(id: string) {
   playlistItem.value = null
   /* v8 ignore start -- picker só emite ids presentes em playlists.value */
   if (result?.added) {
-    showPlaylistFeedback(`“${item.title}” adicionada a “${target?.name ?? 'playlist'}”`)
+    showPlaylistFeedback(t('albums.playlists.addedTo', { title: item.title, name: target?.name ?? t('albums.collectionFallback') }))
   } else {
-    showPlaylistFeedback(`“${item.title}” já está em “${target?.name ?? 'playlist'}”`)
+    showPlaylistFeedback(t('albums.playlists.alreadyIn', { title: item.title, name: target?.name ?? t('albums.collectionFallback') }))
   }
   /* v8 ignore stop */
 }
@@ -230,6 +285,21 @@ async function runAction(
 
       <div v-if="activeCollection && filteredTracks.length > 0"
         class="album-collection-view__playback-actions">
+        <!-- Cópia da Comunidade: id local cru (negativo) → abre EDITÁVEL no editor. -->
+        <button v-if="isCommunityCopyRoute && Number(collectionId) < 0" type="button"
+          class="album-collection-view__shuffle"
+          data-testid="album-edit-collection"
+          aria-label="Editar coletânea" title="Editar coletânea"
+          @click="router.push({ path: '/media/editor', query: { collection: collectionId } })">
+          <i class="ti ti-edit" aria-hidden="true" />
+        </button>
+        <button v-if="isCustomCopy" type="button" class="album-collection-view__shuffle"
+          data-testid="album-delete-collection"
+          :disabled="isDeletingCollection"
+          :aria-label="t('albums.messages.deleteCollectionAction')" :title="t('albums.messages.deleteCollectionAction')"
+          @click="removeCollection">
+          <i class="ti ti-trash" aria-hidden="true" />
+        </button>
         <button type="button" class="album-collection-view__shuffle"
           data-testid="album-stage-customize"
           :aria-label="t('settings.stage.titleSlides')" :title="t('settings.stage.titleSlides')"
@@ -294,6 +364,11 @@ async function runAction(
       </button>
     </div>
 
+    <p v-if="collectionDisabled" class="album-collection-view__disabled-note" role="note">
+      <i class="ti ti-eye-off" aria-hidden="true" />
+      {{ t('albums.disabledAlbums.collectionNote') }}
+    </p>
+
     <p v-if="activeCollection?.kind === 'hymnal'" class="album-collection-view__search-explanation">
       {{ t('albums.searchExplanation') }}
     </p>
@@ -328,6 +403,7 @@ async function runAction(
         :collection-name="title"
         :artwork-url="activeCollection?.coverUrl"
         :busy="busyMusicId === track.musicId"
+        :album-disabled="collectionDisabled"
         @sung="runAction(track.musicId, () => playSung(track.musicId))"
         @instrumental="
           runAction(track.musicId, () => playInstrumental(track.musicId))
@@ -365,6 +441,19 @@ async function runAction(
 </template>
 
 <style scoped lang="scss">
+.album-collection-view__disabled-note {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: fit-content;
+  margin: 0 0 0.75rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--ds-color-outline-strong);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
 .album-collection-view__search-explanation {
   margin: 0;
   color: var(--ds-color-on-surface-variant);

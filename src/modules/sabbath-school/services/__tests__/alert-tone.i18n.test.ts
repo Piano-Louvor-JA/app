@@ -15,9 +15,18 @@ describe('resolveSabbathSchoolAudioLang', () => {
     expect(resolveSabbathSchoolAudioLang('auto', 'es')).toBe('es')
   })
 
+  it('auto mapeia os 12 idiomas com catálogo de áudio', () => {
+    expect(resolveSabbathSchoolAudioLang('auto', 'fr')).toBe('fr')
+    expect(resolveSabbathSchoolAudioLang('auto', 'ru')).toBe('ru')
+    expect(resolveSabbathSchoolAudioLang('auto', 'uk')).toBe('uk')
+    expect(resolveSabbathSchoolAudioLang('auto', 'ja')).toBe('ja')
+    expect(resolveSabbathSchoolAudioLang('auto', 'hi')).toBe('hi')
+  })
+
   it('auto com locale não mapeado cai em pt-BR', () => {
-    expect(resolveSabbathSchoolAudioLang('auto', 'fr')).toBe('pt-BR')
     expect(resolveSabbathSchoolAudioLang('auto', 'xx-YY')).toBe('pt-BR')
+    // it/nl/pl agora mapeados (15 idiomas) — usa locale fictício pro fallback
+    expect(resolveSabbathSchoolAudioLang('auto', 'de')).toBe('pt-BR')
   })
 
   it('fr explícito funciona sem locale FR na UI', () => {

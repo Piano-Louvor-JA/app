@@ -18,6 +18,8 @@ const mocks = vi.hoisted(() => ({
   playLiturgyLocalPdfOnScreens: vi.fn(async () => true),
   playLiturgyLocalPresentationOnScreens: vi.fn(async () => true),
   playLiturgyWebOnConfiguredScreens: vi.fn(async () => true),
+  listPlaylists: vi.fn(() => [] as Array<{ id: string; name: string; items: Array<{ musicId: number; albumId: number | null; title: string }> }>),
+  playQueue: vi.fn(async () => {}),
   bibleStore: {
     books: [] as unknown[],
     bootstrap: vi.fn(async () => {}),
@@ -34,6 +36,14 @@ vi.mock('@modules/bible/stores/useBibleStore', () => ({
 
 vi.mock('@modules/media/services/open-music-player', () => ({
   openMusicPlayer: mocks.openMusicPlayer,
+}))
+
+vi.mock('@modules/albums/services/playlist-storage', () => ({
+  listPlaylists: mocks.listPlaylists,
+}))
+
+vi.mock('@modules/media/stores/useMediaStore', () => ({
+  useMediaStore: () => ({ playQueue: mocks.playQueue }),
 }))
 
 vi.mock('@shared/services/desktop-bridge', () => ({
@@ -168,6 +178,55 @@ describe('executeLiturgyItem', () => {
     expect(routerMock.push).not.toHaveBeenCalled()
   })
 
+  it('playlist sem id: erro playlistMissing', async () => {
+    const result = await executeLiturgyItem(litItem({ type: 'playlist' }), routerMock)
+    expect(result).toEqual({ ok: false, messageKey: 'liturgy.messages.playlistMissing' })
+  })
+
+  it('playlist vazia: erro playlistEmpty', async () => {
+    mocks.listPlaylists.mockReturnValue([{ id: 'pl-1', name: 'Abertura', items: [] }])
+    const result = await executeLiturgyItem(
+      litItem({ type: 'playlist', playlistId: 'pl-1' }),
+      routerMock,
+    )
+    expect(result).toEqual({ ok: false, messageKey: 'liturgy.messages.playlistEmpty' })
+  })
+
+  it('playlist com faixas: playQueue e navega pra media', async () => {
+    const items = [{ musicId: 10, albumId: 1, title: 'Hino 1' }]
+    mocks.listPlaylists.mockReturnValue([{ id: 'pl-1', name: 'Abertura', items }])
+    const result = await executeLiturgyItem(
+      litItem({ type: 'playlist', playlistId: 'pl-1', name: 'Abertura' }),
+      routerMock,
+    )
+    expect(result.ok).toBe(true)
+    expect(mocks.playQueue).toHaveBeenCalledWith(items, 0, 'audio', 'Abertura', {
+      originalOrder: items,
+      shuffled: false,
+    })
+    expect(routerMock.push).toHaveBeenCalledWith({ name: 'media' })
+  })
+
+  it('playlist instrumental e aleatório passam opções ao playQueue', async () => {
+    const items = [
+      { musicId: 1, albumId: null, title: 'A' },
+      { musicId: 2, albumId: null, title: 'B' },
+    ]
+    mocks.listPlaylists.mockReturnValue([{ id: 'pl-1', name: 'Abertura', items }])
+    await executeLiturgyItem(
+      litItem({ type: 'playlist', playlistId: 'pl-1' }),
+      routerMock,
+      { playbackMode: 'instrumental', shuffled: true },
+    )
+    expect(mocks.playQueue).toHaveBeenCalledWith(
+      expect.any(Array),
+      0,
+      'instrumental',
+      'Abertura',
+      { originalOrder: items, shuffled: true },
+    )
+  })
+
   it('verse sem book/chapter: ok sem navegar', async () => {
     const result = await executeLiturgyItem(litItem({ type: 'verse' }), routerMock)
     expect(result).toEqual({ ok: true })
@@ -253,7 +312,9 @@ describe('executeLiturgyItem', () => {
       routerMock,
     )
     expect(result.ok).toBe(true)
-    expect(bridge.presentation.openExternal).toHaveBeenCalledWith('/p.pptx', 'libreoffice')
+    expect(bridge.presentation.openExternal).toHaveBeenCalledWith('/p.pptx', 'libreoffice', {
+      monitorIds: expect.any(Array),
+    })
   })
 
   it('presentation auto sem office: presentationOfficeMissing', async () => {
@@ -269,7 +330,7 @@ describe('executeLiturgyItem', () => {
     expect(result).toEqual({ ok: false, messageKey: 'liturgy.messages.presentationOfficeMissing' })
   })
 
-  it('presentation auto com office: abre controle interno', async () => {
+  it('presentation auto com office: abre já projetando nas telas', async () => {
     mocks.getDesktopBridge.mockReturnValue({
       presentation: { detectOffice: vi.fn(async () => true) },
     } as never)
@@ -278,7 +339,25 @@ describe('executeLiturgyItem', () => {
       routerMock,
     )
     expect(result.ok).toBe(true)
-    expect(mocks.openLiturgyLocalPresentationControl).toHaveBeenCalled()
+    expect(mocks.playLiturgyLocalPresentationOnScreens).toHaveBeenCalled()
+    expect(mocks.openLiturgyLocalPresentationControl).not.toHaveBeenCalled()
+  })
+
+  it('presentation .odt com engine externa: projeta pelo app (Writer não tem slideshow)', async () => {
+    const bridge = {
+      presentation: {
+        openExternal: vi.fn(async () => ({ ok: true })),
+        detectOffice: vi.fn(async () => true),
+      },
+    }
+    mocks.getDesktopBridge.mockReturnValue(bridge as never)
+    const result = await executeLiturgyItem(
+      litItem({ type: 'presentation', filePath: '/avisos.odt', presentationEngine: 'libreoffice' }),
+      routerMock,
+    )
+    expect(result.ok).toBe(true)
+    expect(bridge.presentation.openExternal).not.toHaveBeenCalled()
+    expect(mocks.playLiturgyLocalPresentationOnScreens).toHaveBeenCalled()
   })
 
   it('site ok: abre controle', async () => {

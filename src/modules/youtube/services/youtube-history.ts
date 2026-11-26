@@ -63,9 +63,17 @@ export function listYoutubeHistory(): YoutubeHistoryEntry[] {
   return list
 }
 
+/** Evento disparado quando histórico ou favoritos mudam (tela aberta e controle remoto). */
+export const YOUTUBE_LIBRARY_CHANGED = 'youtube-library-changed'
+
+function notifyLibraryChanged() {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(YOUTUBE_LIBRARY_CHANGED))
+}
+
 function save(list: YoutubeHistoryEntry[]): YoutubeHistoryEntry[] {
   const trimmed = list.slice(0, YOUTUBE_HISTORY_MAX)
   setBrowserItem(BROWSER_STORAGE_KEYS.youtubeHistory, trimmed)
+  notifyLibraryChanged()
   return trimmed
 }
 
@@ -157,6 +165,7 @@ export function listYoutubeFavorites(): YoutubeFavoriteEntry[] {
 function saveFavorites(list: YoutubeFavoriteEntry[]): YoutubeFavoriteEntry[] {
   const trimmed = list.slice(0, YOUTUBE_FAVORITES_MAX)
   setBrowserItem(BROWSER_STORAGE_KEYS.youtubeFavorites, trimmed)
+  notifyLibraryChanged()
   return trimmed
 }
 

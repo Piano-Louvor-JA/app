@@ -483,6 +483,35 @@ describe('StageCustomizationCard', () => {
 
 describe('aparência dos hinos — título e estrofes independentes', () => {
   beforeEach(() => { lsStub.clear(); setActivePinia(createPinia()) })
+  it('hinos: nome do hinário na capa — esconder, tamanho e cor (com padrão)', async () => {
+    const w = await mountCard({ onlyScope: 'hymns' })
+    const store = useStageSettingsStore()
+    await w.get('input[aria-label="settings.stage.hymnalNameSize"]').setValue('48')
+    expect(store.settings.hymnalNameSize).toBe(48)
+    await w.get('input[aria-label="settings.stage.hymnalNameColor"]').setValue('#f6c32a')
+    expect(store.settings.hymnalNameColor).toBe('#f6c32a')
+    await w.get('[data-testid="hymnal-name-color-default"]').trigger('click')
+    expect(store.settings.hymnalNameColor).toBeNull()
+    await w.get('input[aria-label="settings.stage.hymnalNameShow"]').setValue(false)
+    expect(store.settings.hymnalNameShow).toBe(false)
+    expect(w.find('input[aria-label="settings.stage.hymnalNameSize"]').exists()).toBe(false)
+    w.unmount()
+  })
+
+  it('hinos: número do hino na capa — liga/desliga e muda o tamanho', async () => {
+    const w = await mountCard({ onlyScope: 'hymns' })
+    const store = useStageSettingsStore()
+    const toggle = w.get('input[aria-label="settings.stage.hymnNumberShow"]')
+    expect((toggle.element as HTMLInputElement).checked).toBe(true)
+    await w.get('input[aria-label="settings.stage.hymnNumberSize"]').setValue('320')
+    expect(store.settings.hymnNumberSize).toBe(320)
+    await toggle.setValue(false)
+    expect(store.settings.hymnNumberShow).toBe(false)
+    // Desligado: o tamanho some.
+    expect(w.find('input[aria-label="settings.stage.hymnNumberSize"]').exists()).toBe(false)
+    w.unmount()
+  })
+
   it.each(['title', 'lyric'] as const)('edita cor, tamanho, peso e limpa personalização de %s', async field => {
     const w = await mountCard({ onlyScope: 'hymns' })
     const store = useStageSettingsStore()

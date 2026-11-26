@@ -45,7 +45,7 @@ export default {
     inAppProjection: 'Pré-visualização da Bíblia',
     projectionHotkeyHint:
       'ESC encerra a projeção  ·  Ctrl+Alt+P alterna com a tela do operador',
-    emptyCatalog: 'Nenhum conteúdo bíblico disponível. Conclua a inicialização do app.',
+    convite_catalogo: 'Ainda não há conteúdo bíblico neste idioma. Ajude a comunidade a traduzir: saiba mais no LouvorJA.',
     emptyChapter: 'Nenhum versículo encontrado neste capítulo.',
     loading: 'Carregando Bíblia...',
     noSelection: 'Selecione um versículo para projetar',

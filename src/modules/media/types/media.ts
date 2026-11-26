@@ -54,6 +54,8 @@ export type MediaSession = {
   mode: MediaPlaybackMode
   title: string
   subtitle: string
+  /** Hinário: número do hino (capa). null fora do hinário. */
+  hymnNumber?: number | null
   coverUrl: string | null
   audioUrl: string
   hasInstrumental: boolean
@@ -78,6 +80,8 @@ export type MediaProjectionRuntime = {
   imagePosition: string | null
   frameDataUrl: string | null
   isCover: boolean
+  /** Hinário: número do hino, mostrado grande acima do título na capa. */
+  hymnNumber: number | null
   slideIndex: number
   slideCount: number
   nextLyric: string
@@ -99,6 +103,7 @@ export const DEFAULT_MEDIA_PROJECTION: MediaProjectionRuntime = {
   imagePosition: null,
   frameDataUrl: null,
   isCover: false,
+  hymnNumber: null,
   slideIndex: 0,
   slideCount: 0,
   nextLyric: '',

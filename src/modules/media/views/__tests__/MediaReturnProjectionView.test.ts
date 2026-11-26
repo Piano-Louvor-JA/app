@@ -93,6 +93,8 @@ beforeEach(() => {
   window.localStorage?.clear?.()
   vi.clearAllMocks()
   stageSettings.listeners.length = 0
+  // Flyer padrão no retorno; testes de transição ligam explicitamente.
+  Object.assign(stageSettings.settings, { lyricTransitionEnabled: false })
   // jsdom não tem matchMedia: default sem reduced-motion (o teste específico stuba)
   if (!window.matchMedia) {
     window.matchMedia = vi.fn().mockReturnValue({ matches: false }) as unknown as typeof window.matchMedia
@@ -138,6 +140,34 @@ describe('MediaReturnProjectionView', () => {
     await publish(w, { slideIndex: 1, lyric: 'Segunda estrofe', nextLyric: 'Terceira estrofe' })
     expect(w.text()).toContain('Segunda estrofe')
     w.unmount()
+  })
+
+  it('com transições ligadas: avanço sequencial usa snap (sem flyer)', async () => {
+    Object.assign(stageSettings.settings, {
+      lyricTransitionEnabled: true,
+      lyricTransition: 'fade',
+      lyricTransitionSpeed: 'normal',
+    })
+    const anims: unknown[] = []
+    const origAnimate = (HTMLElement.prototype as unknown as { animate?: unknown }).animate
+    ;(HTMLElement.prototype as unknown as { animate: unknown }).animate = function () {
+      anims.push({ cancel: vi.fn(), finished: Promise.resolve() })
+      return anims[anims.length - 1]
+    }
+    try {
+      const w = await mountView()
+      // Transition name = scr-fade (mesma família dos slides)
+      expect((w.vm as { transitionName: string }).transitionName).toBe('scr-fade')
+      await publish(w, { slideIndex: 0, lyric: 'Primeira estrofe', nextLyric: 'Segunda estrofe' })
+      await publish(w, { slideIndex: 1, lyric: 'Segunda estrofe', nextLyric: 'Terceira estrofe' })
+      expect(w.text()).toContain('Segunda estrofe')
+      // snap: Element.animate do flyer não roda
+      expect(anims.length).toBe(0)
+      w.unmount()
+    } finally {
+      ;(HTMLElement.prototype as unknown as { animate: unknown }).animate = origAnimate
+      Object.assign(stageSettings.settings, { lyricTransitionEnabled: false })
+    }
   })
 
   it('mudança não sequencial: snap direto', async () => {

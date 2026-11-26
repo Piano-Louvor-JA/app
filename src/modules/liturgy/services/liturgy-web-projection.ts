@@ -1,15 +1,11 @@
 import {
-  listExtendedDisplays,
-  listSystemDisplays,
-} from '@modules/settings/services/display-service'
-import { loadProjectionSettings } from '@modules/settings/services/projection-preferences'
-import {
   closeProjectionModule,
   openProjectionModule,
 } from '@shared/composables/useProjectionWindow'
 import { getDesktopBridge } from '@shared/services/desktop-bridge'
 import type { OpenUrlProjectionPayload, PresentationEngine } from '@shared/types/desktop-bridge'
 import { palcoSession } from '../../settings/services/palco-session'
+import { resolveTargetMonitorIds } from './liturgy-projection-targets'
 
 import {
   parseLiturgyWebTarget,
@@ -21,14 +17,6 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-async function resolveTargetMonitorIds(): Promise<number[]> {
-  const settings = loadProjectionSettings()
-  const displays = await listSystemDisplays()
-  const extendedIds = new Set(
-    listExtendedDisplays(displays).map((display) => display.id),
-  )
-  return settings.targetDisplayIds.filter((id) => extendedIds.has(id))
-}
 
 /**
  * Abre URL nas telas configuradas, espelhada.

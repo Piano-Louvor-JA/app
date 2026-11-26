@@ -8,6 +8,7 @@ import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import { convertPresentationToPdf } from './presentation-convert.mjs'
+import { closeLibreOfficeMirror } from './presentation-libreoffice-mirror.mjs'
 import { readWorkspaceRecord, writeWorkspaceRecord } from '../workspace.mjs'
 import { getPalcoManager } from '../palco-server.mjs'
 import { addProjectionWindowProvider, ensureProjectionHotkey, releaseProjectionHotkey } from '../projection-hotkey.mjs'
@@ -1982,6 +1983,7 @@ export function registerCloseProjectionPopups(impl) {
 }
 
 export function closeAllProjectionWindows() {
+  closeLibreOfficeMirror()
   try {
     closeProjectionPopupsImpl?.()
   } catch {
@@ -2196,6 +2198,9 @@ export async function openWebProjectionWindows(payload) {
           }
         } catch { /* default auto */ }
       }
+      // Formatos do LibreOffice (.odp/.odt): o PowerPoint não abre .odt e
+      // altera .odp; converte sempre pelo LibreOffice.
+      if (/\.(odp|odt)$/i.test(filePath)) preference = 'libreoffice'
 
       try {
         const { resolvePresentationEngine, exportPptxToPngs } = await import(
@@ -2759,6 +2764,8 @@ export async function getSourcePlaybackState() {
     if (!state || typeof state !== 'object') return null
     return {
       ...state,
+      // Título do vídeo aberto (liturgia ou módulo YouTube) para o controle remoto.
+      title: currentSourceTitle,
       audioOnly: currentSourceAudioOnly,
       audioOutput: currentSourceAudioOnly ? 'player' : getAudioOutputMode(),
       canControlCaptions: currentSourceHasCaptions,

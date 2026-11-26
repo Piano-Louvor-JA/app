@@ -1,0 +1,113 @@
+export default {
+  "announcements": {
+    "title": "公告、提醒与演示",
+    "back": "返回工具",
+    "defaultListName": "自定义列表",
+    "copySuffix": "（副本）",
+    "lists": {
+      "label": "公告列表",
+      "new": "新建列表",
+      "newTitle": "新建公告列表",
+      "rename": "重命名列表",
+      "duplicate": "复制列表",
+      "remove": "删除列表",
+      "removeTitle": "删除列表",
+      "removeConfirm": "删除包含 {count} 条公告的“{name}”列表？复制到应用中的文件也将被删除。",
+      "nameLabel": "列表名称",
+      "actions": "列表操作"
+    },
+    "add": "添加公告",
+    "empty": "此列表中没有公告",
+    "emptyHint": "使用“添加公告”创建第一条。",
+    "kinds": {
+      "text": "文本",
+      "images": "图片",
+      "video": "视频",
+      "presentation": "演示文稿",
+      "url": "URL"
+    },
+    "kindHints": {
+      "text": "标题和带格式文本",
+      "images": "一张或多张图片",
+      "video": "来自此电脑的视频",
+      "presentation": "PowerPoint 或 PDF",
+      "url": "网站、YouTube 或 Vimeo"
+    },
+    "untitled": "无标题",
+    "imagesCount": "无图片 | 1 张图片 | {count} 张图片",
+    "noFile": "无文件",
+    "missingBadge": "文件缺失",
+    "actions": {
+      "label": "公告操作",
+      "project": "投影",
+      "stop": "停止投影",
+      "edit": "编辑",
+      "duplicate": "复制",
+      "remove": "删除",
+      "drag": "拖动重新排序",
+      "carouselOn": "在轮播中（点击移除）",
+      "carouselOff": "不在轮播中（点击加入）"
+    },
+    "remove": "删除",
+    "removeTitle": "删除公告",
+    "removeConfirm": "删除公告“{name}”？复制到应用中的文件也将被删除。",
+    "cancel": "取消",
+    "save": "保存",
+    "dialog": {
+      "newTitle": "新公告：{kind}",
+      "editTitle": "编辑公告：{kind}",
+      "title": "标题",
+      "titlePlaceholder": "例如：下个安息日的洗礼",
+      "titleColor": "标题颜色",
+      "text": "文本",
+      "addImages": "添加图片",
+      "removeImage": "删除图片",
+      "moveImageUp": "图片上移",
+      "moveImageDown": "图片下移",
+      "chooseVideo": "选择视频",
+      "chooseFile": "选择 PowerPoint 或 PDF",
+      "replaceFile": "替换文件",
+      "emptyText": "请填写公告标题或文本。",
+      "emptyFiles": "请至少选择一个文件。",
+      "url": "地址（URL）",
+      "urlHint": "YouTube 和 Vimeo 链接会在视频播放器中打开；其他链接会作为网站打开。",
+      "fetchingTitle": "正在获取链接标题…",
+      "invalidUrl": "请输入有效的地址（例如：https://…）。",
+      "copying": "正在复制文件…"
+    },
+    "notices": {
+      "duplicateFailed": "无法复制公告：复制文件失败。",
+      "duplicateListPartial": "有 {count} 条公告未能复制到新列表。",
+      "rejected": "{count} 个文件被拒绝：{names}",
+      "pickFailed": "无法复制所选文件。",
+      "missing": "找不到文件：{names}",
+      "projectionFailed": "无法投影此公告。",
+      "desktopOnly": "仅在桌面应用中可用。",
+      "close": "关闭提醒"
+    },
+    "carousel": {
+      "title": "轮播",
+      "independent": "独立投影",
+      "start": "作为轮播投影",
+      "pause": "暂停",
+      "resume": "继续",
+      "next": "下一张",
+      "prev": "上一张",
+      "stop": "停止轮播",
+      "slideSeconds": "每张停留秒数",
+      "loop": "循环",
+      "empty": "此列表没有可用于轮播的文本或图片公告。",
+      "skipped": "视频、演示文稿、URL 以及被移出轮播的公告不会包含在内。",
+      "position": "{current} / {total}",
+      "help": {
+        "button": "轮播的工作原理",
+        "what": "轮播会自动逐条显示公告。",
+        "which": "包含打开列表中的文本公告和图片公告中的所有图片；视频、演示文稿和 URL 除外。",
+        "toggle": "用每条公告上的轮播按钮加入或移除。新公告会自动加入。",
+        "timing": "每张停留秒数设置每条公告在屏幕上停留的时间。开启循环后，最后一条之后会回到第一条。",
+        "where": "作为轮播投影会使用在“屏幕”中勾选的屏幕和远程连接。",
+        "independent": "独立投影会将轮播显示在选定的显示器或连接上，叠加在已投影的内容之上。"
+      }
+    }
+  }
+}

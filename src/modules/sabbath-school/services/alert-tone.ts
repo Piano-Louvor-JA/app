@@ -22,18 +22,36 @@ export type AlertPresetKey = keyof typeof ALERT_PRESETS
 
 // ── i18n dos áudios oficiais da Escola Sabatina (SPEC countdown-audio-i18n) ──
 // Idioma EFETIVO da narração. 'fr' existe SÓ aqui — a UI não ganha locale FR.
-export type SabbathAudioLang = 'pt-BR' | 'es' | 'en' | 'fr'
+export type SabbathAudioLang = 'pt-BR' | 'es' | 'en' | 'fr' | 'ja' | 'ko' | 'zh' | 'ru' | 'uk' | 'tr' | 'ar' | 'hi' | 'it' | 'nl' | 'pl'
 export type SabbathAudioLangSetting = SabbathAudioLang | 'auto'
 
-const SABBATH_AUDIO_LANGS: readonly SabbathAudioLang[] = ['pt-BR', 'es', 'en', 'fr']
+const SABBATH_AUDIO_LANGS: readonly SabbathAudioLang[] = ['pt-BR', 'es', 'en', 'fr', 'ja', 'ko', 'zh', 'ru', 'uk', 'tr', 'ar', 'hi', 'it', 'nl', 'pl']
 
-/** Locale de UI → idioma da narração; não mapeado → pt-BR. */
+/** Locale de UI → idioma da narração (auto segue o locale da UI; não mapeado → pt-BR). */
+const UI_LOCALE_TO_AUDIO: Record<string, SabbathAudioLang> = {
+  'pt-BR': 'pt-BR',
+  es: 'es',
+  en: 'en',
+  fr: 'fr',
+  ja: 'ja',
+  ko: 'ko',
+  zh: 'zh',
+  ru: 'ru',
+  uk: 'uk',
+  tr: 'tr',
+  ar: 'ar',
+  hi: 'hi',
+  it: 'it',
+  nl: 'nl',
+  pl: 'pl',
+}
+
 export function resolveSabbathSchoolAudioLang(
   setting: SabbathAudioLangSetting,
   uiLocale: string,
 ): SabbathAudioLang {
-  const auto = SABBATH_AUDIO_LANGS.slice(0, 3).find((l) => l === uiLocale) ?? 'pt-BR'
-  return SABBATH_AUDIO_LANGS.find((l) => l === setting) ?? auto
+  if (setting !== 'auto' && SABBATH_AUDIO_LANGS.includes(setting)) return setting
+  return UI_LOCALE_TO_AUDIO[uiLocale] ?? 'pt-BR'
 }
 
 /** Pasta das narrações oficiais, relativa à pasta Media. */
@@ -44,6 +62,17 @@ const SABBATH_AUDIO_FOLDER: Record<SabbathAudioLang, string> = {
   es: 'es',
   en: 'en',
   fr: 'fr',
+  ja: 'ja',
+  ko: 'ko',
+  zh: 'zh',
+  ru: 'ru',
+  uk: 'uk',
+  tr: 'tr',
+  ar: 'ar',
+  hi: 'hi',
+  it: 'it',
+  nl: 'nl',
+  pl: 'pl',
 }
 
 /** Manifesto: arquivo + duração ffprobe pré-medida (idêntica nos 4 idiomas). */
@@ -263,17 +292,18 @@ export function setLiveVolume(volume: number): void {
   }
 }
 
-// Exporta lista de presets para UI (sintéticos + oficiais + desabilitado)
+// Exporta lista de presets para UI (sintéticos + oficiais + desabilitado).
+// label = chave i18n em sabbathSchool.* (traduzida pelo caller).
 export function getAvailablePresets(): Array<{ key: string; label: string }> {
   return [
-    { key: 'none', label: '— Desabilitado —' },
-    { key: 'abertura_es', label: 'Abertura ES (oficial LouvorJA)' },
-    { key: '5min_es', label: '5 min ES (oficial LouvorJA)' },
-    { key: '1min_es', label: '1 min ES (oficial LouvorJA)' },
-    { key: 'beep', label: 'Beep (sintético)' },
-    { key: 'chime', label: 'Chime (sintético)' },
-    { key: 'gong', label: 'Gong (sintético)' },
-    { key: 'custom', label: 'Áudio personalizado do dispositivo' },
+    { key: 'none', label: 'sabbathSchool.presetNone' },
+    { key: 'abertura_es', label: 'sabbathSchool.presetAbertura' },
+    { key: '5min_es', label: 'sabbathSchool.preset5min' },
+    { key: '1min_es', label: 'sabbathSchool.preset1min' },
+    { key: 'beep', label: 'sabbathSchool.presetBeep' },
+    { key: 'chime', label: 'sabbathSchool.presetChime' },
+    { key: 'gong', label: 'sabbathSchool.presetGong' },
+    { key: 'custom', label: 'sabbathSchool.presetCustom' },
   ]
 }
 

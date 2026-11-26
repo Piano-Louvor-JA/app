@@ -18,6 +18,7 @@ import { ref, computed } from 'vue'
 
 vi.mock('vue-i18n', () => ({
   useI18n: () => ({ t: (key: string) => key }),
+  createI18n: () => ({ global: { locale: { value: 'pt-BR' }, t: (key: string) => key }, install() {} }),
 }))
 
 vi.mock('@assets/brand/logo-louvor-ja.svg', () => ({ default: 'logo.svg' }))

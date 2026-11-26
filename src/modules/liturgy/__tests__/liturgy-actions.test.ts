@@ -47,6 +47,8 @@ import {
   openLiturgyMusicPlayer,
   playLiturgyItemOnScreens,
 } from '../services/liturgy-actions'
+import { tPtBR } from '../../../test/i18n-stub'
+vi.mock('../../../plugins/i18n', async () => ({ default: { global: { t: (await import('../../../test/i18n-stub')).tPtBR } } }))
 
 // --- helpers --------------------------------------------------------------
 
@@ -356,7 +358,7 @@ describe('executeLiturgyItem', () => {
       const getEngine = vi.fn().mockResolvedValue('auto')
       const detectOffice = vi.fn().mockResolvedValue(true)
       setBridge({ presentation: { getEngine, detectOffice } })
-      webProjectionMocks.openLiturgyLocalPresentationControl.mockResolvedValueOnce(true)
+      webProjectionMocks.playLiturgyLocalPresentationOnScreens.mockResolvedValueOnce(true)
       const r = await executeLiturgyItem(
         item({ type: 'presentation', filePath: '/p.pptx' }),
         router,
@@ -367,7 +369,7 @@ describe('executeLiturgyItem', () => {
       const getEngine = vi.fn().mockResolvedValue(undefined)
       const detectOffice = vi.fn().mockResolvedValue(undefined)
       setBridge({ presentation: { getEngine, detectOffice } })
-      webProjectionMocks.openLiturgyLocalPresentationControl.mockResolvedValueOnce(false)
+      webProjectionMocks.playLiturgyLocalPresentationOnScreens.mockResolvedValueOnce(false)
       const r = await executeLiturgyItem(
         item({ type: 'presentation', filePath: '/p.pptx' }),
         router,

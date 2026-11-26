@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   getAuthSession,
-  authHeaders,
+  authHeadersAsync,
   register,
   login,
   logout,
@@ -28,16 +28,16 @@ beforeEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('getAuthSession / authHeaders', () => {
-  it('sem sessão -> null e headers vazios', () => {
+describe('getAuthSession / authHeadersAsync', () => {
+  it('sem sessão -> null e headers vazios', async () => {
     expect(getAuthSession()).toBeNull()
-    expect(authHeaders()).toEqual({})
+    expect(await authHeadersAsync()).toEqual({})
   })
 
-  it('sessão válida -> lê; headers Bearer', () => {
+  it('sessão válida -> lê; headers Bearer', async () => {
     localStorage.setItem(SESSION_KEY, JSON.stringify(session))
     expect(getAuthSession()).toEqual(session)
-    expect(authHeaders()).toEqual({ authorization: 'Bearer tok-123' })
+    expect(await authHeadersAsync()).toEqual({ authorization: 'Bearer tok-123' })
   })
 
   it('JSON inválido -> null; token ausente -> null; user sem id -> null', () => {

@@ -1,0 +1,106 @@
+export default {
+  "albums": {
+    "custom": {
+      "title": "My Collections",
+      "openEditor": "Open lyrics editor",
+      "open": "Open collection {name}",
+      "trackCount": "{count} track(s)",
+      "empty": "No collections yet. Import a .slja file in the editor.",
+      "emptyHint": "You don't have any playlists yet.",
+      "createHint": "Create one in the Playlists section of the Library.",
+      "importedList": "Imported: {parts}.",
+
+      "importedNewPlaylists": "{count} new playlist(s)",
+
+
+      "importedAddedTracks": "{count} track(s) added",
+
+
+
+
+      "importedNothingNew": "Nothing new to import.",
+
+      "importInvalid": "Invalid playlists file.",
+      "newPlaceholder": "New collection name...",
+      "create": "Create",
+      "hide": "Hide My Collections",
+      "show": "Show My Collections"
+    },
+    "fallbackMusic": "Music",
+    "playlists": {
+      "removeTrackTitle": "Remove from playlist?",
+      "removeTrackMessage": "“{title}” leaves “{name}”. The song and downloaded files stay in the library.",
+      "removeTrackConfirm": "Remove",
+      "inPlaylist": "Already in this playlist",
+      "addMusic": "Add songs",
+      "addMusicHint": "Add songs: search for songs for this playlist",
+      "searchMusicHint": "Search by song name, number or lyrics.",
+      "addedTo": "“{title}” added to “{name}”.",
+      "alreadyIn": "“{title}” is already in “{name}”.",
+      "saveName": "Save",
+      "rename": "Rename playlist {name}",
+      "newName": "New playlist name",
+      "deleteTitle": "Delete playlist “{name}”?",
+      "deleteMessage": "The playlist will be deleted. Songs and downloaded files will be kept.",
+      "deleteConfirm": "Delete playlist",
+      "singlePlayHint": "Single mode: play only this song",
+      "shuffleHint": "Shuffle play: play all songs in random order",
+      "playAllHint": "Play playlist: play all songs in sequence",
+      "shuffle": "Shuffle play",
+      "playTrack": "Play {title} in mini player",
+      "reorder": "Drag to reorder (or use the up and down arrow keys)",
+      "title": "Playlists",
+      "newPlaceholder": "New playlist name...",
+      "create": "Create",
+      "export": "Export playlists",
+      "import": "Import playlists",
+      "empty": "No playlists created yet."
+    },
+    "title": "Media Center",
+    "subtitle": "Albums & Collections",
+    "collectionFallback": "Collections",
+    "back": "Back to albums",
+    "searchPlaceholder": "Type the hymn number or name...",
+    "hubSearchPlaceholder": "Search here...",
+    "catalogSearchPlaceholder": "Search album or collection...",
+    "searchExplanation": "Search includes song titles, collections and lyrics. Some results may match only a passage in the lyrics.",
+    "searchResultsTitle": "Search Results",
+    "clearSearch": "Clear search",
+    "openCollection": "Open {name}",
+    "columns": {
+      "number": "#",
+      "title": "Title / Collection",
+      "duration": "Duration",
+      "actions": "Actions"
+    },
+    "trackCount": "{count} tracks",
+    "playAll": "Play all",
+    "appendQueue": "Add to queue",
+    "appendedToQueue": "Collection added to queue",
+    "loading": "Loading…",
+    "retry": "Try again",
+    "dismiss": "Dismiss",
+    "lyric": {
+      "title": "Lyrics",
+      "close": "Close lyrics"
+    },
+    "messages": {
+      "convite_catalogo": "Katalog muzyczny nie jest jeszcze dostępny w tym języku. Dołącz do społeczności LouvorJA i pomóż tłumaczyć oraz publikować kolekcje!",
+      "convite_titulo": "Katalog w przygotowaniu",
+      convite_hint: 'The preview above shows the Portuguese catalog — soon in your language, with your help.',
+
+      "catalogEmpty": "No collection found in the local catalog.",
+      "catalogFailed": "Could not load the album catalog.",
+      "catalogSearchEmpty": "No collection found for this search.",
+      "collectionMissing": "Collection not found.",
+      "tracksEmpty": "No tracks in this collection.",
+      "tracksFailed": "Could not load the tracks.",
+      "searchEmpty": "No song found.",
+      "lyricMissing": "Lyrics unavailable for this track.",
+      "projectionFailed": "Could not open projection on the configured screens.",
+      "deleteCollectionAction": "Delete collection",
+      "deleteCollectionTitle": "Delete “{name}”?",
+      "deleteCollectionText": "The local copy will be deleted. The original in Community is not affected."
+    }
+  }
+}

@@ -89,6 +89,7 @@ const i18n = createI18n({
           editOfficialTitle: 'Editar letra/timing (sugestão)',
           editOfficialHint: 'Sua correção é salva localmente e pode ser publicada para o concilio em Minhas Edições.',
           editOfficialSaved: 'Correção salva localmente',
+          editSavedLocal: 'Correção salva localmente — publique em Minhas Edições (Comunidade)',
           audioManaged: 'Áudio/fundo/capa continuam oficiais',
         },
       },

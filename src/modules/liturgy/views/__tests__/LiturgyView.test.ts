@@ -81,7 +81,7 @@ vi.mock('../../composables/useLiturgy', () => ({
 
 import LiturgyView from '../LiturgyView.vue'
 
-vi.mock('../../../settings/components/StagePaletteButton.vue', () => ({ default: { template: '<div data-stub="palette-btn" />' } }))
+vi.mock('../../components/LiturgyAppearanceButton.vue', () => ({ default: { template: '<div data-stub="palette-btn" />' } }))
 vi.mock('@modules/albums/components/AlbumLyricDialog.vue', () => ({ default: { template: '<div data-stub="lyric-dialog" />' } }))
 vi.mock('../../components/LiturgyCloneDialog.vue', () => ({
   default: {
@@ -380,3 +380,46 @@ it('refreshes the music catalog after SLJA import', async () => {
   expect(mockState.refreshMusicCatalog).toHaveBeenCalledOnce();
   wrapper.unmount();
 });
+
+describe('LiturgyView — exportar e importar liturgia', () => {
+  it('os botões de transferir ficam no cabeçalho; exportar baixa o arquivo da semana', async () => {
+    const { buildLiturgyExport } = await import('../../services/liturgy-transfer')
+    const { normalizeLiturgyState } = await import('../../services/liturgy-preferences')
+    mockState.exportLiturgy = vi.fn(() => buildLiturgyExport(normalizeLiturgyState(null)))
+    mockState.setActionMessage = vi.fn()
+    const urls = { createObjectURL: vi.fn(() => 'blob:x'), revokeObjectURL: vi.fn() }
+    vi.stubGlobal('URL', { ...URL, ...urls })
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    try {
+      const w = createWrapper()
+      const meta = w.get('.liturgy-view__meta')
+      expect(meta.find('[data-testid="liturgy-export"]').exists()).toBe(true)
+      expect(meta.find('[data-testid="liturgy-import"]').exists()).toBe(true)
+      await w.get('[data-testid="liturgy-export"]').trigger('click')
+      expect(mockState.exportLiturgy).toHaveBeenCalled()
+      expect(click).toHaveBeenCalled()
+      expect(mockState.setActionMessage).toHaveBeenCalledWith('liturgy.transfer.exported')
+      w.unmount()
+    } finally {
+      vi.unstubAllGlobals()
+      click.mockRestore()
+    }
+  })
+
+  it('importar um arquivo com a semana vazia aplica direto', async () => {
+    const { buildLiturgyExport } = await import('../../services/liturgy-transfer')
+    const { normalizeLiturgyState } = await import('../../services/liturgy-preferences')
+    const data = buildLiturgyExport(normalizeLiturgyState(null))
+    mockState.importLiturgy = vi.fn()
+    mockState.hasLiturgyContent = vi.fn(() => false)
+    mockState.setActionMessage = vi.fn()
+    const w = createWrapper()
+    const input = w.get('[data-testid="liturgy-import-input"]').element as HTMLInputElement
+    Object.defineProperty(input, 'files', { value: [{ text: async () => JSON.stringify(data) }], configurable: true })
+    input.dispatchEvent(new Event('change'))
+    await new Promise((r) => setTimeout(r, 0))
+    await w.vm.$nextTick()
+    expect(mockState.importLiturgy).toHaveBeenCalledWith(data, 'replace')
+    w.unmount()
+  })
+})

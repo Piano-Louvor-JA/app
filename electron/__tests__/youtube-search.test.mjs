@@ -241,3 +241,32 @@ describe('playlist do YouTube', () => {
     expect(await handlers['youtube-search:playlist']({}, undefined)).toMatchObject({ error: 'invalid' })
   })
 })
+
+describe('logo de um canal como imagem embutida (CPB na Central de Mídia)', () => {
+  it('busca a foto do canal (tamanho pequeno) e devolve data URL', async () => {
+    const { fetchYoutubeChannelLogo } = await import('../youtube-search.mjs')
+    const bytes = Buffer.from([0xff, 0xd8, 0xff, 0x01, 0x02])
+    const fetch = vi.fn(async (url) => ({
+      ok: true,
+      headers: { get: () => 'image/jpeg' },
+      arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.length),
+      url,
+    }))
+    const channel = vi.fn(async () => ({
+      channel: { avatar: 'https://yt3.googleusercontent.com/abc=s900-c-k-c0x00ffffff-no-rj' },
+      playlists: [],
+    }))
+    const result = await fetchYoutubeChannelLogo('https://www.youtube.com/@casapublicadora', { fetch, channel })
+    expect(channel).toHaveBeenCalledWith('https://www.youtube.com/@casapublicadora')
+    expect(fetch.mock.calls[0][0]).toBe('https://yt3.googleusercontent.com/abc=s176-c-k-c0x00ffffff-no-rj')
+    expect(result).toEqual({ dataUrl: `data:image/jpeg;base64,${bytes.toString('base64')}` })
+  })
+
+  it('sem foto, host desconhecido ou falha: erro, sem exceção', async () => {
+    const { fetchYoutubeChannelLogo } = await import('../youtube-search.mjs')
+    const fetch = vi.fn(async () => ({ ok: false, headers: { get: () => '' }, arrayBuffer: async () => new ArrayBuffer(0) }))
+    expect(await fetchYoutubeChannelLogo('x', { fetch, channel: async () => ({ channel: null, playlists: [], error: 'network' }) })).toEqual({ dataUrl: '', error: 'no-avatar' })
+    expect(await fetchYoutubeChannelLogo('x', { fetch, channel: async () => ({ channel: { avatar: 'https://evil.example/a.jpg' }, playlists: [] }) })).toEqual({ dataUrl: '', error: 'no-avatar' })
+    expect(await fetchYoutubeChannelLogo('x', { fetch, channel: async () => ({ channel: { avatar: 'https://yt3.ggpht.com/a=s88' }, playlists: [] }) })).toEqual({ dataUrl: '', error: 'network' })
+  })
+})

@@ -42,6 +42,14 @@ const mountRow = (over: Record<string, unknown> = {}) =>
 describe('AlbumTrackRow', () => {
   beforeEach(() => vi.clearAllMocks())
 
+  it('dentro de álbum desativado: linha marcada como desativada, mas o clique ainda toca', async () => {
+    const w = mountRow({ albumDisabled: true })
+    expect(w.classes()).toContain('album-track-row--album-disabled')
+    expect(w.find('.album-track-row__disabled-badge').exists()).toBe(true)
+    await w.trigger('click')
+    expect(w.emitted('sung')).toHaveLength(1)
+  })
+
   it('renderiza número, título, coletânea e duração; sem artwork mostra ícone', () => {
     const w = mountRow()
     expect(w.find('.album-track-row__number').text()).toBe('3')

@@ -6,6 +6,10 @@ import { startSljaMigrationWatch } from '@modules/sync/services/slja-migration-w
 import { useRoute, RouterView } from 'vue-router'
 import { useTheme } from 'vuetify'
 
+import OnboardingDialog from '@modules/onboarding/components/OnboardingDialog.vue'
+import { useOnboarding } from '@modules/onboarding/composables/useOnboarding'
+import { startHeartbeatLoop } from '@modules/telemetry/services/heartbeat-loop'
+import { isDesktopApp } from '@shared/services/desktop-bridge'
 import StartingOverlay from '@modules/starting/components/StartingOverlay.vue'
 import { useStartingStore } from '@modules/starting/stores/useStartingStore'
 import { useThemeManager } from '@design-system/composables'
@@ -24,6 +28,7 @@ const vuetifyTheme = useTheme()
 const { currentTheme } = useThemeManager()
 const startingStore = useStartingStore()
 const { isAppReady } = storeToRefs(startingStore)
+const onboarding = useOnboarding()
 
 const isProjectionWindow = computed(
   () =>
@@ -50,6 +55,21 @@ watch(
   () => currentTheme.value.mode,
   (mode) => {
     void vuetifyTheme.change(mode === 'dark' ? 'dark' : 'light')
+  },
+  { immediate: true },
+)
+
+// Assistente de primeira execução: uma vez por abertura, quando a janela
+// principal fica pronta (depois do splash/first boot). Espelho não abre.
+let onboardingChecked = false
+watch(
+  isAppReady,
+  (ready) => {
+    if (!ready || onboardingChecked || isProjectionWindow.value) return
+    onboardingChecked = true
+    onboarding.start({ isFirstBoot: startingStore.isFirstBoot === true })
+    // Telemetria de dispositivos: sinal de "online" a cada 5 min (só desktop).
+    if (isDesktopApp()) startHeartbeatLoop()
   },
   { immediate: true },
 )
@@ -104,6 +124,7 @@ function handleViewNotes() {
       <RouterView v-if="isAppReady || isProjectionWindow" />
     </div>
     <UpdateDialog v-if="!isProjectionWindow" v-model="showUpdateDialog" />
+    <OnboardingDialog v-if="!isProjectionWindow" />
   </div>
 </template>
 
