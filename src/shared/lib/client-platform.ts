@@ -18,8 +18,18 @@ function detectDesktopPlatform(): string {
 
 export const CLIENT_PLATFORM = detectDesktopPlatform()
 
-const CLIENT_VERSION: string =
-  (typeof import.meta !== 'undefined' && (import.meta.env as Record<string, string>).VITE_APP_VERSION) || ''
+/**
+ * Versão do app: package.json via define do Vite (`__APP_VERSION__`, o mesmo
+ * "v1.37.2" do topo), sem o "v". Antes lia `VITE_APP_VERSION`, que não existe
+ * no projeto — o X-Client-Version nunca era enviado.
+ */
+export function clientVersion(
+  defined: unknown = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '',
+): string {
+  return typeof defined === 'string' ? defined.trim() : ''
+}
+
+const CLIENT_VERSION = clientVersion()
 
 let patched = false
 

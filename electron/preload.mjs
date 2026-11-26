@@ -78,6 +78,8 @@ contextBridge.exposeInMainWorld('__louvorjaDiag', downloadDiagnosticsJson)
 contextBridge.exposeInMainWorld('louvorja', {
   platform: process.platform,
   isElectron: true,
+  // Telemetria de dispositivos: SO legível (o preload em sandbox não tem `os`).
+  systemInfo: () => ipcRenderer.invoke('system:info'),
 
   // Controle remoto (APK via WS :48080): comandos chegam do main.
   monitorShare: {

@@ -8,6 +8,8 @@ import { useTheme } from 'vuetify'
 
 import OnboardingDialog from '@modules/onboarding/components/OnboardingDialog.vue'
 import { useOnboarding } from '@modules/onboarding/composables/useOnboarding'
+import { startHeartbeatLoop } from '@modules/telemetry/services/heartbeat-loop'
+import { isDesktopApp } from '@shared/services/desktop-bridge'
 import StartingOverlay from '@modules/starting/components/StartingOverlay.vue'
 import { useStartingStore } from '@modules/starting/stores/useStartingStore'
 import { useThemeManager } from '@design-system/composables'
@@ -66,6 +68,8 @@ watch(
     if (!ready || onboardingChecked || isProjectionWindow.value) return
     onboardingChecked = true
     onboarding.start({ isFirstBoot: startingStore.isFirstBoot === true })
+    // Telemetria de dispositivos: sinal de "online" a cada 5 min (só desktop).
+    if (isDesktopApp()) startHeartbeatLoop()
   },
   { immediate: true },
 )
