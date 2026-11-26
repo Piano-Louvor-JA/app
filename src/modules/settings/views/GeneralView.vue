@@ -701,6 +701,13 @@ async function clearAllLocalData() {
   overflow: visible;
 }
 
+/* Card do idioma acima dos vizinhos — o popup do <select> nativo no
+   Electron pinta no layer da página e o card seguinte (Libras) o cobria.
+   z-index permanente no card do idioma (barato e estável). */
+.general-settings__card:has(.general-settings__lang-select-native) {
+  z-index: 50;
+}
+
 .general-settings__accent {
   position: absolute;
   top: 0;
