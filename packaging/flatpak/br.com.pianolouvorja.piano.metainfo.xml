@@ -35,6 +35,11 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.38.0" date="2026-11-26">
+      <description>
+        <p>Live Libras sign language interpreter on projection, LibreOffice presentations mirrored on audience screens, interface in 15 languages, first-run setup assistant, official Sabbath School narrations and general fixes.</p>
+      </description>
+    </release>
     <release version="1.37.2" date="2026-11-20">
       <description>
         <p>Account deletion and blocking of community authors, Russian, Ukrainian and French interface, community catalog improvements and general fixes.</p>
