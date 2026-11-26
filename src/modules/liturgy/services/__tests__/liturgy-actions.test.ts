@@ -312,7 +312,9 @@ describe('executeLiturgyItem', () => {
       routerMock,
     )
     expect(result.ok).toBe(true)
-    expect(bridge.presentation.openExternal).toHaveBeenCalledWith('/p.pptx', 'libreoffice')
+    expect(bridge.presentation.openExternal).toHaveBeenCalledWith('/p.pptx', 'libreoffice', {
+      monitorIds: expect.any(Array),
+    })
   })
 
   it('presentation auto sem office: presentationOfficeMissing', async () => {
@@ -328,7 +330,7 @@ describe('executeLiturgyItem', () => {
     expect(result).toEqual({ ok: false, messageKey: 'liturgy.messages.presentationOfficeMissing' })
   })
 
-  it('presentation auto com office: abre controle interno', async () => {
+  it('presentation auto com office: abre já projetando nas telas', async () => {
     mocks.getDesktopBridge.mockReturnValue({
       presentation: { detectOffice: vi.fn(async () => true) },
     } as never)
@@ -337,7 +339,25 @@ describe('executeLiturgyItem', () => {
       routerMock,
     )
     expect(result.ok).toBe(true)
-    expect(mocks.openLiturgyLocalPresentationControl).toHaveBeenCalled()
+    expect(mocks.playLiturgyLocalPresentationOnScreens).toHaveBeenCalled()
+    expect(mocks.openLiturgyLocalPresentationControl).not.toHaveBeenCalled()
+  })
+
+  it('presentation .odt com engine externa: projeta pelo app (Writer não tem slideshow)', async () => {
+    const bridge = {
+      presentation: {
+        openExternal: vi.fn(async () => ({ ok: true })),
+        detectOffice: vi.fn(async () => true),
+      },
+    }
+    mocks.getDesktopBridge.mockReturnValue(bridge as never)
+    const result = await executeLiturgyItem(
+      litItem({ type: 'presentation', filePath: '/avisos.odt', presentationEngine: 'libreoffice' }),
+      routerMock,
+    )
+    expect(result.ok).toBe(true)
+    expect(bridge.presentation.openExternal).not.toHaveBeenCalled()
+    expect(mocks.playLiturgyLocalPresentationOnScreens).toHaveBeenCalled()
   })
 
   it('site ok: abre controle', async () => {

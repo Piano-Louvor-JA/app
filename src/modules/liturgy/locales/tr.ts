@@ -1,6 +1,6 @@
 export default {
   "liturgy": {
-  "fileFilters": { "video": "Videolar", "all": "Tümü" },
+  "fileFilters": { "video": "Videolar", "presentation": "Sunumlar (PowerPoint/LibreOffice)", "all": "Tümü" },
   "fallback": { "music": "Müzik", "video": "Video", "audio": "Ses" },
     "title": "Ayin Liturjisi",
     "subtitle": "Ayin düzeni",

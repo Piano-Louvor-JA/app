@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import {
   buildDraftFromDroppedPaths,
   detectLiturgyFileType,
+  isPresentationPath,
+  PRESENTATION_EXTENSIONS,
   titleFromFilePath,
 } from '../liturgy-file-detect'
 
@@ -14,6 +16,18 @@ describe('liturgy-file-detect', () => {
     expect(detectLiturgyFileType('liturgia.pdf')).toBe('pdf')
     expect(detectLiturgyFileType('slides.PPTX')).toBe('presentation')
     expect(detectLiturgyFileType('texto.docx')).toBe('other_files')
+  })
+
+  it('aceita arquivos do LibreOffice e de slideshow como apresentação', () => {
+    expect(detectLiturgyFileType('/home/u/culto.odp')).toBe('presentation')
+    expect(detectLiturgyFileType('C:\\docs\\Avisos.ODT')).toBe('presentation')
+    expect(detectLiturgyFileType('abertura.ppsx')).toBe('presentation')
+    expect(detectLiturgyFileType('abertura.pps')).toBe('presentation')
+    expect(isPresentationPath(' /a/culto.odp ')).toBe(true)
+    expect(isPresentationPath('/a/culto.odp.bak')).toBe(false)
+    expect(PRESENTATION_EXTENSIONS).toEqual(
+      expect.arrayContaining(['ppt', 'pptx', 'odp', 'odt']),
+    )
   })
 
   it('titleFromFilePath remove extensão e sufixo de YouTube', () => {

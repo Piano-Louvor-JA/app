@@ -161,7 +161,7 @@ describe('liturgy-actions — mata mutantes OptionalChaining/MethodExpression/re
         const result = await executeLiturgyItem(presItem({ presentationEngine: 'libreoffice' }))
         expect(result.ok).toBe(true)
         expect(bridge.presentation.getEngine).not.toHaveBeenCalled()
-        expect(bridge.presentation.openExternal).toHaveBeenCalledWith('/tmp/d.pptx', 'libreoffice')
+        expect(bridge.presentation.openExternal).toHaveBeenCalledWith('/tmp/d.pptx', 'libreoffice', { monitorIds: [] })
       })
     })
 
