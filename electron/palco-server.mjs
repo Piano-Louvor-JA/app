@@ -29,7 +29,7 @@ import { createServer } from 'node:http'
 import { networkInterfaces } from 'node:os'
 import { createHash } from 'node:crypto'
 import path from 'node:path'
-import { readFile } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
@@ -140,6 +140,8 @@ class PalcoSlot {
   // recarga: aba de navegador presa na página antiga recarrega uma vez só.
   #announcedClients = new WeakSet()
   #reloadAsked = new WeakSet()
+  /** mtime do receiver.html — abas/OBS com build antiga recarregam 1×. */
+  #receiverBuild = ''
   #running = false
   #media = new Map() // mídia local servida em /media/
   #contents // callback pro renderer
@@ -345,6 +347,10 @@ class PalcoSlot {
     if (this.#httpServer?.listening) return
     if (this.#preparing) return this.#preparing
     this.#preparing = (async () => {
+      try {
+        const info = await stat(path.join(__dirname, 'palco', 'receiver.html'))
+        this.#receiverBuild = String(Math.trunc(info.mtimeMs))
+      } catch { /* bundle sem receiver: build fica vazio */ }
       const server = createServer((req, res) => { void this.handleHttp(req, res) })
       const host = networkBinding().listenHost
       this.#httpServer = server
@@ -415,6 +421,12 @@ class PalcoSlot {
             if (message.type === 'caps' && PAGES.has(message.page) && this.#clientInfo.has(ws)) {
               this.#clientInfo.set(ws, { ...this.#clientInfo.get(ws), page: message.page })
               this.#notifyClients()
+              // Espelho/OBS/retorno: se a aba ficou com HTML antigo após o app
+              // reiniciar, força 1 reload (WS reconecta sem recarregar a página).
+              if (this.#receiverBuild && message.rxBuild !== this.#receiverBuild && !this.#reloadAsked.has(ws)) {
+                this.#reloadAsked.add(ws)
+                this.#sendTo(ws, { v: 2, type: 'obsControl', action: 'reload', requestId: this.#receiverBuild })
+              }
             }
             if (Array.isArray(message.caps) && message.caps.includes('frameView')) this.#frameViewClients.add(ws)
             if (message.type === 'hello' && message.role === 'tv') this.#announcedClients.add(ws)
@@ -647,13 +659,20 @@ class PalcoSlot {
     // Receiver embutido (mesma página do palco-receiver): /espelho replica a TV; em /retorno vira o retorno de palco
     if (p === '/' || p === '/receiver.html' || p === '/index.html' || p === '/espelho' || p === '/retorno') {
       try {
-        const page = await readFile(path.join(__dirname, 'palco', 'receiver.html'))
+        const file = path.join(__dirname, 'palco', 'receiver.html')
+        const [page, info] = await Promise.all([readFile(file), stat(file)])
+        this.#receiverBuild = String(Math.trunc(info.mtimeMs))
+        // Carimbo de build: o cliente compara no caps e recarrega se divergir.
+        const html = page.toString('utf8').replace(
+          '<head>',
+          `<head><script>window.__PALCO_RX_BUILD__='${this.#receiverBuild}'</script>`,
+        )
         // Versão do RECEIVER (appinfo.json embutido, mesmo do .ipk webOS) —
         // o HTML resolve via fetch. NÃO usar a versão do app desktop aqui.
         res.setHeader('Content-Type', 'text/html; charset=utf-8')
         // Receiver sempre revalida — evita browser preso em HTML antigo
         res.setHeader('Cache-Control', 'no-store')
-        res.end(page)
+        res.end(html)
       } catch {
         res.statusCode = 404
         res.end('receiver not bundled')

@@ -96,15 +96,25 @@
      width FIXO restaura o véu largo — o fit-content do .box-on é só
      para MÍDIA (música), Bíblia NÃO (14/10 Rafael). */
   #text.bible-box{padding:2vh 3.8vh;width:92vw;max-height:72vh}
-  /* Entrada do versículo novo. translate/scale individuais somam ao transform
+  /* Entrada do slide/versículo. translate/scale individuais somam ao transform
      que posiciona o #text; motores antigos ignoram e ficam só com o fade. */
   @keyframes rxEnterFade{from{opacity:0}}
   @keyframes rxEnterSlide{from{opacity:0;translate:0 4vh}}
   @keyframes rxEnterZoom{from{opacity:0;scale:.94}}
+  @keyframes rxGhostOutFade{to{opacity:0}}
+  @keyframes rxGhostOutSlide{to{opacity:0;translate:0 -2vh}}
+  @keyframes rxGhostOutZoom{to{opacity:0;scale:1.03}}
   .rx-enter-fade{animation:rxEnterFade var(--rx-ms,250ms) ease-out both}
   .rx-enter-slide{animation:rxEnterSlide var(--rx-ms,250ms) ease-out both}
   .rx-enter-zoom{animation:rxEnterZoom var(--rx-ms,250ms) ease-out both}
-  @media (prefers-reduced-motion:reduce){.rx-enter-slide,.rx-enter-zoom{animation-name:rxEnterFade}}
+  .rx-ghost{position:fixed;margin:0;transform:none;pointer-events:none;z-index:6}
+  .rx-ghost-leave-fade{animation:rxGhostOutFade var(--rx-ms,250ms) ease-in both}
+  .rx-ghost-leave-slide{animation:rxGhostOutSlide var(--rx-ms,250ms) ease-in both}
+  .rx-ghost-leave-zoom{animation:rxGhostOutZoom var(--rx-ms,250ms) ease-in both}
+  @media (prefers-reduced-motion:reduce){
+    .rx-enter-slide,.rx-enter-zoom{animation-name:rxEnterFade}
+    .rx-ghost-leave-slide,.rx-ghost-leave-zoom{animation-name:rxGhostOutFade}
+  }
 
   #footer{position:fixed;bottom:4vh;left:0;right:0;text-align:center;
     font-size:2.6vh;font-weight:300;opacity:1;letter-spacing:.02em}
@@ -2781,11 +2791,27 @@ function applyStageReturn(m){
   const slide=Number(m.slideIndex),ratio=Math.min(1,Math.max(0,Number(m.progress)||0));
   const canPromote=sr.active&&slide===sr.slide+1&&current.length>0&&current===sr.next&&!cover&&!sr.cover;
   const slideChanged=!sr.active||slide!==sr.slide;
+  const configured=m.transition==='fade'||m.transition==='slide'||m.transition==='zoom'?m.transition:null;
+  const contentChanged=current!==sr.current||String(m.next||'')!==sr.next||cover!==sr.cover||(m.nextIsCover===true)!==sr.nextCover;
   sr.active=true;sr.slide=slide;
   srSyncBar(ratio,slideChanged);
-  if(canPromote)void srPromote(m);
+  // Transições de slides ligadas: snap + rx-enter-*; desligadas: flyer srPromote.
+  if(configured){
+    if(canPromote||contentChanged||sr.busy)srSnap(m);
+    if(canPromote||contentChanged){
+      const ms=Number(m.transitionMs);
+      const lyric=srLyric(),title=q('.stage-return__title'),nextLyric=q('.stage-return__next-lyric');
+      [lyric,title,nextLyric].forEach(function(el){
+        if(!el||el.hidden)return;
+        el.classList.remove('rx-enter-fade','rx-enter-slide','rx-enter-zoom');
+        el.style.setProperty('--rx-ms',(Number.isFinite(ms)&&ms>=0&&ms<=2000?ms:250)+'ms');
+        void el.offsetWidth;
+        el.classList.add('rx-enter-'+configured);
+      });
+    }
+  }else if(canPromote)void srPromote(m);
   else if(sr.busy){if(current!==sr.flyerText||cover)srSnap(m)}
-  else if(current!==sr.current||String(m.next||'')!==sr.next||cover!==sr.cover||(m.nextIsCover===true)!==sr.nextCover)srSnap(m);
+  else if(contentChanged)srSnap(m);
   q('.stage-return__bar-fill').style.backgroundColor=stageReturnColor(s.barColor);
   root.style.backgroundColor=stageReturnColor(s.backgroundColor);
   const bg=typeof m.background==='string'&&/^https?:\/\//i.test(m.background)?m.background:'';
@@ -2880,22 +2906,67 @@ function footerPosition(m){
   const p=m&&m.footerPosition;
   return p==='below-left'||p==='below-center'||p==='below-right'||p==='corner'?p:null;
 }
-// Transição do versículo: só anima quando o texto muda; sem o campo (APK), troca seca.
+// Transição Bíblia/hinos (espelho/OBS/TV): só anima quando o texto muda;
+// sem o campo (APK ou transições desligadas), troca seca.
 let lastBibleVerse='';
-function bibleEnter(m){
-  const kind=m.scope==='bible'&&(m.transition==='fade'||m.transition==='slide'||m.transition==='zoom')?m.transition:null;
-  const verse=m.scope==='bible'?String(m.text||'')+'|'+String(m.footerRef||''):'';
+function projectionEnterKind(m){
+  const scoped=m.scope==='bible'||m.scope==='hymns'||m.scope==='media'||m.scope==='hymn';
+  if(!scoped)return null;
+  return m.transition==='fade'||m.transition==='slide'||m.transition==='zoom'?m.transition:null;
+}
+function projectionEnterKey(m){
+  const scoped=m.scope==='bible'||m.scope==='hymns'||m.scope==='media'||m.scope==='hymn';
+  return scoped
+    ? String(m.scope||'')+'|'+String(m.text||'')+'|'+String(m.footerRef||'')+'|'+(m.isCover===true?'1':'0')
+    : '';
+}
+/** Clona o texto atual num fantasma fixo p/ saída (paridade out-in do Vue). */
+function snapshotProjectionGhost(el){
+  if(!el||!el.innerHTML||el.style.display==='none')return null;
+  const r=el.getBoundingClientRect();
+  if(!(r.width>2&&r.height>2))return null;
+  const g=el.cloneNode(true);
+  g.removeAttribute('id');
+  g.classList.add('rx-ghost');
+  Object.assign(g.style,{
+    position:'fixed',left:r.left+'px',top:r.top+'px',width:r.width+'px',
+    margin:'0',transform:'none',zIndex:'6',pointerEvents:'none',
+  });
+  (el.parentNode||document.body).appendChild(g);
+  return g;
+}
+function dismissProjectionGhost(ghost,kind,ms){
+  if(!ghost)return;
+  const dur=Number.isFinite(ms)&&ms>=0&&ms<=2000?ms:250;
+  ghost.style.setProperty('--rx-ms',dur+'ms');
+  ghost.classList.remove('rx-ghost-leave-fade','rx-ghost-leave-slide','rx-ghost-leave-zoom');
+  void ghost.offsetWidth;
+  ghost.classList.add('rx-ghost-leave-'+(kind||'fade'));
+  const done=function(){try{ghost.remove()}catch(e){}};
+  ghost.addEventListener('animationend',done,{once:true});
+  setTimeout(done,dur+80);
+}
+function bibleEnter(m,ghost){
+  const kind=projectionEnterKind(m);
+  const verse=projectionEnterKey(m);
   const changed=verse!==lastBibleVerse;
   lastBibleVerse=verse;
-  if(kind&&!changed)return;
+  if(kind&&!changed){if(ghost)try{ghost.remove()}catch(e){}return;}
   const ms=Number(m.transitionMs);
+  const dur=Number.isFinite(ms)&&ms>=0&&ms<=2000?ms:250;
+  if(kind&&changed)dismissProjectionGhost(ghost,kind,dur);
+  else if(ghost)try{ghost.remove()}catch(e){}
   ['text','footer'].forEach(function(id){
     const el=$(id);if(!el)return;
     el.classList.remove('rx-enter-fade','rx-enter-slide','rx-enter-zoom');
     if(!kind)return;
-    el.style.setProperty('--rx-ms',(Number.isFinite(ms)&&ms>=0&&ms<=2000?ms:250)+'ms');
+    el.style.setProperty('--rx-ms',dur+'ms');
     void el.offsetWidth;
     el.classList.add('rx-enter-'+kind);
+    // WAAPI (só opacity): reforço p/ OBS/CEF que às vezes não disparam a classe.
+    try{
+      if(typeof el.animate==='function')el.animate([{opacity:0},{opacity:1}],{duration:dur,easing:'ease-out'});
+    }catch(e){}
   });
 }
 // Conexões diretas: somente IPv4 de LAN/loopback e localhost, nunca DNS público.
@@ -3128,7 +3199,7 @@ function doConnect(){
     // Avisa que aplica o zoom de imagem/PDF sozinho (frameView): o app manda
     // só zoom + posição, em vez de reenviar o quadro recortado.
     // e qual página é esta aba (Aparelhos conectados mostra espelho/retorno)
-    try{ws.send(JSON.stringify({v:2,type:'caps',caps:['frameView','heartbeat'],page:stageReturnMode?'retorno':'espelho'}))}catch(e){}
+    try{ws.send(JSON.stringify({v:2,type:'caps',caps:['frameView','heartbeat'],page:stageReturnMode?'retorno':'espelho',rxBuild:window.__PALCO_RX_BUILD__||''}))}catch(e){}
     if(window.__hideSplash)window.__hideSplash(); // F3.3j: splash sai no connect
     localStorage.setItem('palcoHost',host);
     localStorage.setItem('palcoPort',port)};
@@ -3829,7 +3900,7 @@ function handle(m){
   if(youtubeId&&['projection','timer','clock','audio','idle','bgPalco','stop-all'].includes(m.type))stopYoutube();
   switch(m.type){
     case 'projection':
-      document.documentElement.classList.toggle('obs-music',m.scope==='media'||m.scope==='hymns');
+      document.documentElement.classList.toggle('obs-music',m.scope==='media'||m.scope==='hymns'||m.scope==='hymn');
       hideIdle();
       hideCloudPair();
       hideNp();
@@ -3856,10 +3927,14 @@ function handle(m){
       // Slide/PDF/PPT (text vazio) é mídia visual pura: sem véu de leitura,
       // preserva a tonalidade original do canvas do operador.
       $('veil').style.display=m.text?'':'none';
-      const compactLyrics=(m.scope==='hymns'||m.scope==='media')&&m.isCover!==true;
+      const compactLyrics=(m.scope==='hymns'||m.scope==='media'||m.scope==='hymn')&&m.isCover!==true;
       const displayText=compactLyrics?String(m.text||'').replace(/(?:<br\s*\/?>|\r?\n)(?:[\t ]*(?:<br\s*\/?>|\r?\n))*/gi,'<br>'):m.text;
+      // Fantasma do texto atual ANTES de trocar — saída + entrada (out-in).
+      const enterKind=projectionEnterKind(m);
+      const enterChanged=projectionEnterKey(m)!==lastBibleVerse;
+      const projectionGhost=enterKind&&enterChanged?snapshotProjectionGhost($('text')):null;
       renderProjectionText($('text'),displayText);
-      $('text').classList.toggle('music-lyrics',(m.scope==='hymns'||m.scope==='media')&&m.isCover!==true);
+      $('text').classList.toggle('music-lyrics',(m.scope==='hymns'||m.scope==='media'||m.scope==='hymn')&&m.isCover!==true);
       $('text').classList.toggle('cover-on',m.isCover===true);
       applyHymnNumber($('text'),m);
       applyHymnalName($('text'),m);
@@ -4029,7 +4104,7 @@ function handle(m){
       // Label de versão some durante projection com referência (colidia no
       // canto inferior direito — print 02/09 Rafael).
       {const iv=$('idleVer');if(iv)iv.style.display=m.footerRef?'none':''}
-      bibleEnter(m);
+      bibleEnter(m,projectionGhost);
       break;
     case 'bgPalco':
       // BG permanente do palco (idle) — personalização, não da música

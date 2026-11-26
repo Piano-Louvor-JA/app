@@ -131,14 +131,59 @@ describe('receiver — transição ao trocar versículo', () => {
     expect(text().style.getPropertyValue('--rx-ms')).toBe(before)
   })
 
-  it('nenhuma, sem o campo (APK) ou fora da Bíblia: troca seca', async () => {
+  it('nenhuma ou sem o campo (APK): troca seca', async () => {
     await next({ transition: 'none' })
     expect(enterClasses(text())).toEqual([])
     await next({ transition: 'fade', transitionMs: 250 })
     await next({})
     expect(enterClasses(text())).toEqual([])
     expect(enterClasses(footer())).toEqual([])
-    await next({ scope: 'hymns', transition: 'fade', transitionMs: 250 })
+  })
+
+  it('hinos (espelho/OBS): slide novo entra com a transição escolhida', async () => {
+    await next({
+      scope: 'hymns',
+      text: 'Primeira estrofe',
+      footerRef: '',
+      transition: 'fade',
+      transitionMs: 250,
+    })
+    expect(enterClasses(text())).toEqual(['rx-enter-fade'])
+    expect(text().style.getPropertyValue('--rx-ms')).toBe('250ms')
+
+    await next({
+      scope: 'hymns',
+      text: 'Segunda estrofe',
+      footerRef: '',
+      transition: 'slide',
+      transitionMs: 150,
+    })
+    expect(enterClasses(text())).toEqual(['rx-enter-slide'])
+    expect(text().style.getPropertyValue('--rx-ms')).toBe('150ms')
+  })
+
+  it('hinos: mesma letra reenviada não reinicia a animação', async () => {
+    await next({
+      scope: 'hymns',
+      text: 'Mesma estrofe',
+      footerRef: '',
+      transition: 'zoom',
+      transitionMs: 250,
+    })
+    const before = text().style.getPropertyValue('--rx-ms')
+    await project({
+      scope: 'hymns',
+      text: 'Mesma estrofe',
+      footerRef: '',
+      transition: 'zoom',
+      transitionMs: 450,
+    })
+    expect(enterClasses(text())).toEqual(['rx-enter-zoom'])
+    expect(text().style.getPropertyValue('--rx-ms')).toBe(before)
+  })
+
+  it('hinos sem transition (desligada): troca seca', async () => {
+    await next({ scope: 'hymns', text: 'Estrofe sem transição', footerRef: '' })
     expect(enterClasses(text())).toEqual([])
   })
 
