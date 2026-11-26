@@ -7,6 +7,9 @@ export default {
       "filter": "Filtrar álbumes",
       "count": "{count} desactivado(s)",
       "badge": "Álbum desactivado",
+      "disableConfirmTitle": "¿Desactivar “{name}”?",
+      "disableConfirmMessage": "Las canciones de este álbum aparecen atenuadas en la búsqueda y el selector las salta. Puede reactivarlo después con el ojo del card.",
+      "disableConfirmYes": "Desactivar",
       "enable": "Activar álbum",
       "disable": "Desactivar álbum"
     },

@@ -7,6 +7,9 @@ export default {
       "filter": "Filter albums",
       "count": "{count} turned off",
       "badge": "Album turned off",
+      "disableConfirmTitle": "Turn off “{name}”?",
+      "disableConfirmMessage": "Songs from this album show greyed out in search and the selector skips them. You can turn it back on later with the eye on the card.",
+      "disableConfirmYes": "Turn off",
       "enable": "Turn album on",
       "disable": "Turn album off"
     },

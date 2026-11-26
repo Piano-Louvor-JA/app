@@ -96,6 +96,9 @@ export default {
       "count": "已停用 {count} 个",
       "description": "停用不使用的专辑（例如旧版赞美诗）。其歌曲在搜索中显示为灰色，Enter 键和方向键会跳过它们。也可以在媒体中心的专辑卡片上停用。",
       "disable": "停用专辑",
+      "disableConfirmTitle": "停用“{name}”？",
+      "disableConfirmMessage": "该专辑的歌曲在搜索中会变灰，选择器会跳过它们。之后可在卡片上用眼睛图标重新启用。",
+      "disableConfirmYes": "停用",
       "enable": "启用专辑",
       "filter": "筛选专辑",
       "title": "启用的专辑"

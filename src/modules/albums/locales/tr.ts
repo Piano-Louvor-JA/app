@@ -96,6 +96,9 @@ export default {
       "count": "{count} kapalı",
       "description": "Kullanmadığınız albümleri kapatın (örneğin eski ilahi kitabı). Şarkıları aramada soluk görünür; Enter ve ok tuşları bunları atlar. Albümü Medya Merkezi'ndeki kartından da kapatabilirsiniz.",
       "disable": "Albümü kapat",
+      "disableConfirmTitle": "“{name}” kapatılsın mı?",
+      "disableConfirmMessage": "Bu albümün şarkıları aramada soluk görünür ve seçici onları atlar. Sonra karttaki göz ile yeniden açabilirsiniz.",
+      "disableConfirmYes": "Kapat",
       "enable": "Albümü aç",
       "filter": "Albümleri filtrele",
       "title": "Etkin albümler"

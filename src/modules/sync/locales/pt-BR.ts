@@ -25,7 +25,7 @@ export default {
       cpbYoutubeName: 'Hinário Adventista - CPB',
       cpbYoutubeSubtitle: 'Novo Hinário Adventista em vídeo · Casa Publicadora Brasileira',
       edition1996Name: 'Hinário Adventista - Edição 1996',
-      officialSubtitle: '{count} hinos com partituras e letras',
+      officialSubtitle: '{count} hinos com letras',
       edition1996Subtitle: 'Histórico - {count} hinos tradicionais',
     },
     progress: {

@@ -96,6 +96,9 @@ export default {
       "count": "無効：{count}",
       "description": "使わないアルバム（古い讃美歌集など）を無効にします。その曲は検索で薄く表示され、Enterキーと矢印キーでスキップされます。メディアセンターのアルバムカードからも無効にできます。",
       "disable": "アルバムを無効にする",
+      "disableConfirmTitle": "「{name}」を無効にしますか？",
+      "disableConfirmMessage": "このアルバムの曲は検索で薄く表示され、セレクターはスキップします。カードの目のアイコンで後から戻せます。",
+      "disableConfirmYes": "無効にする",
       "enable": "アルバムを有効にする",
       "filter": "アルバムを絞り込む",
       "title": "有効なアルバム"

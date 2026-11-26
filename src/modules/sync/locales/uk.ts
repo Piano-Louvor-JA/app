@@ -22,7 +22,7 @@ export default {
     },
     "hymnal": {
       "edition1996Name": "Адвентистський збірник гімнів — видання 1996",
-      "officialSubtitle": "{count} гімнів з нотами та текстами",
+      "officialSubtitle": "{count} гімнів з текстами",
       "edition1996Subtitle": "Історичне видання — {count} традиційних гімнів",
       "cpbYoutubeName": "Hinário Adventista - CPB",
       "cpbYoutubeSubtitle": "Новий адвентистський збірник гімнів на відео · Casa Publicadora Brasileira"

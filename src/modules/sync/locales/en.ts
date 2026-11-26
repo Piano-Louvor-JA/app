@@ -24,7 +24,7 @@ export default {
       "cpbYoutubeName": "Adventist Hymnal - CPB",
       "cpbYoutubeSubtitle": "New Adventist Hymnal on video · Casa Publicadora Brasileira",
       "edition1996Name": "Adventist Hymnal - 1996 Edition",
-      "officialSubtitle": "{count} hymns with sheet music and lyrics",
+      "officialSubtitle": "{count} hymns with lyrics",
       "edition1996Subtitle": "Historic - {count} traditional hymns"
     },
     "progress": {

@@ -96,6 +96,9 @@ export default {
       "count": "비활성 {count}개",
       "description": "사용하지 않는 앨범(예: 이전 찬송가)을 끄세요. 해당 곡은 검색에서 흐리게 표시되고 Enter와 화살표 키가 건너뜁니다. 미디어 센터의 앨범 카드에서도 끌 수 있습니다.",
       "disable": "앨범 끄기",
+      "disableConfirmTitle": "“{name}”을(를) 끌까요?",
+      "disableConfirmMessage": "이 앨범의 곡은 검색에서 흐리게 보이고 선택기가 건너뜁니다. 나중에 카드의 눈 아이콘으로 다시 켤 수 있습니다.",
+      "disableConfirmYes": "끄기",
       "enable": "앨범 켜기",
       "filter": "앨범 필터",
       "title": "사용 중인 앨범"

@@ -171,6 +171,8 @@ const busyMusicId = ref<number | null>(null)
 const playlistItem = ref<PlaylistItem | null>(null)
 const playlistFeedback = ref('')
 const albumPendingRemoval = ref<LibraryAlbum | null>(null)
+/** Confirmação ao desativar álbum/coletânea pelo olho do card. */
+const albumPendingDisable = ref<AlbumCollection | null>(null)
 
 let playlistFeedbackTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -530,6 +532,27 @@ async function confirmRemove() {
   if (!album) return
   albumPendingRemoval.value = null
   await removeCollection(album.id)
+}
+
+function albumDisableLabel(collection: AlbumCollection): string {
+  if (collection.id === 'hymnal_1996') return t('sync.hymnal.edition1996Name')
+  return collection.name
+}
+
+/** Desativar pede confirmação; reativar é direto. */
+function requestToggleDisabled(collection: AlbumCollection) {
+  if (isAlbumDisabled(collection.id)) {
+    setAlbumDisabled(collection.id, false)
+    return
+  }
+  albumPendingDisable.value = collection
+}
+
+function confirmDisableAlbum() {
+  const collection = albumPendingDisable.value
+  albumPendingDisable.value = null
+  if (!collection) return
+  setAlbumDisabled(collection.id, true)
 }
 
 async function runAction(
@@ -1042,7 +1065,7 @@ async function runAction(
             @download="downloadCollection(collection.id)"
             @cancel="cancelCollection(collection.id)"
             @remove="requestRemove(collection)"
-            @toggle-disabled="setAlbumDisabled(collection.id, !isAlbumDisabled(collection.id))"
+            @toggle-disabled="requestToggleDisabled(collection)"
           />
           <AlbumHymnalCard
             v-if="youtubeHymnal"
@@ -1072,7 +1095,7 @@ async function runAction(
               @download="downloadCollection(collection.id)"
               @cancel="cancelCollection(collection.id)"
               @remove="requestRemove(collection)"
-              @toggle-disabled="setAlbumDisabled(collection.id, !isAlbumDisabled(collection.id))"
+              @toggle-disabled="requestToggleDisabled(collection)"
             />
           </div>
         </GlassCard>
@@ -1195,6 +1218,17 @@ async function runAction(
       :message="t('albums.playlists.removeTrackMessage', { title: pendingTrackRemoval?.title ?? '', name: pendingTrackRemoval?.name ?? '' })"
       :confirm-label="t('albums.playlists.removeTrackConfirm')" :cancel-label="t('common.cancel')"
       @cancel="pendingTrackRemoval = null" @confirm="confirmTrackRemoval" />
+    <AppConfirm
+      :open="albumPendingDisable !== null"
+      :z-index="150"
+      danger
+      :title="t('albums.disabledAlbums.disableConfirmTitle', { name: albumPendingDisable ? albumDisableLabel(albumPendingDisable) : '' })"
+      :message="t('albums.disabledAlbums.disableConfirmMessage')"
+      :confirm-label="t('albums.disabledAlbums.disableConfirmYes')"
+      :cancel-label="t('common.cancel')"
+      @cancel="albumPendingDisable = null"
+      @confirm="confirmDisableAlbum"
+    />
   </section>
 </template>
 
@@ -1619,7 +1653,7 @@ async function runAction(
 .albums-view__hymnal-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 1.25rem;
+  gap: 0.75rem;
 
   @media (min-width: 768px) {
     grid-template-columns: repeat(2, minmax(0, 1fr));

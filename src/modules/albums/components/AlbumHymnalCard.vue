@@ -76,147 +76,162 @@ watch(coverSrc, () => {
     :class="{ 'album-hymnal-card--downloaded': isDownloaded, 'album-hymnal-card--disabled': canDisable && disabled }"
     :padding="false"
   >
-    <div
-      v-if="showDownloadControls && isDownloaded"
-      class="album-hymnal-card__badge"
-    >
-      <i
-        class="ti ti-check"
+    <div class="album-hymnal-card__main">
+      <button
+        type="button"
+        class="album-hymnal-card__cover-btn"
+        tabindex="-1"
         aria-hidden="true"
-      />
-      <span>{{ t('sync.downloaded') }}</span>
-    </div>
-
-    <button
-      v-if="canDisable"
-      type="button"
-      class="album-card-disable album-hymnal-card__disable"
-      :aria-pressed="disabled ? 'true' : 'false'"
-      :title="t(disabled ? 'albums.disabledAlbums.enable' : 'albums.disabledAlbums.disable')"
-      :aria-label="t(disabled ? 'albums.disabledAlbums.enable' : 'albums.disabledAlbums.disable')"
-      @click.stop="emit('toggle-disabled')"
-    >
-      <i class="ti" :class="disabled ? 'ti-eye-off' : 'ti-eye'" aria-hidden="true" />
-    </button>
-
-    <button
-      type="button"
-      class="album-hymnal-card__open"
-      :aria-label="displayName"
-      @click="emit('open')"
-    >
-      <div
-        class="album-hymnal-card__cover"
-        :class="{
-          'album-hymnal-card__cover--muted':
-            showDownloadControls && (status === 'idle' || status === 'error'),
-        }"
+        @click="emit('open')"
       >
-        <img
-          v-if="coverSrc && !coverFailed"
-          class="album-hymnal-card__cover-img"
-          :src="coverSrc"
-          alt=""
-          @error="coverFailed = true"
+        <div
+          class="album-hymnal-card__cover"
+          :class="{
+            'album-hymnal-card__cover--muted':
+              showDownloadControls && (status === 'idle' || status === 'error'),
+          }"
         >
-        <i
-          v-else
-          class="ti album-hymnal-card__fallback-icon"
-          :class="coverIcon"
-          aria-hidden="true"
-        />
-      </div>
-
-      <div class="album-hymnal-card__body">
-        <h4 class="album-hymnal-card__name">
-          {{ displayName }}
-        </h4>
-
-        <template v-if="showDownloadControls && status === 'downloading'">
-          <div class="album-hymnal-card__progress-meta">
-            <span>{{ subtitle }}</span>
-            <span>{{ progress }}%</span>
-          </div>
-          <div
-            class="album-hymnal-card__track"
-            aria-hidden="true"
+          <img
+            v-if="coverSrc && !coverFailed"
+            class="album-hymnal-card__cover-img"
+            :src="coverSrc"
+            alt=""
+            @error="coverFailed = true"
           >
-            <div
-              class="album-hymnal-card__fill"
-              :style="{ width: `${progress}%` }"
-            />
-          </div>
-        </template>
+          <i
+            v-else
+            class="ti album-hymnal-card__fallback-icon"
+            :class="coverIcon"
+            aria-hidden="true"
+          />
+        </div>
+      </button>
 
-        <p
-          v-else-if="subtitle"
-          class="album-hymnal-card__subtitle"
+      <div class="album-hymnal-card__content">
+        <button
+          type="button"
+          class="album-hymnal-card__open"
+          :aria-label="displayName"
+          @click="emit('open')"
         >
-          {{ subtitle }}
-        </p>
-        <span v-if="canDisable && disabled" class="album-card-disabled-label">
-        <i class="ti ti-eye-off" aria-hidden="true" />
-        {{ t('albums.disabledAlbums.badge') }}
-      </span>
+          <h4 class="album-hymnal-card__name">
+            {{ displayName }}
+          </h4>
+
+          <template v-if="showDownloadControls && status === 'downloading'">
+            <div class="album-hymnal-card__progress-meta">
+              <span>{{ subtitle }}</span>
+              <span>{{ progress }}%</span>
+            </div>
+            <div
+              class="album-hymnal-card__track"
+              aria-hidden="true"
+            >
+              <div
+                class="album-hymnal-card__fill"
+                :style="{ width: `${progress}%` }"
+              />
+            </div>
+          </template>
+
+          <p
+            v-else-if="subtitle"
+            class="album-hymnal-card__subtitle"
+          >
+            {{ subtitle }}
+          </p>
+          <span v-if="canDisable && disabled" class="album-card-disabled-label">
+            <i class="ti ti-eye-off" aria-hidden="true" />
+            {{ t('albums.disabledAlbums.badge') }}
+          </span>
+        </button>
+
+        <div
+          v-if="showDownloadControls || canDisable"
+          class="album-hymnal-card__footer"
+        >
+        <div
+          v-if="showDownloadControls && isDownloaded"
+          class="album-hymnal-card__badge"
+        >
+          <i
+            class="ti ti-check"
+            aria-hidden="true"
+          />
+          <span>{{ t('sync.downloaded') }}</span>
+        </div>
+
+        <div
+          v-if="showDownloadControls"
+          class="album-hymnal-card__actions"
+        >
+          <button
+            v-if="status === 'downloading'"
+            type="button"
+            class="album-hymnal-card__cancel"
+            @click="emit('cancel')"
+          >
+            <i
+              class="ti ti-x"
+              aria-hidden="true"
+            />
+            {{ t('sync.cancel') }}
+          </button>
+
+          <button
+            v-else-if="status === 'idle'"
+            type="button"
+            class="album-hymnal-card__action album-hymnal-card__action--download"
+            @click="emit('download')"
+          >
+            <i
+              class="ti ti-download"
+              aria-hidden="true"
+            />
+            {{ t('sync.downloadOffline') }}
+          </button>
+
+          <button
+            v-else-if="status === 'downloaded'"
+            type="button"
+            class="album-hymnal-card__action album-hymnal-card__action--remove"
+            @click="emit('remove')"
+          >
+            <i
+              class="ti ti-trash"
+              aria-hidden="true"
+            />
+            {{ t('sync.remove') }}
+          </button>
+
+          <!-- v8 ignore next 3 -- remap V8 do else-if: false side exercido pelo status downloaded -->
+          <button
+            v-else-if="status === 'error'"
+            type="button"
+            class="album-hymnal-card__action album-hymnal-card__action--retry"
+            @click="emit('download')"
+          >
+            <i
+              class="ti ti-refresh"
+              aria-hidden="true"
+            />
+            {{ t('sync.retry') }}
+          </button>
+        </div>
+
+        <button
+          v-if="canDisable"
+          type="button"
+          class="album-card-disable album-hymnal-card__disable"
+          :aria-pressed="disabled ? 'true' : 'false'"
+          :title="t(disabled ? 'albums.disabledAlbums.enable' : 'albums.disabledAlbums.disable')"
+          :aria-label="t(disabled ? 'albums.disabledAlbums.enable' : 'albums.disabledAlbums.disable')"
+          @click.stop="emit('toggle-disabled')"
+        >
+          <i class="ti" :class="disabled ? 'ti-eye-off' : 'ti-eye'" aria-hidden="true" />
+        </button>
+        </div>
       </div>
-    </button>
-
-    <div
-      v-if="showDownloadControls"
-      class="album-hymnal-card__actions"
-    >
-      <button
-        v-if="status === 'downloading'"
-        type="button"
-        class="album-hymnal-card__cancel"
-        @click="emit('cancel')"
-      >
-        <i
-          class="ti ti-x"
-          aria-hidden="true"
-        />
-        {{ t('sync.cancel') }}
-      </button>
-
-      <button
-        v-else-if="status === 'idle'"
-        type="button"
-        class="album-hymnal-card__action album-hymnal-card__action--download"
-        @click="emit('download')"
-      >
-        <i
-          class="ti ti-download"
-          aria-hidden="true"
-        />
-        {{ t('sync.downloadOffline') }}
-      </button>
-
-      <button
-        v-else-if="status === 'downloaded'"
-        type="button"
-        class="album-hymnal-card__action album-hymnal-card__action--remove"
-        @click="emit('remove')"
-      >
-        <i
-          class="ti ti-trash"
-          aria-hidden="true"
-        />
-        {{ t('sync.remove') }}
-      </button>
-
-      <!-- v8 ignore next 3 -- remap V8 do else-if: false side exercido pelo status downloaded -->
-      <button
-        v-else-if="status === 'error'"
-        type="button"
-        class="album-hymnal-card__action album-hymnal-card__action--retry"
-        @click="emit('download')"
-      >
-        <i
-          class="ti ti-refresh"
-          aria-hidden="true"
-        />
-        {{ t('sync.retry') }}
-      </button>
     </div>
   </GlassCard>
 </template>
@@ -224,10 +239,8 @@ watch(coverSrc, () => {
 <style scoped lang="scss">
 .album-hymnal-card {
   position: relative;
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
-  padding: 1.5rem;
+  display: block;
+  padding: 0.95rem 1rem;
   overflow: hidden;
   border-radius: 1rem 0 1rem 0 !important;
   transition:
@@ -236,19 +249,46 @@ watch(coverSrc, () => {
     transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
 
   &:hover {
-    transform: translateY(-4px);
+    transform: translateY(-2px);
   }
 }
 
+/* Capa compacta à esquerda; texto+botões empilhados à direita */
+.album-hymnal-card__main {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.album-hymnal-card__cover-btn {
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.album-hymnal-card__content {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.album-hymnal-card__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .album-hymnal-card__badge {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  z-index: 1;
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.25rem 0.75rem;
+  gap: 0.3rem;
+  padding: 0.15rem 0.55rem;
   border-radius: 9999px;
   border: 1px solid color-mix(in srgb, var(--ds-color-secondary, #78d6d2) 20%, transparent);
   background: color-mix(in srgb, var(--ds-color-secondary, #78d6d2) 20%, transparent);
@@ -259,7 +299,7 @@ watch(coverSrc, () => {
   animation: album-badge-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 
   .ti {
-    font-size: 0.875rem;
+    font-size: 0.8rem;
     line-height: 1;
     font-weight: 700;
   }
@@ -267,10 +307,11 @@ watch(coverSrc, () => {
 
 .album-hymnal-card__open {
   display: flex;
-  flex: 1;
+  width: 100%;
   min-width: 0;
-  align-items: center;
-  gap: 1.5rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.1rem;
   padding: 0;
   border: 0;
   background: transparent;
@@ -282,16 +323,16 @@ watch(coverSrc, () => {
 .album-hymnal-card__cover {
   position: relative;
   display: flex;
-  width: 5rem;
-  height: 6rem;
+  width: 3.25rem;
+  height: 3.25rem;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  border-radius: 0.75rem 0 0.75rem 0;
+  border-radius: 0.55rem 0 0.55rem 0;
   border: 1px solid color-mix(in srgb, var(--ds-color-on-surface) 10%, transparent);
   background: var(--ds-color-surface-container-high, #2a2a2a);
-  box-shadow: 0 12px 24px rgb(0 0 0 / 35%);
+  box-shadow: 0 6px 14px rgb(0 0 0 / 28%);
 
   .album-hymnal-card__cover-img {
     position: absolute;
@@ -318,30 +359,31 @@ watch(coverSrc, () => {
 }
 
 .album-hymnal-card__fallback-icon {
-  font-size: 2.75rem;
+  font-size: 1.6rem;
   color: var(--ds-color-primary);
   line-height: 1;
 }
 
-.album-hymnal-card__body {
-  min-width: 0;
-  flex: 1;
-  padding-right: 0.5rem;
-}
-
 .album-hymnal-card__name {
-  margin: 0 0 0.25rem;
+  margin: 0;
+  overflow: hidden;
   color: var(--ds-color-on-surface);
-  font-size: 20px;
-  font-weight: 600;
-  line-height: 28px;
+  /* Mesmo tamanho/peso dos títulos das coletâneas */
+  font-size: 0.95rem;
+  font-weight: 650;
+  line-height: 1.3;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .album-hymnal-card__subtitle {
   margin: 0;
+  overflow: hidden;
   color: var(--ds-color-on-surface-variant);
-  font-size: 14px;
-  line-height: 20px;
+  font-size: 0.8rem;
+  line-height: 1.25;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .album-hymnal-card__progress-meta {
@@ -371,28 +413,30 @@ watch(coverSrc, () => {
 }
 
 .album-hymnal-card__actions {
+  display: inline-flex;
   flex-shrink: 0;
+  align-items: center;
 }
 
 .album-hymnal-card__action,
 .album-hymnal-card__cancel {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  height: 2.25rem;
-  padding: 0 1rem;
+  gap: 0.35rem;
+  height: 1.85rem;
+  padding: 0 0.7rem;
   border-radius: var(--ds-radius-md, 0.5rem 0 0.5rem 0);
   cursor: pointer;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
-  line-height: 16px;
+  line-height: 14px;
   transition:
     background-color 200ms ease,
     color 200ms ease,
     border-color 200ms ease;
 
   .ti {
-    font-size: 1.125rem;
+    font-size: 1rem;
     line-height: 1;
   }
 }
@@ -439,41 +483,29 @@ watch(coverSrc, () => {
 
 @media (max-width: 1280px) {
   .album-hymnal-card {
-    gap: 1rem;
-    padding: 1rem;
+    padding: 0.85rem 0.9rem;
   }
 
-  .album-hymnal-card__open {
-    gap: 1rem;
+  .album-hymnal-card__main {
+    gap: 0.7rem;
   }
 
   .album-hymnal-card__cover {
-    width: 4rem;
-    height: 5rem;
+    width: 2.85rem;
+    height: 2.85rem;
   }
 
   .album-hymnal-card__fallback-icon {
-    font-size: 2rem;
-  }
-
-  .album-hymnal-card__name {
-    font-size: 16px;
-    line-height: 22px;
-  }
-
-  .album-hymnal-card__subtitle {
-    font-size: 13px;
-    line-height: 18px;
+    font-size: 1.35rem;
   }
 }
 
 /* Desativar álbum (paridade Classic): sempre visível, discreto. */
 .album-card-disable {
-  position: absolute;
-  z-index: 5;
   display: inline-flex;
-  width: 2rem;
-  height: 2rem;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--ds-color-outline-strong);
@@ -507,11 +539,6 @@ watch(coverSrc, () => {
   border: 1px solid var(--ds-color-outline-strong);
   font-size: 0.75rem;
   font-weight: 600;
-}
-
-.album-hymnal-card__disable {
-  right: 1rem;
-  bottom: 1rem;
 }
 
 .album-hymnal-card--disabled .album-hymnal-card__cover {

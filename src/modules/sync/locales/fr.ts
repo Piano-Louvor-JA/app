@@ -22,7 +22,7 @@ export default {
     },
     "hymnal": {
       "edition1996Name": "Recueil de cantiques adventiste - Édition 1996",
-      "officialSubtitle": "{count} cantiques avec partitions et paroles",
+      "officialSubtitle": "{count} cantiques avec paroles",
       "edition1996Subtitle": "Historique - {count} cantiques traditionnels",
       "cpbYoutubeName": "Hinário Adventista - CPB",
       "cpbYoutubeSubtitle": "Nouveau recueil adventiste en vidéo · Casa Publicadora Brasileira"

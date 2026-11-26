@@ -7,6 +7,9 @@ export default {
       "filter": "Filtrer les albums",
       "count": "{count} désactivé(s)",
       "badge": "Album désactivé",
+      "disableConfirmTitle": "Désactiver « {name} » ?",
+      "disableConfirmMessage": "Les chants de cet album apparaissent grisés dans la recherche et le sélecteur les ignore. Vous pourrez le réactiver plus tard via l’œil sur la carte.",
+      "disableConfirmYes": "Désactiver",
       "enable": "Activer l'album",
       "disable": "Désactiver l'album"
     },

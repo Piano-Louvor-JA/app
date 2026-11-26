@@ -22,7 +22,7 @@ export default {
     },
     "hymnal": {
       "edition1996Name": "كتاب الترانيم الأدفنتستي - طبعة 1996",
-      "officialSubtitle": "{count} ترنيمة مع النوتات والكلمات",
+      "officialSubtitle": "{count} ترنيمة مع الكلمات",
       "edition1996Subtitle": "تاريخية - {count} ترنيمة تقليدية",
       "cpbYoutubeName": "Hinário Adventista - CPB",
       "cpbYoutubeSubtitle": "كتاب الترانيم الأدفنتستي الجديد بالفيديو · Casa Publicadora Brasileira"

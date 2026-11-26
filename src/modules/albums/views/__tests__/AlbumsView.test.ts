@@ -367,11 +367,24 @@ describe('AlbumsView', () => {
   it('card do álbum liga e desliga o álbum', async () => {
     setState({ categories, disabledAlbums: ['10'] })
     const wrapper = await mountView()
-    const cards = wrapper.findAll('.collection-card-stub')
-    const disabledCard = cards.find((card) => card.attributes('data-disabled') === 'true')!
+    const disabledCard = wrapper.findAll('.collection-card-stub').find((card) => card.attributes('data-disabled') === 'true')!
     expect(disabledCard).toBeTruthy()
+    // Reativar: direto, sem popup
     await disabledCard.get('.cc-toggle-disabled').trigger('click')
     expect((globalThis as AnyObj).__albumsApi.setAlbumDisabled).toHaveBeenCalledWith(disabledCard.attributes('data-id'), false)
+    wrapper.unmount()
+
+    // Desativar: pede confirmação (AppConfirm) antes de persistir
+    setState({ categories, disabledAlbums: [] })
+    const enabledWrapper = await mountView()
+    const enabledCard = enabledWrapper.get('.collection-card-stub')
+    ;(globalThis as AnyObj).__albumsApi.setAlbumDisabled.mockClear()
+    await enabledCard.get('.cc-toggle-disabled').trigger('click')
+    expect((globalThis as AnyObj).__albumsApi.setAlbumDisabled).not.toHaveBeenCalled()
+    expect(body().querySelector('.app-confirm')).not.toBeNull()
+    ;(body().querySelector('.app-confirm__btn--danger') as HTMLElement).click()
+    await flushPromises()
+    expect((globalThis as AnyObj).__albumsApi.setAlbumDisabled).toHaveBeenCalledWith(enabledCard.attributes('data-id'), true)
   })
 
   it('adds a search result to a saved playlist through the shared album picker', async () => {

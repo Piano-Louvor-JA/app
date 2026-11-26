@@ -22,7 +22,7 @@ export default {
     },
     "hymnal": {
       "edition1996Name": "एडवेंटिस्ट भजन संग्रह - 1996 संस्करण",
-      "officialSubtitle": "स्वरलिपि और बोल सहित {count} भजन",
+      "officialSubtitle": "बोल सहित {count} भजन",
       "edition1996Subtitle": "ऐतिहासिक - {count} पारंपरिक भजन",
       "cpbYoutubeName": "Hinário Adventista - CPB",
       "cpbYoutubeSubtitle": "नया एडवेंटिस्ट भजन-संग्रह वीडियो में · Casa Publicadora Brasileira"
