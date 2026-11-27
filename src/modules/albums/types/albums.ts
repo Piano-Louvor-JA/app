@@ -31,6 +31,8 @@ export type AlbumTrack = {
   track: number | null
   durationLabel: string
   hasInstrumental: boolean
+  /** Capa própria da faixa (single/cover local via blob URL). Fallback: capa da coletânea. */
+  coverUrl?: string | null
 }
 
 export type AlbumSearchAlbumRef = {

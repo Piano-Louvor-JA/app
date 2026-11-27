@@ -515,11 +515,42 @@ export type CustomMusicSummary = {
 }
 
 /** LocalMusic (localStorage) → resumo no formato da listagem. */
+// Decodifica o áudio de uma música local e devolve a duração real em ms,
+// persistindo-a no store (backfill legado). Falha silenciosa → null.
+async function decodeLocalMusicDurationMs(m: LocalMusic): Promise<number | null> {
+  try {
+    let blob: Blob | null = null
+    if (m.audioMediaId) {
+      const { getMedia } = await import('./local-media-store')
+      blob = await getMedia(m.audioMediaId)
+    } else if (m.audioBase64) {
+      blob = await (
+        await fetch(`data:audio/*;base64,${m.audioBase64}`)
+      ).blob()
+    }
+    if (!blob) return null
+    const AC: typeof AudioContext =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext: typeof AudioContext })
+        .webkitAudioContext
+    const ctx = new AC()
+    const buf = await ctx.decodeAudioData(
+      await blob.slice(0).arrayBuffer(),
+    )
+    const audioMs = Math.round(buf.duration * 1000)
+    void ctx.close?.()
+    if (audioMs > 0) updateLocalMusic(m.id, { durationMs: audioMs })
+    return audioMs > 0 ? audioMs : null
+  } catch {
+    return null
+  }
+}
+
 function localMusicToSummary(m: LocalMusic): CustomMusicSummary {
   return {
     id: m.id,
     name: m.name,
-    duration: null,
+    duration: m.durationMs != null ? Math.round(m.durationMs / 1000) : null,
     hasAudio:
       Boolean(m.audioBase64) ||
       Boolean(m.audioMediaId) ||
@@ -704,7 +735,21 @@ export async function listCustomMusics(
   collectionId: number,
 ): Promise<CustomMusicSummary[]> {
   if (isLocalId(collectionId)) {
-    return listLocalMusics(collectionId).map(localMusicToSummary)
+    const musics = listLocalMusics(collectionId)
+    // Backfill legado: sem durationMs gravado mas com áudio → decodifica e
+    // persiste a duração real (uma única vez; persistido no IndexedDB).
+    const pending = musics.filter(
+      (m) => m.durationMs == null && (m.audioMediaId || m.audioBase64),
+    )
+    for (const m of pending) {
+      try {
+        const audioMs = await decodeLocalMusicDurationMs(m)
+        if (audioMs != null) m.durationMs = audioMs
+      } catch {
+        // decode falhou — duração continua null, sem bloquear a listagem
+      }
+    }
+    return musics.map(localMusicToSummary)
   }
   try {
     const response = await fetch(

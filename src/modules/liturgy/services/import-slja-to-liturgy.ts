@@ -494,6 +494,23 @@ async function importSljaLocal({
 	// no draft e o catálogo da liturgia expõe; 0 = desconhecida.
 	if (durationMs > 0) {
 		updateLocalMusic(musicId, { durationMs });
+	} else if (archive.audio?.bytes?.length) {
+		// Sem timecodes nos slides (tudo 0): duração real do áudio.
+		try {
+			const AC: typeof AudioContext =
+				window.AudioContext ??
+				(window as unknown as { webkitAudioContext: typeof AudioContext })
+					.webkitAudioContext;
+			const ctx = new AC();
+			const buf = await ctx.decodeAudioData(
+				await archive.audio.bytes.slice(0).arrayBuffer(),
+			);
+			const audioMs = Math.round(buf.duration * 1000);
+			if (audioMs > 0) updateLocalMusic(musicId, { durationMs: audioMs });
+			void ctx.close?.();
+		} catch {
+			// decode falhou — duração fica desconhecida (null), não bloqueia import
+		}
 	}
 
 	// BG (16:9) → 1 blob em IndexedDB, VINCULADO À MÚSICA como background —
