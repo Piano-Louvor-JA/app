@@ -81,6 +81,28 @@ jobs:
             echo "PIANO_BUILD_PROFILE=homologation" >> "$GITHUB_ENV"
           fi
 
+      # X-Partner-Key: espelha release.yml (Linux). Sem isso o Windows sai
+      # sem token e a telemetria marca identified:false.
+      - name: Resolve partner key for profile
+        shell: bash
+        env:
+          KEY_PROD: ${{ secrets.VITE_PARTNER_KEY_PROD }}
+          KEY_STG: ${{ secrets.VITE_PARTNER_KEY_STG }}
+        run: |
+          if [ "${PIANO_BUILD_PROFILE}" = "release" ]; then
+            key="${KEY_PROD:-}"
+            label=PROD
+          else
+            key="${KEY_STG:-}"
+            label=STG
+          fi
+          if [ -z "$key" ]; then
+            echo "::warning::VITE_PARTNER_KEY_${label} ausente — build sem X-Partner-Key (API aceita; métricas de parceiro ficam vazias)."
+          else
+            echo "VITE_PARTNER_KEY=$key" >> "$GITHUB_ENV"
+            echo "Partner key ${label} injetada no bundle."
+          fi
+
       - name: Check MS Store secrets
         id: store
         if: steps.decision.outputs.publish == 'true'
