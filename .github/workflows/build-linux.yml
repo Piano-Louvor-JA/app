@@ -31,6 +31,18 @@ jobs:
       - name: Resolve API build profile
         run: echo "PIANO_BUILD_PROFILE=homologation" >> "$GITHUB_ENV"
 
+      # X-Partner-Key STG (dispatch manual = homologação).
+      - name: Resolve partner key for profile
+        env:
+          KEY_STG: ${{ secrets.VITE_PARTNER_KEY_STG }}
+        run: |
+          if [ -z "${KEY_STG:-}" ]; then
+            echo "::warning::VITE_PARTNER_KEY_STG ausente — build sem X-Partner-Key (API aceita; métricas de parceiro ficam vazias)."
+          else
+            echo "VITE_PARTNER_KEY=$KEY_STG" >> "$GITHUB_ENV"
+            echo "Partner key STG injetada no bundle."
+          fi
+
       - name: Build Vite + Electron AppImage (x64)
         run: npm run electron:build -- --linux AppImage --publish never
         env:

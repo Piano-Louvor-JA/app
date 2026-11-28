@@ -92,6 +92,20 @@ jobs:
             exit 1
           fi
 
+      # X-Partner-Key: espelha release.yml. Snap recompila o app — precisa
+      # da mesma chave PROD no bundle.
+      - name: Resolve partner key for profile
+        shell: bash
+        env:
+          KEY_PROD: ${{ secrets.VITE_PARTNER_KEY_PROD }}
+        run: |
+          if [ -z "${KEY_PROD:-}" ]; then
+            echo "::warning::VITE_PARTNER_KEY_PROD ausente — Snap sem X-Partner-Key (API aceita; métricas de parceiro ficam vazias)."
+          else
+            echo "VITE_PARTNER_KEY=$KEY_PROD" >> "$GITHUB_ENV"
+            echo "Partner key PROD injetada no bundle."
+          fi
+
       - name: Build app (linux-unpacked)
         run: |
           npm ci
