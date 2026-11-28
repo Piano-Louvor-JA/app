@@ -308,6 +308,8 @@ export type CustomCollectionSummary = {
   name: string
   description: string | null
   coverUrl?: string | null
+  /** t_c68a47ac: capa privada (só dono vê cover_url; default true). */
+  coverPrivate?: boolean
   /** Dono (null = coletânea legado/pública, sem dono). */
   ownerId?: number | null
   /** Resolvido server-side quando autenticado (API: is_owner). */
@@ -327,6 +329,8 @@ export async function updateCustomCollection(
     description?: string | null
     cover_url?: string | null
     visibility?: CollectionVisibility
+    /** t_c68a47ac: privacidade da capa (true = só o dono vê cover_url). */
+    cover_private?: boolean
   },
 ): Promise<CustomCollectionSummary | null> {
   if (isLocalId(collectionId)) {
@@ -378,6 +382,7 @@ export async function updateCustomCollection(
       name: patch.name ?? local.name,
       description: patch.description ?? local.description ?? null,
       coverUrl,
+      coverPrivate: patch.cover_private ?? true,
       musicsCount: listLocalMusics(collectionId).length,
       ownerId: null,
       authorName: null,
@@ -398,6 +403,7 @@ export async function updateCustomCollection(
       name: string
       description: string | null
       cover_url?: string | null
+      cover_private?: number
       visibility?: CollectionVisibility
       musics_count?: number
     }
@@ -406,6 +412,7 @@ export async function updateCustomCollection(
       name: row.name,
       description: row.description ?? null,
       coverUrl: row.cover_url ?? null,
+      coverPrivate: row.cover_private === 0 ? false : true,
       visibility: row.visibility ?? patch.visibility,
       musicsCount: row.musics_count ?? 0,
     }
