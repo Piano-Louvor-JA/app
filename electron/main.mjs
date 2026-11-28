@@ -160,6 +160,43 @@ let mainWindow = null;
 let splashWindow = null;
 
 /**
+ * Mensagem do splash por idioma da UI (t_5582d47e). O idioma persistido pelo
+ * renderer (user_data → localStorage) não é legível do main; na troca de
+ * idioma o renderer grava o record "ui_language" no workspace (disco) e o
+ * splash lê aqui. Fallback pt-BR.
+ */
+const SPLASH_MESSAGES = {
+	pt: "Estamos configurando e preparando tudo para você.",
+	en: "We are setting everything up for you.",
+	es: "Estamos configurando y preparando todo para ti.",
+	fr: "Nous préparons tout pour vous.",
+	ru: "Мы всё готовим для вас.",
+	uk: "Ми все готуємо для вас.",
+	it: "Stiamo preparando tutto per te.",
+	nl: "We bereiden alles voor je voor.",
+	pl: "Przygotowujemy dla Ciebie wszystko.",
+	tr: "Her şeyi senin için hazırlıyoruz.",
+	ja: "すべてを準備しています。",
+	ko: "모든 것을 준비하고 있습니다.",
+	zh: "我们正在为您准备一切。",
+	ar: "نقوم بتجهيز كل شيء من أجلك.",
+	hi: "हम आपके लिए सब कुछ तैयार कर रहे हैं।",
+};
+
+function splashMessage() {
+	try {
+		const lang = readWorkspaceRecord("ui_language");
+		const prefix =
+			typeof lang === "string" && lang.length >= 2
+				? lang.slice(0, 2).toLowerCase()
+				: "pt";
+		return SPLASH_MESSAGES[prefix] ?? SPLASH_MESSAGES.pt;
+	} catch {
+		return SPLASH_MESSAGES.pt;
+	}
+}
+
+/**
  * HTML do splash inline — não depende de filesystem, sempre carrega.
  * Solução de contorno para o bug de loadFile falhar no Windows empacotado.
  */
@@ -176,7 +213,7 @@ html,body{width:100%;height:100%;background:#12121c;overflow:hidden;user-select:
 </style></head><body><div class="s">
 ${pianoLogoSvg("l")}
 <div class="t">LouvorJA - PIANO</div>
-<div class="m">Estamos configurando e preparando tudo para você.</div>
+<div class="m">${splashMessage()}</div>
 <div class="sp"></div>
 </div></body></html>`;
 

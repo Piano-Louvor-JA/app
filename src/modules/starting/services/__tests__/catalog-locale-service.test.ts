@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * app#339 — troca de idioma deve garantir o catálogo do idioma alvo.
@@ -7,88 +7,109 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
  * essenciais do idioma novo (serviço retomável) e é idempotente.
  */
 
-const store = new Map<string, unknown>()
+const store = new Map<string, unknown>();
 
-vi.mock('@shared/constants/storage-keys', () => ({
+vi.mock("@shared/constants/storage-keys", () => ({
   WORKSPACE_RECORD_KEYS: {
-    bootstrapComplete: 'bootstrapComplete',
-    config: 'config',
+    bootstrapComplete: "bootstrapComplete",
+    config: "config",
   },
-}))
+}));
 
-vi.mock('@shared/services/desktop-bridge', () => ({
+vi.mock("@shared/services/desktop-bridge", () => ({
   getDesktopBridge: () => null,
-}))
+}));
 
-vi.mock('@shared/services/remote-catalog', () => ({
+vi.mock("@shared/services/remote-catalog", () => ({
   fetchRemoteCatalogJson: vi.fn(async (file: string) => ({ file })),
-}))
+}));
 
-vi.mock('@shared/services/workspace-api', () => ({
+vi.mock("@shared/services/workspace-api", () => ({
   clearWorkspace: vi.fn(async () => {}),
   readCatalogRecord: vi.fn(async (key: string) => store.get(key) ?? null),
   writeCatalogRecord: vi.fn(async (key: string, value: unknown) => {
-    store.set(key, value)
-    return true
+    store.set(key, value);
+    return true;
   }),
-}))
+}));
 
 // library-catalog mockado com prefixo CONTROLÁVEL pelo teste
-let currentPrefix = 'pt'
-vi.mock('@modules/sync/services/library-catalog', () => ({
+let currentPrefix = "pt";
+vi.mock("@modules/sync/services/library-catalog", () => ({
   getCurrentApiPrefix: vi.fn(() => currentPrefix),
   localeToApiPrefix: (locale: string) =>
-    ({ 'pt-BR': 'pt', en: 'en', es: 'es' })[locale] ?? 'pt',
-}))
+    ({ "pt-BR": "pt", en: "en", es: "es" })[locale] ?? "pt",
+}));
 
-import { ensureCatalogForLocale } from '../catalog-locale-service'
-import { fetchRemoteCatalogJson } from '@shared/services/remote-catalog'
-import { getCurrentApiPrefix } from '@modules/sync/services/library-catalog'
+import { ensureCatalogForLocale } from "../catalog-locale-service";
+import { fetchRemoteCatalogJson } from "@shared/services/remote-catalog";
+import { getCurrentApiPrefix } from "@modules/sync/services/library-catalog";
 
 const EN_FILES = [
-  'en_categories',
-  'en_hymnal',
-  'en_hymnal_1996',
-  'en_musics',
-  'en_bible_book',
-  'en_bible_version',
-]
+  "en_categories",
+  "en_hymnal",
+  "en_hymnal_1996",
+  "en_musics",
+  "en_bible_book",
+  "en_bible_version",
+];
 
-describe('ensureCatalogForLocale (app#339)', () => {
+describe("ensureCatalogForLocale (app#339)", () => {
   beforeEach(() => {
-    store.clear()
-    currentPrefix = 'pt'
-    vi.mocked(fetchRemoteCatalogJson).mockClear()
-  })
+    store.clear();
+    currentPrefix = "pt";
+    vi.mocked(fetchRemoteCatalogJson).mockClear();
+  });
 
-  it.each(['fr', 'ru', 'uk', 'ja', 'ko', 'zh', 'tr', 'ar', 'hi', 'it', 'nl', 'pl'])('idioma %s sem catálogo publicado não baixa fallback pt', async (locale) => {
-    currentPrefix = 'en'
-    await ensureCatalogForLocale(locale)
-    expect(fetchRemoteCatalogJson).not.toHaveBeenCalled()
-  })
+  it.each([
+    "fr",
+    "ru",
+    "uk",
+    "ja",
+    "ko",
+    "zh",
+    "tr",
+    "ar",
+    "hi",
+    "it",
+    "nl",
+    "pl",
+  ])(
+    "idioma %s: baixa os essenciais do idioma alvo, incl. bíblia 15 idiomas (t_5582d47e)",
+    async (locale) => {
+      currentPrefix = "en";
+      await ensureCatalogForLocale(locale);
+      const files = vi
+        .mocked(fetchRemoteCatalogJson)
+        .mock.calls.map((c) => c[0]);
+      // essenciais do idioma alvo (não do en, não do pt)
+      expect(files).toContain(`${locale}_bible_book`);
+      expect(files).toContain(`${locale}_bible_version`);
+      expect(files).not.toContain("en_bible_book");
+      expect(files).not.toContain("pt_bible_version");
+      // hinário/coletâneas: 404 no upstream é tratado pelo bootstrap com
+      // lista vazia + convite (app#convite-catalogo) — o download ACONTECE
+    },
+  );
 
-  it('idioma novo sem catálogo → baixa os essenciais do idioma alvo', async () => {
-    const progress: number[] = []
-    await ensureCatalogForLocale('en', (p) => progress.push(p))
-    const files = vi
-      .mocked(fetchRemoteCatalogJson)
-      .mock.calls.map((c) => c[0])
-    expect(files).toEqual(EN_FILES)
-    expect(progress.at(-1)).toBe(100)
-  })
+  it("idioma novo sem catálogo → baixa os essenciais do idioma alvo", async () => {
+    const progress: number[] = [];
+    await ensureCatalogForLocale("en", (p) => progress.push(p));
+    const files = vi.mocked(fetchRemoteCatalogJson).mock.calls.map((c) => c[0]);
+    expect(files).toEqual(EN_FILES);
+    expect(progress.at(-1)).toBe(100);
+  });
 
-  it('idioma já presente → zero downloads (idempotente)', async () => {
-    await ensureCatalogForLocale('en', () => {})
-    const calls = vi.mocked(fetchRemoteCatalogJson).mock.calls.length
-    await ensureCatalogForLocale('en', () => {})
-    expect(
-      vi.mocked(fetchRemoteCatalogJson).mock.calls.length - calls,
-    ).toBe(0)
-  })
+  it("idioma já presente → zero downloads (idempotente)", async () => {
+    await ensureCatalogForLocale("en", () => {});
+    const calls = vi.mocked(fetchRemoteCatalogJson).mock.calls.length;
+    await ensureCatalogForLocale("en", () => {});
+    expect(vi.mocked(fetchRemoteCatalogJson).mock.calls.length - calls).toBe(0);
+  });
 
-  it('volta pro idioma anterior depois de rodar (não coloca o prefixo em estado global)', async () => {
-    currentPrefix = 'pt'
-    await ensureCatalogForLocale('en', () => {})
-    expect(getCurrentApiPrefix()).toBe('pt')
-  })
-})
+  it("volta pro idioma anterior depois de rodar (não coloca o prefixo em estado global)", async () => {
+    currentPrefix = "pt";
+    await ensureCatalogForLocale("en", () => {});
+    expect(getCurrentApiPrefix()).toBe("pt");
+  });
+});

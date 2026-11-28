@@ -16,31 +16,71 @@
  * `language` do `user_data` (localStorage), com fallback `pt`.
  */
 
-/** Prefixos com catálogo real publicado no upstream (api.louvorja.com.br). */
-export const CATALOG_PREFIXES = ['pt', 'en', 'es'] as const
+/**
+ * Prefixos com catálogo essencial publicado no upstream: pt/en/es têm hinário
+ * + coletâneas; os demais 12 (fr, ru, uk, it, nl, pl, tr, ja, ko, zh, ar, hi)
+ * têm Bíblia (campanha 15 idiomas, versões 100–112) mas não têm hinário —
+ * o bootstrap trata 404 de índice ausente gravando lista vazia e a UI mostra
+ * o convite à comunidade (app#convite-catalogo), sem quebrar o first-boot.
+ */
+export const CATALOG_PREFIXES = [
+  "pt",
+  "en",
+  "es",
+  "fr",
+  "ru",
+  "uk",
+  "it",
+  "nl",
+  "pl",
+  "tr",
+  "ja",
+  "ko",
+  "zh",
+  "ar",
+  "hi",
+] as const;
 
 /** O upstream publica catálogo essencial para este prefixo de idioma? */
 export function hasCatalogForPrefix(prefix: string): boolean {
-  return (CATALOG_PREFIXES as readonly string[]).includes(prefix)
+  return (CATALOG_PREFIXES as readonly string[]).includes(prefix);
 }
 
 export function localeToApiPrefix(locale: string): string {
-  const prefix = locale.slice(0, 2).toLowerCase()
-  return ['pt', 'en', 'es', 'fr', 'ru', 'uk', 'ja', 'ko', 'zh', 'tr', 'ar', 'hi', 'it', 'nl', 'pl'].includes(prefix) ? prefix : 'pt'
+  const prefix = locale.slice(0, 2).toLowerCase();
+  return [
+    "pt",
+    "en",
+    "es",
+    "fr",
+    "ru",
+    "uk",
+    "ja",
+    "ko",
+    "zh",
+    "tr",
+    "ar",
+    "hi",
+    "it",
+    "nl",
+    "pl",
+  ].includes(prefix)
+    ? prefix
+    : "pt";
 }
 
 export function getCurrentApiPrefix(customLocale?: string): string {
-  if (customLocale) return localeToApiPrefix(customLocale)
+  if (customLocale) return localeToApiPrefix(customLocale);
   try {
-    const stored = localStorage.getItem('user_data')
+    const stored = localStorage.getItem("user_data");
     if (stored) {
-      const prefs = JSON.parse(stored)
-      if (typeof prefs.language === 'string') {
-        return localeToApiPrefix(prefs.language)
+      const prefs = JSON.parse(stored);
+      if (typeof prefs.language === "string") {
+        return localeToApiPrefix(prefs.language);
       }
     }
   } catch {
     // localStorage indisponível (SSR/test) — fallback pt
   }
-  return 'pt'
+  return "pt";
 }
