@@ -119,10 +119,16 @@ function loadDb(): LocalDb {
 			// = já existia antes = tratado como publicado. O primeiro saveDb
 			// persiste o campo (roundtrip: migrado sobrevive a reload).
 			musics: Array.isArray(parsed.musics)
-				? parsed.musics.map((m) => ({
-						...m,
-						status: m.status ?? "published",
-					}))
+				? parsed.musics.map((m) => {
+						let next = { ...m, status: m.status ?? "published" };
+						// Migração BG×cover (regra Rafael): import .slja legado gravava
+						// o BG 16:9 em coverMediaId. Uma vez migrado, coverMediaId só
+						// pode ser cover quadrada definida no editor — nunca sobrescrito.
+						if (next.backgroundMediaId === undefined && next.coverMediaId?.startsWith("slja-")) {
+							next = { ...next, backgroundMediaId: next.coverMediaId };
+						}
+						return next;
+					})
 				: [],
 		};
 	} catch {
