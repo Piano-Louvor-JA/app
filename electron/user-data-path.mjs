@@ -33,6 +33,9 @@ const WRITE_PROBE = '.write-probe'
  */
 function shouldUseSharedUserData({ isDev = false } = {}) {
   if (isDev) return false
+  // Flatpak: /var/lib não é persistente no sandbox e pkexec não faz sentido;
+  // Electron já resolve userData para ~/.var/app/<id> (persistente).
+  if (process.platform === 'linux' && process.env.FLATPAK_ID) return false
   return process.platform === 'win32' || process.platform === 'linux' || process.platform === 'darwin'
 }
 

@@ -127,6 +127,20 @@ describe('user-data-path', () => {
     expect(resolveLinuxSharedUserDataPath()).toBe('/var/lib/LouvorJA-PIANO')
   })
 
+  it('resolveUserDataPath no Flatpak (FLATPAK_ID) mantém appData per-user persistente', () => {
+    mocks.platform = 'linux'
+    platformSpy.mockReturnValue('linux')
+    process.env.FLATPAK_ID = 'br.com.pianolouvorja.piano'
+
+    try {
+      expect(resolveUserDataPath({ isDev: false })).toBe(
+        path.join(mocks.appData, 'LouvorJA-PIANO'),
+      )
+    } finally {
+      delete process.env.FLATPAK_ID
+    }
+  })
+
   it('resolveUserDataPath no Linux cai para per-user se /var/lib for inacessível', () => {
     mocks.platform = 'linux'
     platformSpy.mockReturnValue('linux')
