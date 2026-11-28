@@ -17,6 +17,19 @@ export function saveUserPreferences(preferences: UserPreferences): void {
  * sem dependência de modules (inversão).
  */
 let prefsChangedHook: ((key: string) => void) | null = null
+// HOTFIX libras: `storage` event não é confiável entre janelas Electron
+// (window.open). Além do localStorage, publicamos num BroadcastChannel — mesmo
+// transporte que o runtime da projeção já usa.
+const PREFS_CHANNEL = 'louvorja-user-prefs'
+let prefsChannel: BroadcastChannel | null = null
+function publishPrefs(key: string): void {
+  try {
+    prefsChannel ??= new BroadcastChannel(PREFS_CHANNEL)
+    prefsChannel.postMessage({ key })
+  } catch {
+    // BroadcastChannel indisponível: fica só o storage event
+  }
+}
 
 export function registerPrefsChangedHook(fn: (key: string) => void): void {
   prefsChangedHook = fn
@@ -26,6 +39,7 @@ export function setUserPreference(key: string, value: unknown): UserPreferences 
   const current = loadUserPreferences()
   const next = { ...current, [key]: value }
   saveUserPreferences(next)
+  publishPrefs(key)
   try {
     prefsChangedHook?.(key)
   } catch {

@@ -65,4 +65,18 @@ describe('HOTFIX — Libras OFF na projeção', () => {
     expect(player.classes()).toContain('vlibras-hidden')
     w.unmount()
   })
+
+  it('desligar libras em outra janela Electron (BroadcastChannel) esconde o player', async () => {
+    setPrefs({ 'libras.enabled': true })
+    const w = mount(MediaProjectionView)
+    await flushPromises()
+    const player = w.find('[data-testid="vlibras-unity-player"]')
+    setPrefs({ 'libras.enabled': false })
+    const ch = new BroadcastChannel('louvorja-user-prefs')
+    ch.postMessage({ key: 'libras.enabled' })
+    await flushPromises()
+    ch.close()
+    expect(player.classes()).toContain('vlibras-hidden')
+    w.unmount()
+  })
 })

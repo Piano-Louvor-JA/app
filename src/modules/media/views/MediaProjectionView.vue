@@ -30,6 +30,7 @@ const stage = ref<StageSettings>(readEffectiveStageSettings('hymns'))
 let unsubStage: (() => void) | null = null
 
 let channel: BroadcastChannel | null = null
+let prefsChannel: BroadcastChannel | null = null
 
 const lyric = computed(() => stripHtmlBreaks(runtime.value.lyric))
 // SOLUÇÃO EZEQUIAS (web, 3dc37df): SEM fit JS. white-space:pre-line no CSS
@@ -97,10 +98,19 @@ onMounted(() => {
   }
 
   window.addEventListener('storage', onStorage)
+
+  try {
+    prefsChannel = new BroadcastChannel('louvorja-user-prefs')
+    prefsChannel.onmessage = () => refreshLibrasPrefs()
+  } catch {
+    // BroadcastChannel indisponível
+  }
 })
 
 onUnmounted(() => {
   window.removeEventListener('storage', onStorage)
+  prefsChannel?.close()
+  prefsChannel = null
   unsubStage?.()
   channel?.close()
   channel = null
