@@ -494,16 +494,34 @@ async function importSljaLocal({
 	// no draft e o catálogo da liturgia expõe; 0 = desconhecida.
 	if (durationMs > 0) {
 		updateLocalMusic(musicId, { durationMs });
+	} else if (archive.audio?.bytes?.length) {
+		// Sem timecodes nos slides (tudo 0): duração real do áudio.
+		try {
+			const AC: typeof AudioContext =
+				window.AudioContext ??
+				(window as unknown as { webkitAudioContext: typeof AudioContext })
+					.webkitAudioContext;
+			const ctx = new AC();
+			const buf = await ctx.decodeAudioData(
+				await archive.audio.bytes.slice(0).arrayBuffer(),
+			);
+			const audioMs = Math.round(buf.duration * 1000);
+			if (audioMs > 0) updateLocalMusic(musicId, { durationMs: audioMs });
+			void ctx.close?.();
+		} catch {
+			// decode falhou — duração fica desconhecida (null), não bloqueia import
+		}
 	}
 
-	// Capa → 1 blob em IndexedDB, VINCULADA À MÚSICA (não por estrofe — o
-	// agravante do bug era a mesma data: URL de 4 MB repetida 33×). O .slja
-	// clássico traz fundo único: primeiro asset cobre capa + todos os slides
-	// (padrão web#174), resolvido na leitura via getMedia.
+	// BG (16:9) → 1 blob em IndexedDB, VINCULADO À MÚSICA como background —
+	// NÃO como cover (regra Rafael: cover 1:1 e BG 16:9 são distintos; definir
+	// cover no editor nunca substitui o BG da projeção). O .slja clássico traz
+	// fundo único: primeiro asset cobre todos os slides (padrão web#174),
+	// resolvido na leitura via getMedia.
 	if (archive.assets?.length && archive.assets[0]?.bytes?.length) {
 		await putMedia(`slja-${sljaHash}-cover`, archive.assets[0].bytes);
 		updateLocalMusic(musicId, {
-			coverMediaId: `slja-${sljaHash}-cover`,
+			backgroundMediaId: `slja-${sljaHash}-cover`,
 		});
 	}
 

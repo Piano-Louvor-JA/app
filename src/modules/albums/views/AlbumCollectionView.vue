@@ -401,7 +401,7 @@ async function runAction(
         :selected="index === selectedSearchIndex"
         @focus="selectedSearchIndex = index"
         :collection-name="title"
-        :artwork-url="activeCollection?.coverUrl"
+        :artwork-url="track.coverUrl ?? activeCollection?.coverUrl"
         :busy="busyMusicId === track.musicId"
         :album-disabled="collectionDisabled"
         @sung="runAction(track.musicId, () => playSung(track.musicId))"

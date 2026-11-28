@@ -41,6 +41,9 @@ export type MediaTrackRecord = {
   instrumentalUrl: string | null
   coverUrl: string | null
   coverPosition: string | null
+  /** BG 16:9 da projeção (ex: 1º asset do .slja) — NUNCA é a cover quadrada.
+   * Ausente (tracks remotos) = fallback para coverUrl (comportamento legado). */
+  backgroundUrl?: string | null
   albums: MediaAlbumRef[]
   categories: string[]
   lyrics: MediaLyricSlide[]

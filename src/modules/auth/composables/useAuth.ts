@@ -10,6 +10,7 @@ import {
   requestPasswordReset,
   type AuthSession,
 } from '../../media/services/auth-client'
+import { authSession } from '../services/auth-session-ref'
 import {
   currentAccountProvider,
   firebaseLogin,
@@ -28,8 +29,8 @@ import {
  * API custom. Mesma chave de sessão e mesma API do web — a conta é a mesma.
  */
 
-/** Estado reativo da sessão de autenticação. */
-export const authSession = ref<AuthSession | null>(getAuthSession())
+/** Estado reativo da sessão de autenticação (ref compartilhado, sem i18n). */
+export { authSession }
 
 /** Notificador global (snackbar) — setado pelo AppShell ao montar. */
 let notifyFn: ((message: string, isError?: boolean) => void) | null = null

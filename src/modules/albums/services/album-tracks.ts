@@ -9,6 +9,8 @@ import {
   loadCustomMusicTrack,
   toCustomMusicId,
 } from '@modules/media/services/custom-catalog'
+import { getLocalMusic } from '@modules/media/services/local-custom-store'
+import { getMedia } from '@modules/media/services/local-media-store'
 
 import type {
   AlbumCollection,
@@ -163,22 +165,36 @@ export async function loadCollectionTracks(
   if (collection.isCustom) {
     const customId = fromCustomCollectionId(Number(collection.id))
     const musics = await listCustomMusics(customId)
-    return musics.map((music, index) => ({
-      musicId:
-        music.officialMusicId != null
-          ? music.officialMusicId
-          : // Local (id negativo) NÃO empacota: toCustomMusicId(-N) = 1M−N
-            // não é >= 1M nem < 0 → dispatcher cairia no loader OFICIAL e
-            // tocaria hino errado. Negativo puro o dispatcher resolve via
-            // isLocalId (app#331).
-            music.id < 0
-            ? music.id
-            : toCustomMusicId(music.id),
-      name: music.name ?? `Hino oficial #${music.officialMusicId ?? music.id}`,
-      track: index + 1,
-      durationLabel: music.duration != null ? formatDurationLabel(music.duration) : '—',
-      hasInstrumental: false,
-    }))
+    return Promise.all(
+      musics.map(async (music, index) => {
+        // Capa própria do single (local): blob do IndexedDB → objectURL.
+        let coverUrl: string | null = null
+        if (music.id < 0) {
+          const local = getLocalMusic(music.id)
+          if (local?.coverMediaId) {
+            const blob = await getMedia(local.coverMediaId)
+            if (blob) coverUrl = URL.createObjectURL(blob)
+          }
+        }
+        return {
+          musicId:
+            music.officialMusicId != null
+              ? music.officialMusicId
+              : // Local (id negativo) NÃO empacota: toCustomMusicId(-N) = 1M−N
+                // não é >= 1M nem < 0 → dispatcher cairia no loader OFICIAL e
+                // tocaria hino errado. Negativo puro o dispatcher resolve via
+                // isLocalId (app#331).
+              music.id < 0
+              ? music.id
+              : toCustomMusicId(music.id),
+          name: music.name ?? `Hino oficial #${music.officialMusicId ?? music.id}`,
+          track: index + 1,
+          durationLabel: music.duration != null ? formatDurationLabel(music.duration) : '—',
+          hasInstrumental: false,
+          coverUrl,
+        }
+      }),
+    )
   }
 
   if (collection.kind === 'hymnal') {

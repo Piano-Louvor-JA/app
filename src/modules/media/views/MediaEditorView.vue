@@ -1,16 +1,19 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
 import MediaSlideStage from '../components/MediaSlideStage.vue'
 import AppConfirm from '@shared/components/AppConfirm.vue'
 import { getAuthSession } from '../services/auth-client'
+import { authSession } from '@modules/auth/services/auth-session-ref'
 import { getAuthReadiness } from '@modules/auth/services/firebase-client'
 import { startOutboxLoop } from '../services/outbox-loop'
 import {
   getLocalMusic as getLocalMusicById,
   isLocalId,
+  listLocalCollections,
+  updateLocalCollection,
   updateLocalMusic,
 } from '../services/local-custom-store'
 import { getMedia, putMedia } from '../services/local-media-store'
@@ -553,9 +556,108 @@ async function onReuseMusic(music: ReusableMusic): Promise<void> {
 
 const coverInput = ref<HTMLInputElement | null>(null)
 
+// t_c68a47ac (cover privacy, decisão Rafael 27/11): capa fica LOCAL
+// (IndexedDB) enquanto deslogado; ao autenticar, capa local existente →
+// upload pra API com escolha de privacidade (default: privada).
+const pendingCoverUpload = ref(false)
+const pendingCoverPrivacy = ref<'private' | 'public'>('private')
+
 const selectedCollection = computed(
   () => collections.value.find((c) => c.id === selectedCollectionId.value) ?? null,
 )
+
+/** Cover local (IndexedDB) da coletânea local selecionada, se houver. */
+function localCollectionCoverMediaId(collectionId: number | null): string | null {
+  if (collectionId == null || !isLocalId(collectionId)) return null
+  const local = listLocalCollections().find((c) => c.id === collectionId)
+  return local?.coverMediaId ?? null
+}
+
+/**
+ * Upload da cover local pendente: lê o blob do IndexedDB, sobe pra API e
+ * aplica na coletânea com a privacidade escolhida pelo usuário.
+ */
+async function uploadLocalCover(
+  collectionId: number,
+  coverMediaId: string,
+  privacy: 'private' | 'public',
+): Promise<boolean> {
+  const bytes = await getMedia(coverMediaId)
+  if (!bytes) return false
+  const data: Uint8Array =
+    bytes instanceof Uint8Array
+      ? bytes
+      : new Uint8Array(await bytes.arrayBuffer())
+  const uploaded = await uploadCustomFile(data, 'capa.png', 'imagens')
+  if (!uploaded) return false
+  const updated = await updateCustomCollection(collectionId, {
+    cover_url: uploaded.url,
+    cover_private: privacy === 'public' ? false : true,
+  })
+  return !!updated
+}
+
+/** Login chegou: se a coletânea local selecionada tem capa, oferece o upload. */
+async function onAuthMaybeOfferCoverUpload(): Promise<void> {
+  if (!getAuthSession() || selectedCollectionId.value == null) return
+  if (!localCollectionCoverMediaId(selectedCollectionId.value)) return
+  pendingCoverUpload.value = true
+}
+
+/** Confirmou o upload da capa pendente com a privacidade escolhida. */
+async function onConfirmPendingCover(privacy: 'private' | 'public'): Promise<void> {
+  pendingCoverUpload.value = false
+  const collectionId = selectedCollectionId.value
+  const coverMediaId = localCollectionCoverMediaId(collectionId)
+  if (collectionId == null || coverMediaId == null) return
+  saving.value = true
+  try {
+    // Coletânea local ainda não existe na API: cria antes de subir a capa.
+    let targetId = collectionId
+    if (isLocalId(collectionId)) {
+      const current = selectedCollection.value
+      const created = await createCustomCollection(
+        current?.name ?? 'Minha Coletânea',
+        current?.description ?? undefined,
+        undefined,
+        'private',
+      )
+      if (!created) {
+        notify(t('media.editor.coverUploadFailed'), true)
+        return
+      }
+      targetId = created.id
+      await refreshCollections()
+      selectedCollectionId.value = created.id
+    }
+    const ok = await uploadLocalCover(targetId, coverMediaId, privacy)
+    if (ok) {
+      await refreshCollections()
+      notify(privacy === 'public'
+        ? 'Capa enviada — visível para todos'
+        : 'Capa enviada — visível só para você')
+    } else {
+      notify(t('media.editor.coverUploadFailed'), true)
+    }
+  } finally {
+    saving.value = false
+  }
+}
+
+/** Recusa a oferta: mantém a capa local (nada sobe). */
+function onDismissPendingCover(): void {
+  pendingCoverUpload.value = false
+}
+
+// Login/logout em runtime: authSession é ref global do useAuth (singleton
+// de módulo) — login via dialog do header dispara sem recarregar página.
+// t_c68a47ac: ao autenticar com capa local pendente, oferece o upload.
+let lastAuthState = !!getAuthSession()
+watch(authSession, (session) => {
+  const loggedIn = !!session
+  if (loggedIn && !lastAuthState) void onAuthMaybeOfferCoverUpload()
+  lastAuthState = loggedIn
+})
 
 /* ---------- SPEC v3.1 (Rafael 24/11): single ≠ coletânea ----------
  * Música é single ATÉ entrar numa coletânea. A coletânea fixa "Singles" é
@@ -670,6 +772,17 @@ async function onCoverFile(event: Event): Promise<void> {
   saving.value = true
   try {
     const bytes = new Uint8Array(await file.arrayBuffer())
+    // t_c68a47ac: deslogado → capa LOCAL em IndexedDB (nunca sobe).
+    if (isLocalId(selectedCollectionId.value)) {
+      const mediaId = `local-collection-${selectedCollectionId.value}-cover`
+      await putMedia(mediaId, bytes)
+      updateLocalCollection(selectedCollectionId.value, { coverMediaId: mediaId })
+      collections.value = collections.value.map((c) =>
+        c.id === selectedCollectionId.value ? { ...c, coverUrl: mediaId } : c,
+      )
+      notify('Capa salva no aparelho — entre com sua conta para enviar à rede')
+      return
+    }
     const uploaded = await uploadCustomFile(bytes, file.name, 'imagens')
     if (!uploaded) {
       notify(t('media.editor.coverUploadFailed'))
@@ -677,6 +790,8 @@ async function onCoverFile(event: Event): Promise<void> {
     }
     const updated = await updateCustomCollection(selectedCollectionId.value, {
       cover_url: uploaded.url,
+      // default da decisão 27/11: capa privada (opt-in p/ pública)
+      cover_private: true,
     })
     if (!updated) {
       notify(t('media.editor.coverSaveFailed'))
@@ -2423,6 +2538,82 @@ onMounted(async () => {
         </div>
       </div>
     </Teleport>
+
+    <!-- t_c68a47ac: capa local pendente → oferta de upload na autenticação -->
+    <Teleport to="body">
+      <div
+        v-if="pendingCoverUpload"
+        class="rules-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Enviar capa para a sua conta"
+      >
+        <div
+          class="rules-dialog__backdrop"
+          aria-hidden="true"
+          @click="onDismissPendingCover"
+        />
+        <div class="rules-dialog__panel">
+          <h2 class="cover-offer__title">
+            Enviar a capa desta coletânea?
+          </h2>
+          <p class="cover-offer__text">
+            A capa está salva só neste aparelho. Ao entrar com sua conta você
+            pode enviá-la para a sua coletânea. Quem pode vê-la?
+          </p>
+          <div class="cover-offer__choices">
+            <button
+              type="button"
+              class="editor__btn cover-offer__choice"
+              :class="{ 'cover-offer__choice--active': pendingCoverPrivacy === 'private' }"
+              data-testid="cover-offer-private"
+              @click="pendingCoverPrivacy = 'private'"
+            >
+              <i
+                class="ti ti-lock"
+                aria-hidden="true"
+              />
+              Só eu
+            </button>
+            <button
+              type="button"
+              class="editor__btn cover-offer__choice"
+              :class="{ 'cover-offer__choice--active': pendingCoverPrivacy === 'public' }"
+              data-testid="cover-offer-public"
+              @click="pendingCoverPrivacy = 'public'"
+            >
+              <i
+                class="ti ti-world"
+                aria-hidden="true"
+              />
+              Todos
+            </button>
+          </div>
+          <div class="cover-offer__actions">
+            <button
+              type="button"
+              class="editor__btn"
+              @click="onDismissPendingCover"
+            >
+              Manter no aparelho
+            </button>
+            <button
+              type="button"
+              class="editor__btn editor__btn--save"
+              data-testid="cover-offer-confirm"
+              :disabled="saving"
+              @click="onConfirmPendingCover(pendingCoverPrivacy)"
+            >
+              <i
+                class="ti ti-upload"
+                aria-hidden="true"
+              />
+              Enviar
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </section>
 </template>
 
@@ -2606,6 +2797,39 @@ onMounted(async () => {
   border: none;
   border-radius: 0;
   background: transparent;
+}
+
+/* t_c68a47ac: oferta de upload da capa local na autenticação */
+.cover-offer__title {
+  margin: 0 0 0.4rem;
+  font-size: 1.1rem;
+}
+
+.cover-offer__text {
+  margin: 0 0 1rem;
+  color: var(--text-muted, rgba(255, 255, 255, 0.7));
+  font-size: 0.9rem;
+}
+
+.cover-offer__choices {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.cover-offer__choice {
+  flex: 1;
+  justify-content: center;
+}
+
+.cover-offer__choice--active {
+  outline: 2px solid var(--primary, #4f7cff);
+}
+
+.cover-offer__actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
 }
 
 .rules-dialog__ok {

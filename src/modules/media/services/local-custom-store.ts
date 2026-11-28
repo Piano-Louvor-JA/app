@@ -45,6 +45,9 @@ export type LocalMusic = {
 	audioMediaId?: string | null;
 	/** Id do blob da capa em IndexedDB — capa 1× por música, não por estrofe. */
 	coverMediaId?: string | null;
+	/** Id do blob do BG 16:9 (projeção, ex: 1º asset do .slja) — DISTINTO da
+	 * cover quadrada; definir cover nunca substitui o BG (regra Rafael). */
+	backgroundMediaId?: string | null;
 	/** Duração conhecida/estimada (ms) — p.ex. import .slja (app#331). */
 	durationMs?: number | null;
 	/** SHA-256 do arquivo de origem — dedupe de re-import/migração (app#336). */
@@ -116,10 +119,40 @@ function loadDb(): LocalDb {
 			// = já existia antes = tratado como publicado. O primeiro saveDb
 			// persiste o campo (roundtrip: migrado sobrevive a reload).
 			musics: Array.isArray(parsed.musics)
-				? parsed.musics.map((m) => ({
-						...m,
-						status: m.status ?? "published",
-					}))
+				? parsed.musics.map((m) => {
+						let next = { ...m, status: m.status ?? "published" };
+						// Migração BG×cover (regra Rafael): import .slja legado gravava
+						// o BG 16:9 em coverMediaId. O blob segue em slja-<hash>-cover
+						// (IndexedDB) mesmo depois de o editor definir uma capa — a
+						// música guarda sljaHash, então o BG é reativado SEM reimport.
+						if (next.backgroundMediaId === undefined && next.sljaHash) {
+							next = {
+								...next,
+								backgroundMediaId: next.coverMediaId?.startsWith("slja-")
+									? next.coverMediaId
+									: `slja-${next.sljaHash}-cover`,
+							};
+						}
+						// Migração legado 2 (sem sljaHash, import pré-hash): o BG 16:9
+						// vivia em coverMediaId (sem capa do editor por cima) OU por
+						// estrofe (imageMediaId único compartilhado). Promove pro
+						// backgroundMediaId pra separar BG de cover — SEM reimport.
+						if (next.backgroundMediaId === undefined && !next.sljaHash) {
+							if (next.coverMediaId?.startsWith("slja-")) {
+								next = { ...next, backgroundMediaId: next.coverMediaId };
+							} else {
+								const stanzaImages = [
+									...new Set(
+										next.lyrics.map((l) => l.imageMediaId).filter(Boolean),
+									),
+								];
+								if (stanzaImages.length === 1) {
+									next = { ...next, backgroundMediaId: stanzaImages[0] };
+								}
+							}
+						}
+						return next;
+					})
 				: [],
 		};
 	} catch {
@@ -288,6 +321,8 @@ export function updateLocalMusic(
 		/** Ids de blobs em IndexedDB (local-media-store) — sem quota. */
 		audioMediaId?: string | null;
 		coverMediaId?: string | null;
+		/** BG 16:9 (projeção) — distinto da cover; separação regra Rafael. */
+		backgroundMediaId?: string | null;
 		/** Estado de trabalho (SPEC t_deed74b5). */
 		status?: "draft" | "published";
 	},
@@ -302,6 +337,7 @@ export function updateLocalMusic(
 	if (patch.image_url !== undefined) music.image_url = patch.image_url;
 	if (patch.audioMediaId !== undefined) music.audioMediaId = patch.audioMediaId;
 	if (patch.coverMediaId !== undefined) music.coverMediaId = patch.coverMediaId;
+	if (patch.backgroundMediaId !== undefined) music.backgroundMediaId = patch.backgroundMediaId;
 	if (patch.status !== undefined) music.status = patch.status;
 	saveDb(db);
 	return true;

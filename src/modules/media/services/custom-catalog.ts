@@ -214,6 +214,11 @@ export async function loadCustomMusicTrack(
     const coverBlob = local.coverMediaId
       ? await getMedia(local.coverMediaId)
       : null
+    // BG do .slja (16:9) é separado da cover quadrada (1:1). Legado: sem
+    // backgroundMediaId, o BG vivia em coverMediaId — fallback mantém projeção.
+    const backgroundBlob = local.backgroundMediaId
+      ? await getMedia(local.backgroundMediaId)
+      : (coverBlob ?? null)
     const audioUrl = audioBlob
       ? URL.createObjectURL(audioBlob)
       : local.audioBase64
@@ -231,7 +236,13 @@ export async function loadCustomMusicTrack(
         showSlide: l.show_slide !== false && l.show_slide !== 0,
         time: l.time ?? '00:00:00',
         instrumentalTime: l.instrumental_time ?? '00:00:00',
-        imageUrl: imageBlob ? URL.createObjectURL(imageBlob) : (l.image_url ?? null),
+        // Legado .slja: o BG vivia por estrofe (imageMediaId duplicado). Com
+        // backgroundMediaId presente (migração), o blob repetido É o fundo
+        // único — estrofe herda o BG da música, não sobrepõe.
+        imageUrl:
+          imageBlob && l.imageMediaId !== local.backgroundMediaId
+            ? URL.createObjectURL(imageBlob)
+            : (l.image_url ?? null),
         imagePosition: l.image_position ?? null,
         isCover: l.order === 1 && Boolean(l.image_url ?? l.imageMediaId),
       }
@@ -244,6 +255,9 @@ export async function loadCustomMusicTrack(
       instrumentalUrl: null,
       coverUrl,
       coverPosition: null,
+      backgroundUrl: backgroundBlob
+        ? URL.createObjectURL(backgroundBlob)
+        : null,
       albums: [],
       categories: ['Minhas Coletâneas'],
       lyrics,
@@ -308,6 +322,8 @@ export type CustomCollectionSummary = {
   name: string
   description: string | null
   coverUrl?: string | null
+  /** t_c68a47ac: capa privada (só dono vê cover_url; default true). */
+  coverPrivate?: boolean
   /** Dono (null = coletânea legado/pública, sem dono). */
   ownerId?: number | null
   /** Resolvido server-side quando autenticado (API: is_owner). */
@@ -327,6 +343,8 @@ export async function updateCustomCollection(
     description?: string | null
     cover_url?: string | null
     visibility?: CollectionVisibility
+    /** t_c68a47ac: privacidade da capa (true = só o dono vê cover_url). */
+    cover_private?: boolean
   },
 ): Promise<CustomCollectionSummary | null> {
   if (isLocalId(collectionId)) {
@@ -378,6 +396,7 @@ export async function updateCustomCollection(
       name: patch.name ?? local.name,
       description: patch.description ?? local.description ?? null,
       coverUrl,
+      coverPrivate: patch.cover_private ?? true,
       musicsCount: listLocalMusics(collectionId).length,
       ownerId: null,
       authorName: null,
@@ -398,6 +417,7 @@ export async function updateCustomCollection(
       name: string
       description: string | null
       cover_url?: string | null
+      cover_private?: number
       visibility?: CollectionVisibility
       musics_count?: number
     }
@@ -406,6 +426,7 @@ export async function updateCustomCollection(
       name: row.name,
       description: row.description ?? null,
       coverUrl: row.cover_url ?? null,
+      coverPrivate: row.cover_private === 0 ? false : true,
       visibility: row.visibility ?? patch.visibility,
       musicsCount: row.musics_count ?? 0,
     }
@@ -500,11 +521,42 @@ export type CustomMusicSummary = {
 }
 
 /** LocalMusic (localStorage) → resumo no formato da listagem. */
+// Decodifica o áudio de uma música local e devolve a duração real em ms,
+// persistindo-a no store (backfill legado). Falha silenciosa → null.
+async function decodeLocalMusicDurationMs(m: LocalMusic): Promise<number | null> {
+  try {
+    let blob: Blob | null = null
+    if (m.audioMediaId) {
+      const { getMedia } = await import('./local-media-store')
+      blob = await getMedia(m.audioMediaId)
+    } else if (m.audioBase64) {
+      blob = await (
+        await fetch(`data:audio/*;base64,${m.audioBase64}`)
+      ).blob()
+    }
+    if (!blob) return null
+    const AC: typeof AudioContext =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext: typeof AudioContext })
+        .webkitAudioContext
+    const ctx = new AC()
+    const buf = await ctx.decodeAudioData(
+      await blob.slice(0).arrayBuffer(),
+    )
+    const audioMs = Math.round(buf.duration * 1000)
+    void ctx.close?.()
+    if (audioMs > 0) updateLocalMusic(m.id, { durationMs: audioMs })
+    return audioMs > 0 ? audioMs : null
+  } catch {
+    return null
+  }
+}
+
 function localMusicToSummary(m: LocalMusic): CustomMusicSummary {
   return {
     id: m.id,
     name: m.name,
-    duration: null,
+    duration: m.durationMs != null ? Math.round(m.durationMs / 1000) : null,
     hasAudio:
       Boolean(m.audioBase64) ||
       Boolean(m.audioMediaId) ||
@@ -689,7 +741,21 @@ export async function listCustomMusics(
   collectionId: number,
 ): Promise<CustomMusicSummary[]> {
   if (isLocalId(collectionId)) {
-    return listLocalMusics(collectionId).map(localMusicToSummary)
+    const musics = listLocalMusics(collectionId)
+    // Backfill legado: sem durationMs gravado mas com áudio → decodifica e
+    // persiste a duração real (uma única vez; persistido no IndexedDB).
+    const pending = musics.filter(
+      (m) => m.durationMs == null && (m.audioMediaId || m.audioBase64),
+    )
+    for (const m of pending) {
+      try {
+        const audioMs = await decodeLocalMusicDurationMs(m)
+        if (audioMs != null) m.durationMs = audioMs
+      } catch {
+        // decode falhou — duração continua null, sem bloquear a listagem
+      }
+    }
+    return musics.map(localMusicToSummary)
   }
   try {
     const response = await fetch(

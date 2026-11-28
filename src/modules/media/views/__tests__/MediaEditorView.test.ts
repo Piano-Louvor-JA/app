@@ -759,6 +759,8 @@ describe("MediaEditorView — capa e reuso", () => {
 		expect(uploadCustomFile).toHaveBeenCalled();
 		expect(updateCustomCollection).toHaveBeenCalledWith(1, {
 			cover_url: "/capa.png",
+			// t_c68a47ac: capa sobe privada por default (opt-in p/ pública)
+			cover_private: true,
 		});
 		w.unmount();
 	});
