@@ -45,6 +45,9 @@ export type LocalMusic = {
 	audioMediaId?: string | null;
 	/** Id do blob da capa em IndexedDB — capa 1× por música, não por estrofe. */
 	coverMediaId?: string | null;
+	/** Id do blob do BG 16:9 (projeção, ex: 1º asset do .slja) — DISTINTO da
+	 * cover quadrada; definir cover nunca substitui o BG (regra Rafael). */
+	backgroundMediaId?: string | null;
 	/** Duração conhecida/estimada (ms) — p.ex. import .slja (app#331). */
 	durationMs?: number | null;
 	/** SHA-256 do arquivo de origem — dedupe de re-import/migração (app#336). */
@@ -288,6 +291,8 @@ export function updateLocalMusic(
 		/** Ids de blobs em IndexedDB (local-media-store) — sem quota. */
 		audioMediaId?: string | null;
 		coverMediaId?: string | null;
+		/** BG 16:9 (projeção) — distinto da cover; separação regra Rafael. */
+		backgroundMediaId?: string | null;
 		/** Estado de trabalho (SPEC t_deed74b5). */
 		status?: "draft" | "published";
 	},
@@ -302,6 +307,7 @@ export function updateLocalMusic(
 	if (patch.image_url !== undefined) music.image_url = patch.image_url;
 	if (patch.audioMediaId !== undefined) music.audioMediaId = patch.audioMediaId;
 	if (patch.coverMediaId !== undefined) music.coverMediaId = patch.coverMediaId;
+	if (patch.backgroundMediaId !== undefined) music.backgroundMediaId = patch.backgroundMediaId;
 	if (patch.status !== undefined) music.status = patch.status;
 	saveDb(db);
 	return true;

@@ -496,14 +496,15 @@ async function importSljaLocal({
 		updateLocalMusic(musicId, { durationMs });
 	}
 
-	// Capa → 1 blob em IndexedDB, VINCULADA À MÚSICA (não por estrofe — o
-	// agravante do bug era a mesma data: URL de 4 MB repetida 33×). O .slja
-	// clássico traz fundo único: primeiro asset cobre capa + todos os slides
-	// (padrão web#174), resolvido na leitura via getMedia.
+	// BG (16:9) → 1 blob em IndexedDB, VINCULADO À MÚSICA como background —
+	// NÃO como cover (regra Rafael: cover 1:1 e BG 16:9 são distintos; definir
+	// cover no editor nunca substitui o BG da projeção). O .slja clássico traz
+	// fundo único: primeiro asset cobre todos os slides (padrão web#174),
+	// resolvido na leitura via getMedia.
 	if (archive.assets?.length && archive.assets[0]?.bytes?.length) {
 		await putMedia(`slja-${sljaHash}-cover`, archive.assets[0].bytes);
 		updateLocalMusic(musicId, {
-			coverMediaId: `slja-${sljaHash}-cover`,
+			backgroundMediaId: `slja-${sljaHash}-cover`,
 		});
 	}
 

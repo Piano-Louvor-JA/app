@@ -27,18 +27,21 @@ export function buildMediaSlides(
   options?: { showTitleSlide?: boolean },
 ): MediaLyricSlide[] {
   const showTitle = options?.showTitleSlide !== false
+  // BG 16:9 da projeção (ex: 1º asset do .slja) — DISTINTO da cover quadrada:
+  // fallback track.backgroundUrl ?? coverUrl preserva legado (BG em coverUrl).
+  const backgroundUrl = track.backgroundUrl ?? track.coverUrl
   const cover: MediaLyricSlide = {
     order: -1,
     lyric: showTitle ? track.name : '',
     showSlide: true,
     time: '00:00:00',
     instrumentalTime: '00:00:00',
-    imageUrl: track.coverUrl,
+    imageUrl: backgroundUrl,
     imagePosition: track.coverPosition,
     isCover: true,
   }
 
-  let prevImage = track.coverUrl
+  let prevImage = backgroundUrl
   let prevPosition = track.coverPosition
 
   const lyricSlides = track.lyrics

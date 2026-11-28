@@ -214,6 +214,11 @@ export async function loadCustomMusicTrack(
     const coverBlob = local.coverMediaId
       ? await getMedia(local.coverMediaId)
       : null
+    // BG do .slja (16:9) é separado da cover quadrada (1:1). Legado: sem
+    // backgroundMediaId, o BG vivia em coverMediaId — fallback mantém projeção.
+    const backgroundBlob = local.backgroundMediaId
+      ? await getMedia(local.backgroundMediaId)
+      : (coverBlob ?? null)
     const audioUrl = audioBlob
       ? URL.createObjectURL(audioBlob)
       : local.audioBase64
@@ -244,6 +249,9 @@ export async function loadCustomMusicTrack(
       instrumentalUrl: null,
       coverUrl,
       coverPosition: null,
+      backgroundUrl: backgroundBlob
+        ? URL.createObjectURL(backgroundBlob)
+        : null,
       albums: [],
       categories: ['Minhas Coletâneas'],
       lyrics,
