@@ -36,6 +36,8 @@ export function buildMediaSlides(
     showSlide: true,
     time: '00:00:00',
     instrumentalTime: '00:00:00',
+    // Slide de título: BG 16:9 (ex: 1º asset do .slja) desde o primeiro slide;
+    // a cover QUADRADA é só artwork da faixa na listagem, nunca na projeção.
     imageUrl: backgroundUrl,
     imagePosition: track.coverPosition,
     isCover: true,
