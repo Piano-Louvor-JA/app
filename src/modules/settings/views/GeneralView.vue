@@ -1,169 +1,220 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { appConfirm } from '@shared/composables/useAppConfirm'
-import { hasMediaCustomCatalogBackup, restoreMediaCustomCatalogBackup } from '@modules/sync/services/media-custom-backup'
+import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
+import { appConfirm } from "@shared/composables/useAppConfirm";
+import {
+  hasMediaCustomCatalogBackup,
+  restoreMediaCustomCatalogBackup,
+} from "@modules/sync/services/media-custom-backup";
 
-import { GlassCard } from '@design-system/index'
-import { isDesktopApp } from '@shared/services/desktop-bridge'
-import { clearWorkspace } from '@shared/services/workspace-api'
+import { GlassCard } from "@design-system/index";
+import { isDesktopApp } from "@shared/services/desktop-bridge";
+import { clearWorkspace } from "@shared/services/workspace-api";
 import {
   removeBrowserItem,
   removeBrowserItemsByPrefix,
-} from '@shared/services/browser-storage'
-import { BROWSER_STORAGE_KEYS, USER_PREFERENCE_KEYS } from '@shared/constants/storage-keys'
-import { APP_VERSION } from '@shared/constants/app'
-import { useUpdateChecker } from '@shared/composables/useUpdateChecker'
-import { getUserPreference, setUserPreference } from '@shared/services/user-preferences'
+} from "@shared/services/browser-storage";
+import {
+  BROWSER_STORAGE_KEYS,
+  USER_PREFERENCE_KEYS,
+} from "@shared/constants/storage-keys";
+import { APP_VERSION } from "@shared/constants/app";
+import { useUpdateChecker } from "@shared/composables/useUpdateChecker";
+import {
+  getUserPreference,
+  setUserPreference,
+} from "@shared/services/user-preferences";
 import {
   exportLouvorjaFile,
   importLouvorjaFile,
-} from '@modules/sync/services/louvorja-file'
+} from "@modules/sync/services/louvorja-file";
 import {
   exportLouvorjaFromBrowser,
   importLouvorjaIntoBrowser,
-} from '@modules/sync/services/louvorja-adapter'
+} from "@modules/sync/services/louvorja-adapter";
 import {
   decodeLouvorjaPackage,
   encodeLouvorjaPackage,
   isValidLouvorjaContent,
-} from '@modules/sync/services/louvorja-package'
-import LegacyMediaImportCard from '../components/LegacyMediaImportCard.vue'
-import MediaFolderCard from '../components/MediaFolderCard.vue'
-import AppBackupCard from '../components/AppBackupCard.vue'
-import DiagnosticsCard from '../components/DiagnosticsCard.vue'
-import { ensureCatalogForLocale } from '@modules/starting/services/catalog-locale-service'
-import { isLibrasEnabled, setLibrasEnabled, getLibrasAvatar, setLibrasAvatar, type LibrasAvatar, getLibrasRegionalism, setLibrasRegionalism, type LibrasRegionalism, isLibrasSubtitleEnabled, setLibrasSubtitleEnabled, getLibrasSpeed, setLibrasSpeed } from '@modules/libras/services/libras-preferences'
+} from "@modules/sync/services/louvorja-package";
+import LegacyMediaImportCard from "../components/LegacyMediaImportCard.vue";
+import MediaFolderCard from "../components/MediaFolderCard.vue";
+import AppBackupCard from "../components/AppBackupCard.vue";
+import DiagnosticsCard from "../components/DiagnosticsCard.vue";
+import { ensureCatalogForLocale } from "@modules/starting/services/catalog-locale-service";
+import {
+  isLibrasEnabled,
+  setLibrasEnabled,
+  getLibrasAvatar,
+  setLibrasAvatar,
+  type LibrasAvatar,
+  getLibrasRegionalism,
+  setLibrasRegionalism,
+  type LibrasRegionalism,
+  isLibrasSubtitleEnabled,
+  setLibrasSubtitleEnabled,
+  getLibrasSpeed,
+  setLibrasSpeed,
+} from "@modules/libras/services/libras-preferences";
 
-const librasOn = ref(isLibrasEnabled())
-const librasAvatar = ref<LibrasAvatar>(getLibrasAvatar())
-const librasSubtitle = ref(isLibrasSubtitleEnabled())
-const librasRegionalism = ref<LibrasRegionalism>(getLibrasRegionalism())
-const librasSpeed = ref(getLibrasSpeed())
+const librasOn = ref(isLibrasEnabled());
+const librasAvatar = ref<LibrasAvatar>(getLibrasAvatar());
+const librasSubtitle = ref(isLibrasSubtitleEnabled());
+const librasRegionalism = ref<LibrasRegionalism>(getLibrasRegionalism());
+const librasSpeed = ref(getLibrasSpeed());
 
-const { t, locale } = useI18n()
-const catalogSyncState = ref<'idle' | 'syncing' | 'done' | 'error'>('idle')
+const { t, locale } = useI18n();
+const catalogSyncState = ref<"idle" | "syncing" | "done" | "error">("idle");
 /** 0–100 do download do catálogo do idioma (0 = nada concluído ainda). */
-const catalogSyncProgress = ref(0)
-const isClearing = ref(false)
-const clearError = ref(false)
-const clearConfirmOpen = ref(false)
-const clearAcknowledged = ref(false)
-const clearConfirmTitleId = 'settings-clear-confirm-title'
-const clearConfirmTextId = 'settings-clear-confirm-text'
+const catalogSyncProgress = ref(0);
+const isClearing = ref(false);
+const clearError = ref(false);
+const clearConfirmOpen = ref(false);
+const clearAcknowledged = ref(false);
+const clearConfirmTitleId = "settings-clear-confirm-title";
+const clearConfirmTextId = "settings-clear-confirm-text";
 
 function openClearConfirm() {
-  if (!isDesktopApp() || isClearing.value) return
-  clearError.value = false
-  clearAcknowledged.value = false
-  clearConfirmOpen.value = true
+  if (!isDesktopApp() || isClearing.value) return;
+  clearError.value = false;
+  clearAcknowledged.value = false;
+  clearConfirmOpen.value = true;
 }
 
 function closeClearConfirm() {
   /* v8 ignore next 1 -- popup fecha antes de isClearing ficar true */
-  if (isClearing.value) return
-  clearConfirmOpen.value = false
-  clearAcknowledged.value = false
+  if (isClearing.value) return;
+  clearConfirmOpen.value = false;
+  clearAcknowledged.value = false;
 }
 
 type SyncStatus =
-  | { kind: 'idle' }
-  | { kind: 'success'; messageKey: string; params?: Record<string, unknown> }
-  | { kind: 'error'; messageKey: string }
+  | { kind: "idle" }
+  | { kind: "success"; messageKey: string; params?: Record<string, unknown> }
+  | { kind: "error"; messageKey: string };
 
-const syncStatus = ref<SyncStatus>({ kind: 'idle' })
-const isSyncBusy = ref(false)
-const hasCatalogBackup = ref(hasMediaCustomCatalogBackup())
+const syncStatus = ref<SyncStatus>({ kind: "idle" });
+const isSyncBusy = ref(false);
+const hasCatalogBackup = ref(hasMediaCustomCatalogBackup());
 
 async function handleSyncExport() {
-  if (isSyncBusy.value) return
-  isSyncBusy.value = true
-  syncStatus.value = { kind: 'idle' }
+  if (isSyncBusy.value) return;
+  isSyncBusy.value = true;
+  syncStatus.value = { kind: "idle" };
   try {
-    const pkg = exportLouvorjaFromBrowser(APP_VERSION, isDesktopApp() ? 'desktop' : 'web')
-    const ok = await exportLouvorjaFile(encodeLouvorjaPackage(pkg))
+    const pkg = exportLouvorjaFromBrowser(
+      APP_VERSION,
+      isDesktopApp() ? "desktop" : "web",
+    );
+    const ok = await exportLouvorjaFile(encodeLouvorjaPackage(pkg));
     syncStatus.value = ok
-      ? { kind: 'success', messageKey: 'settings.general.syncExported' }
-      : { kind: 'error', messageKey: 'settings.general.syncCancelled' }
+      ? { kind: "success", messageKey: "settings.general.syncExported" }
+      : { kind: "error", messageKey: "settings.general.syncCancelled" };
   } catch (error) {
-    console.error('[settings] falha ao exportar pacote', error)
-    syncStatus.value = { kind: 'error', messageKey: 'settings.general.syncInvalid' }
+    console.error("[settings] falha ao exportar pacote", error);
+    syncStatus.value = {
+      kind: "error",
+      messageKey: "settings.general.syncInvalid",
+    };
   } finally {
-    isSyncBusy.value = false
+    isSyncBusy.value = false;
   }
 }
 
 async function handleSyncImport() {
-  if (isSyncBusy.value) return
-  isSyncBusy.value = true
-  syncStatus.value = { kind: 'idle' }
+  if (isSyncBusy.value) return;
+  isSyncBusy.value = true;
+  syncStatus.value = { kind: "idle" };
   try {
-    const raw = await importLouvorjaFile()
+    const raw = await importLouvorjaFile();
     if (raw == null) {
-      syncStatus.value = { kind: 'error', messageKey: 'settings.general.syncCancelled' }
-      return
+      syncStatus.value = {
+        kind: "error",
+        messageKey: "settings.general.syncCancelled",
+      };
+      return;
     }
     if (!isValidLouvorjaContent(raw)) {
-      syncStatus.value = { kind: 'error', messageKey: 'settings.general.syncInvalid' }
-      return
+      syncStatus.value = {
+        kind: "error",
+        messageKey: "settings.general.syncInvalid",
+      };
+      return;
     }
-    const pkg = decodeLouvorjaPackage(raw)
-    let catalogReplacementConfirmed = false
+    const pkg = decodeLouvorjaPackage(raw);
+    let catalogReplacementConfirmed = false;
     if (pkg.entities.mediaCustomCatalog) {
       catalogReplacementConfirmed = await appConfirm({
-        title: t('settings.general.catalogReplaceTitle'),
-        message: t('settings.general.catalogReplaceMessage'),
-        confirmLabel: t('settings.general.catalogReplaceConfirm'),
-        cancelLabel: t('settings.general.catalogCancel'),
+        title: t("settings.general.catalogReplaceTitle"),
+        message: t("settings.general.catalogReplaceMessage"),
+        confirmLabel: t("settings.general.catalogReplaceConfirm"),
+        cancelLabel: t("settings.general.catalogCancel"),
         danger: true,
-      })
+      });
       if (!catalogReplacementConfirmed) {
-        syncStatus.value = { kind: 'error', messageKey: 'settings.general.syncCancelled' }
-        return
+        syncStatus.value = {
+          kind: "error",
+          messageKey: "settings.general.syncCancelled",
+        };
+        return;
       }
     }
-    const result = importLouvorjaIntoBrowser(pkg, { catalogReplacementConfirmed })
-    hasCatalogBackup.value = hasMediaCustomCatalogBackup()
+    const result = importLouvorjaIntoBrowser(pkg, {
+      catalogReplacementConfirmed,
+    });
+    hasCatalogBackup.value = hasMediaCustomCatalogBackup();
     if (result.applied.length > 0) {
       if (result.applied.includes("liturgy")) {
-        window.dispatchEvent(new CustomEvent("liturgy:imported"))
+        window.dispatchEvent(new CustomEvent("liturgy:imported"));
       }
       syncStatus.value = {
-        kind: 'success',
-        messageKey: 'settings.general.syncImported',
-        params: { applied: result.applied.join(', ') },
-      }
+        kind: "success",
+        messageKey: "settings.general.syncImported",
+        params: { applied: result.applied.join(", ") },
+      };
     } else {
       syncStatus.value = {
-        kind: 'success',
-        messageKey: 'settings.general.syncNothingToApply',
+        kind: "success",
+        messageKey: "settings.general.syncNothingToApply",
         params: {
-          localModified: result.localModified ?? '—',
-          packageModified: result.packageModified ?? '—',
+          localModified: result.localModified ?? "—",
+          packageModified: result.packageModified ?? "—",
         },
-      }
+      };
     }
   } catch (error) {
-    console.error('[settings] falha ao importar pacote', error)
-    syncStatus.value = { kind: 'error', messageKey: 'settings.general.catalogImportFailed' }
+    console.error("[settings] falha ao importar pacote", error);
+    syncStatus.value = {
+      kind: "error",
+      messageKey: "settings.general.catalogImportFailed",
+    };
   } finally {
-    isSyncBusy.value = false
+    isSyncBusy.value = false;
   }
 }
 
 async function handleCatalogRestore() {
-  if (isSyncBusy.value) return
-  isSyncBusy.value = true
+  if (isSyncBusy.value) return;
+  isSyncBusy.value = true;
   try {
-    const confirmed = await appConfirm({ title: t('settings.general.catalogRestore'), message: t('settings.general.catalogRestoreMessage'), confirmLabel: t('settings.general.catalogRestore'), cancelLabel: t('settings.general.catalogCancel'), danger: true })
-    if (!confirmed) return
+    const confirmed = await appConfirm({
+      title: t("settings.general.catalogRestore"),
+      message: t("settings.general.catalogRestoreMessage"),
+      confirmLabel: t("settings.general.catalogRestore"),
+      cancelLabel: t("settings.general.catalogCancel"),
+      danger: true,
+    });
+    if (!confirmed) return;
     syncStatus.value = restoreMediaCustomCatalogBackup()
-      ? { kind: 'success', messageKey: 'settings.general.catalogRestored' }
-      : { kind: 'error', messageKey: 'settings.general.catalogImportFailed' }
+      ? { kind: "success", messageKey: "settings.general.catalogRestored" }
+      : { kind: "error", messageKey: "settings.general.catalogImportFailed" };
   } catch {
-    syncStatus.value = { kind: 'error', messageKey: 'settings.general.catalogImportFailed' }
+    syncStatus.value = {
+      kind: "error",
+      messageKey: "settings.general.catalogImportFailed",
+    };
   } finally {
-    isSyncBusy.value = false
+    isSyncBusy.value = false;
   }
 }
 
@@ -174,51 +225,34 @@ const {
   newVersion,
   error: updateError,
   hasChecked,
-} = useUpdateChecker()
+} = useUpdateChecker();
 
 const SUPPORTED_LOCALES = [
-  { value: 'pt-BR', labelKey: 'settings.general.languagePortuguese' },
-  { value: 'en', labelKey: 'settings.general.languageEnglish' },
-  { value: 'es', labelKey: 'settings.general.languageSpanish' },
-  { value: 'ru', labelKey: 'settings.general.languageRussian' },
-  { value: 'uk', labelKey: 'settings.general.languageUkrainian' },
-  { value: 'fr', labelKey: 'settings.general.languageFrench' },
-  { value: 'ja', labelKey: 'settings.general.languageJapanese' },
-  { value: 'ko', labelKey: 'settings.general.languageKorean' },
-  { value: 'zh', labelKey: 'settings.general.languageChinese' },
-  { value: 'tr', labelKey: 'settings.general.languageTurkish' },
-  { value: 'ar', labelKey: 'settings.general.languageArabic' },
-  { value: 'hi', labelKey: 'settings.general.languageHindi' },
-  { value: 'it', labelKey: 'settings.general.languageItalian' },
-  { value: 'nl', labelKey: 'settings.general.languageDutch' },
-  { value: 'pl', labelKey: 'settings.general.languagePolish' },
-] as const
+  { value: "pt-BR", labelKey: "settings.general.languagePortuguese" },
+  { value: "en", labelKey: "settings.general.languageEnglish" },
+  { value: "es", labelKey: "settings.general.languageSpanish" },
+  { value: "ru", labelKey: "settings.general.languageRussian" },
+  { value: "uk", labelKey: "settings.general.languageUkrainian" },
+  { value: "fr", labelKey: "settings.general.languageFrench" },
+  { value: "ja", labelKey: "settings.general.languageJapanese" },
+  { value: "ko", labelKey: "settings.general.languageKorean" },
+  { value: "zh", labelKey: "settings.general.languageChinese" },
+  { value: "tr", labelKey: "settings.general.languageTurkish" },
+  { value: "ar", labelKey: "settings.general.languageArabic" },
+  { value: "hi", labelKey: "settings.general.languageHindi" },
+  { value: "it", labelKey: "settings.general.languageItalian" },
+  { value: "nl", labelKey: "settings.general.languageDutch" },
+  { value: "pl", labelKey: "settings.general.languagePolish" },
+] as const;
 
 const currentLanguage = ref(
-  getUserPreference<string>(USER_PREFERENCE_KEYS.language, 'pt-BR') ?? 'pt-BR',
-)
+  getUserPreference<string>(USER_PREFERENCE_KEYS.language, "pt-BR") ?? "pt-BR",
+);
 
-/** Seletor premium de idioma (dropdown custom). */
-const langSelectOpen = ref(false)
-const langSelectRoot = ref<HTMLElement | null>(null)
-const currentLanguageLabel = computed(
-  () =>
-    t(
-      SUPPORTED_LOCALES.find((l) => l.value === currentLanguage.value)
-        ?.labelKey ?? 'settings.general.languagePortuguese',
-    ),
-)
+/** Seletor nativo de idioma. */
 function selectLanguage(lang: string) {
-  langSelectOpen.value = false
-  void changeLanguage(lang)
+  void changeLanguage(lang);
 }
-function onLangDocClick(event: MouseEvent) {
-  if (!langSelectRoot.value?.contains(event.target as Node)) {
-    langSelectOpen.value = false
-  }
-}
-onMounted(() => document.addEventListener('click', onLangDocClick))
-onBeforeUnmount(() => document.removeEventListener('click', onLangDocClick))
 
 /** Ordem D2 da SPEC-locale-hot-reload: download do catálogo do idioma alvo
  * PRIMEIRO, persistir o idioma DEPOIS, reload do renderer por último. O guard
@@ -226,61 +260,64 @@ onBeforeUnmount(() => document.removeEventListener('click', onLangDocClick))
  * preferência persistida — persistir antes = early-return = download nunca
  * roda (causa do "tem que fechar e abrir denovo", app#locale-hot-reload).
  * Falha de rede = rollback real: nada persistido, UI fica no idioma antigo. */
-let languageSwitchBusy = false
+let languageSwitchBusy = false;
 async function changeLanguage(lang: string) {
-  if (languageSwitchBusy) return
-  languageSwitchBusy = true
+  if (languageSwitchBusy) return;
+  languageSwitchBusy = true;
   try {
     // D4: no-op re-clicar o idioma ativo (nada a baixar nem recarregar).
-    if (lang === currentLanguage.value) return
-    catalogSyncState.value = 'syncing'
-    catalogSyncProgress.value = 0
+    if (lang === currentLanguage.value) return;
+    catalogSyncState.value = "syncing";
+    catalogSyncProgress.value = 0;
     await ensureCatalogForLocale(lang, (progress) => {
-      catalogSyncProgress.value = progress
-    })
-    setUserPreference(USER_PREFERENCE_KEYS.language, lang)
-    currentLanguage.value = lang
-    locale.value = lang
+      catalogSyncProgress.value = progress;
+    });
+    setUserPreference(USER_PREFERENCE_KEYS.language, lang);
+    currentLanguage.value = lang;
+    locale.value = lang;
     // D1: reload controlado do renderer (precedente runFirstBoot) — zera as
     // consts de módulo (ex.: BOOKS_FILE da bíblia) e recarrega os stores com
     // os índices do novo idioma. Não chega aqui se o download falhou.
-    window.location.reload()
+    window.location.reload();
   } catch {
-    catalogSyncState.value = 'error'
+    catalogSyncState.value = "error";
     // rollback: locale/currentLanguage ficam no idioma antigo (D2).
   } finally {
-    languageSwitchBusy = false
+    languageSwitchBusy = false;
   }
 }
 
 async function handleCheckUpdate() {
-  await checkForUpdates()
+  await checkForUpdates();
 }
 
 async function clearAllLocalData() {
   /* v8 ignore next 1 -- botão confirmar só habilita com acknowledged e desktop */
-  if (!isDesktopApp() || isClearing.value || !clearAcknowledged.value) return
+  if (!isDesktopApp() || isClearing.value || !clearAcknowledged.value) return;
 
-  isClearing.value = true
-  clearError.value = false
-  clearConfirmOpen.value = false
+  isClearing.value = true;
+  clearError.value = false;
+  clearConfirmOpen.value = false;
 
   try {
-    const cleared = await clearWorkspace()
+    const cleared = await clearWorkspace();
     if (!cleared) {
-      throw new Error('clear failed')
+      throw new Error("clear failed");
     }
 
-    removeBrowserItem(BROWSER_STORAGE_KEYS.userPreferences)
-    removeBrowserItem(BROWSER_STORAGE_KEYS.recentCollections)
-    removeBrowserItem(BROWSER_STORAGE_KEYS.topSongs)
-    removeBrowserItemsByPrefix(BROWSER_STORAGE_KEYS.catalogSessionPrefix, 'session')
+    removeBrowserItem(BROWSER_STORAGE_KEYS.userPreferences);
+    removeBrowserItem(BROWSER_STORAGE_KEYS.recentCollections);
+    removeBrowserItem(BROWSER_STORAGE_KEYS.topSongs);
+    removeBrowserItemsByPrefix(
+      BROWSER_STORAGE_KEYS.catalogSessionPrefix,
+      "session",
+    );
 
-    window.location.reload()
+    window.location.reload();
   } catch (error) {
-    console.error('[settings] falha ao limpar dados', error)
-    clearError.value = true
-    isClearing.value = false
+    console.error("[settings] falha ao limpar dados", error);
+    clearError.value = true;
+    isClearing.value = false;
   }
 }
 </script>
@@ -293,15 +330,18 @@ async function clearAllLocalData() {
 
       <div class="general-settings__header">
         <div class="general-settings__heading">
-          <i class="ti ti-refresh-dot general-settings__icon" aria-hidden="true" />
+          <i
+            class="ti ti-refresh-dot general-settings__icon"
+            aria-hidden="true"
+          />
           <h3 class="general-settings__title">
-            {{ t('settings.general.updateTitle') }}
+            {{ t("settings.general.updateTitle") }}
           </h3>
         </div>
       </div>
 
       <p class="general-settings__hint">
-        {{ t('settings.general.updateHint') }}
+        {{ t("settings.general.updateHint") }}
       </p>
 
       <button
@@ -311,7 +351,11 @@ async function clearAllLocalData() {
         @click="handleCheckUpdate"
       >
         <i class="ti ti-cloud-download" aria-hidden="true" />
-        {{ isChecking ? t('settings.general.checking') : t('settings.general.checkUpdate') }}
+        {{
+          isChecking
+            ? t("settings.general.checking")
+            : t("settings.general.checkUpdate")
+        }}
       </button>
 
       <p
@@ -319,28 +363,25 @@ async function clearAllLocalData() {
         class="general-settings__status general-settings__status--success"
       >
         <i class="ti ti-circle-check" aria-hidden="true" />
-        {{ t('settings.general.updateAvailable', { version: newVersion }) }}
+        {{ t("settings.general.updateAvailable", { version: newVersion }) }}
       </p>
       <p
         v-else-if="updateError"
         class="general-settings__status general-settings__status--error"
       >
         <i class="ti ti-alert-circle" aria-hidden="true" />
-        {{ t('settings.general.updateError') }}
+        {{ t("settings.general.updateError") }}
       </p>
       <p
         v-else-if="hasChecked && !isChecking"
         class="general-settings__status general-settings__status--info"
       >
         <i class="ti ti-check" aria-hidden="true" />
-        {{ t('settings.general.updateNotAvailable') }}
+        {{ t("settings.general.updateNotAvailable") }}
       </p>
 
-      <p
-        v-if="!isDesktopApp()"
-        class="general-settings__desktop-only"
-      >
-        {{ t('settings.general.updateDesktopOnly') }}
+      <p v-if="!isDesktopApp()" class="general-settings__desktop-only">
+        {{ t("settings.general.updateDesktopOnly") }}
       </p>
     </GlassCard>
 
@@ -352,47 +393,31 @@ async function clearAllLocalData() {
         <div class="general-settings__heading">
           <i class="ti ti-world general-settings__icon" aria-hidden="true" />
           <h3 class="general-settings__title">
-            {{ t('settings.general.languageTitle') }}
+            {{ t("settings.general.languageTitle") }}
           </h3>
         </div>
       </div>
 
       <p class="general-settings__hint">
-        {{ t('settings.general.languageHint') }}
+        {{ t("settings.general.languageHint") }}
       </p>
 
-      <!-- Seletor premium: dropdown custom (fecha ao clicar fora / escolher). -->
-      <div ref="langSelectRoot" class="general-settings__lang-select" :class="{ 'general-settings__lang-select--open': langSelectOpen }">
-        <button
-          type="button"
-          class="general-settings__lang-select-trigger"
-          :disabled="catalogSyncState === 'syncing'"
-          :aria-expanded="langSelectOpen"
-          aria-haspopup="listbox"
-          @click="langSelectOpen = !langSelectOpen"
+      <!-- Seletor nativo: sem overlay/clip, acessível por padrão. -->
+      <select
+        class="general-settings__lang-select-native"
+        :value="currentLanguage"
+        :disabled="catalogSyncState === 'syncing'"
+        :aria-label="t('settings.general.languageHint')"
+        @change="selectLanguage(($event.target as HTMLSelectElement).value)"
+      >
+        <option
+          v-for="lang in SUPPORTED_LOCALES"
+          :key="lang.value"
+          :value="lang.value"
         >
-          <i class="ti ti-world" aria-hidden="true" />
-          <span>{{ currentLanguageLabel }}</span>
-          <i class="ti general-settings__lang-select-chevron" :class="langSelectOpen ? 'ti-chevron-up' : 'ti-chevron-down'" aria-hidden="true" />
-        </button>
-        <Transition name="lang-pop">
-          <ul v-if="langSelectOpen" class="general-settings__lang-menu" role="listbox">
-            <li
-              v-for="lang in SUPPORTED_LOCALES"
-              :key="lang.value"
-              role="option"
-              :aria-selected="currentLanguage === lang.value"
-              class="general-settings__lang-option"
-              :class="{ 'general-settings__lang-option--active': currentLanguage === lang.value }"
-              :aria-disabled="catalogSyncState === 'syncing'"
-              @click="selectLanguage(lang.value)"
-            >
-              <i class="ti ti-check general-settings__lang-option-check" aria-hidden="true" />
-              <span>{{ t(lang.labelKey) }}</span>
-            </li>
-          </ul>
-        </Transition>
-      </div>
+          {{ t(lang.labelKey) }}
+        </option>
+      </select>
 
       <!-- D3 SPEC-locale-hot-reload: feedback do download do catálogo -->
       <div
@@ -404,31 +429,39 @@ async function clearAllLocalData() {
           data-testid="language-sync-downloading"
           role="status"
         >
-          {{ t('settings.general.languageSyncDownloading') }}
+          {{ t("settings.general.languageSyncDownloading") }}
         </p>
         <div class="general-settings__lang-progress-row">
           <div
             class="general-settings__lang-progress"
             :class="{
-              'general-settings__lang-progress--indeterminate': catalogSyncProgress <= 0,
+              'general-settings__lang-progress--indeterminate':
+                catalogSyncProgress <= 0,
             }"
             data-testid="language-sync-progress"
             role="progressbar"
             aria-valuemin="0"
             aria-valuemax="100"
-            :aria-valuenow="catalogSyncProgress > 0 ? catalogSyncProgress : undefined"
+            :aria-valuenow="
+              catalogSyncProgress > 0 ? catalogSyncProgress : undefined
+            "
             :aria-label="t('settings.general.languageSyncDownloading')"
           >
             <div
               class="general-settings__lang-progress-fill"
-              :style="catalogSyncProgress > 0 ? { width: `${catalogSyncProgress}%` } : undefined"
+              :style="
+                catalogSyncProgress > 0
+                  ? { width: `${catalogSyncProgress}%` }
+                  : undefined
+              "
             />
           </div>
           <span
             v-if="catalogSyncProgress > 0"
             class="general-settings__lang-progress-label"
             data-testid="language-sync-percent"
-          >{{ catalogSyncProgress }}%</span>
+            >{{ catalogSyncProgress }}%</span
+          >
         </div>
       </div>
       <div
@@ -437,13 +470,13 @@ async function clearAllLocalData() {
         data-testid="language-sync-error"
         role="alert"
       >
-        <span>{{ t('settings.general.languageSyncErrorTitle') }}</span>
+        <span>{{ t("settings.general.languageSyncErrorTitle") }}</span>
         <button
           type="button"
           class="general-settings__lang-sync-retry"
           @click="changeLanguage(currentLanguage === 'es' ? 'pt-BR' : 'es')"
         >
-          {{ t('settings.general.languageSyncRetry') }}
+          {{ t("settings.general.languageSyncRetry") }}
         </button>
       </div>
     </GlassCard>
@@ -454,25 +487,31 @@ async function clearAllLocalData() {
 
       <div class="general-settings__header">
         <div class="general-settings__heading">
-          <i class="ti ti-sign-language general-settings__icon" aria-hidden="true" />
+          <i
+            class="ti ti-sign-language general-settings__icon"
+            aria-hidden="true"
+          />
           <h3 class="general-settings__title">
-            {{ t('settings.general.librasTitle') }}
+            {{ t("settings.general.librasTitle") }}
           </h3>
         </div>
       </div>
 
       <p class="general-settings__hint">
-        {{ t('settings.general.librasHint') }}
+        {{ t("settings.general.librasHint") }}
       </p>
 
-      <label class="general-settings__libras-row" data-testid="libras-toggle-row">
+      <label
+        class="general-settings__libras-row"
+        data-testid="libras-toggle-row"
+      >
         <input
           v-model="librasOn"
           type="checkbox"
           data-testid="libras-toggle"
           @change="setLibrasEnabled(librasOn)"
-        >
-        <span>{{ t('settings.general.librasToggleLabel') }}</span>
+        />
+        <span>{{ t("settings.general.librasToggleLabel") }}</span>
       </label>
 
       <label
@@ -485,7 +524,7 @@ async function clearAllLocalData() {
           type="checkbox"
           data-testid="libras-subtitle-toggle"
           @change="setLibrasSubtitleEnabled(librasSubtitle)"
-        >
+        />
         <span>Legendas do intérprete</span>
       </label>
 
@@ -494,15 +533,21 @@ async function clearAllLocalData() {
         class="general-settings__libras-row"
         data-testid="libras-avatar-row"
       >
-        <span>{{ t('settings.general.librasAvatarLabel') }}</span>
+        <span>{{ t("settings.general.librasAvatarLabel") }}</span>
         <select
           v-model="librasAvatar"
           data-testid="libras-avatar-select"
           @change="setLibrasAvatar(librasAvatar)"
         >
-          <option value="icaro">{{ t('settings.general.librasAvatarIcaro') }}</option>
-          <option value="hozana">{{ t('settings.general.librasAvatarHozana') }}</option>
-          <option value="guga">{{ t('settings.general.librasAvatarGuga') }}</option>
+          <option value="icaro">
+            {{ t("settings.general.librasAvatarIcaro") }}
+          </option>
+          <option value="hozana">
+            {{ t("settings.general.librasAvatarHozana") }}
+          </option>
+          <option value="guga">
+            {{ t("settings.general.librasAvatarGuga") }}
+          </option>
         </select>
       </label>
 
@@ -553,15 +598,18 @@ async function clearAllLocalData() {
 
       <div class="general-settings__header">
         <div class="general-settings__heading">
-          <i class="ti ti-arrows-exchange general-settings__icon" aria-hidden="true" />
+          <i
+            class="ti ti-arrows-exchange general-settings__icon"
+            aria-hidden="true"
+          />
           <h3 class="general-settings__title">
-            {{ t('settings.general.syncTitle') }}
+            {{ t("settings.general.syncTitle") }}
           </h3>
         </div>
       </div>
 
       <p class="general-settings__hint">
-        {{ t('settings.general.syncHint') }}
+        {{ t("settings.general.syncHint") }}
       </p>
 
       <div class="general-settings__sync-actions">
@@ -572,7 +620,7 @@ async function clearAllLocalData() {
           @click="handleSyncExport"
         >
           <i class="ti ti-file-export" aria-hidden="true" />
-          {{ t('settings.general.syncExport') }}
+          {{ t("settings.general.syncExport") }}
         </button>
 
         <button
@@ -582,10 +630,16 @@ async function clearAllLocalData() {
           @click="handleSyncImport"
         >
           <i class="ti ti-file-import" aria-hidden="true" />
-          {{ t('settings.general.syncImport') }}
+          {{ t("settings.general.syncImport") }}
         </button>
-        <button v-if="hasCatalogBackup" type="button" class="general-settings__btn" :disabled="isSyncBusy" @click="handleCatalogRestore">
-          {{ t('settings.general.catalogRestore') }}
+        <button
+          v-if="hasCatalogBackup"
+          type="button"
+          class="general-settings__btn"
+          :disabled="isSyncBusy"
+          @click="handleCatalogRestore"
+        >
+          {{ t("settings.general.catalogRestore") }}
         </button>
       </div>
 
@@ -620,19 +674,22 @@ async function clearAllLocalData() {
 
     <!-- Dados locais -->
     <GlassCard class="general-settings__card" elevated>
-      <div class="general-settings__accent general-settings__accent--danger" aria-hidden="true" />
+      <div
+        class="general-settings__accent general-settings__accent--danger"
+        aria-hidden="true"
+      />
 
       <div class="general-settings__header">
         <div class="general-settings__heading">
           <i class="ti ti-database general-settings__icon" aria-hidden="true" />
           <h3 class="general-settings__title">
-            {{ t('settings.general.dataTitle') }}
+            {{ t("settings.general.dataTitle") }}
           </h3>
         </div>
       </div>
 
       <p class="general-settings__hint">
-        {{ t('settings.general.dataHint') }}
+        {{ t("settings.general.dataHint") }}
       </p>
 
       <button
@@ -642,7 +699,7 @@ async function clearAllLocalData() {
         @click="openClearConfirm"
       >
         <i class="ti ti-trash" aria-hidden="true" />
-        {{ t('settings.general.clearData') }}
+        {{ t("settings.general.clearData") }}
       </button>
 
       <p
@@ -650,14 +707,11 @@ async function clearAllLocalData() {
         class="general-settings__status general-settings__status--error"
       >
         <i class="ti ti-alert-circle" aria-hidden="true" />
-        {{ t('settings.general.clearError') }}
+        {{ t("settings.general.clearError") }}
       </p>
 
-      <p
-        v-if="!isDesktopApp()"
-        class="general-settings__desktop-only"
-      >
-        {{ t('settings.general.desktopOnly') }}
+      <p v-if="!isDesktopApp()" class="general-settings__desktop-only">
+        {{ t("settings.general.desktopOnly") }}
       </p>
     </GlassCard>
 
@@ -676,17 +730,11 @@ async function clearAllLocalData() {
           @click="closeClearConfirm"
         />
         <div class="clear-confirm__panel">
-          <h2
-            :id="clearConfirmTitleId"
-            class="clear-confirm__title"
-          >
-            {{ t('settings.general.clearConfirmTitle') }}
+          <h2 :id="clearConfirmTitleId" class="clear-confirm__title">
+            {{ t("settings.general.clearConfirmTitle") }}
           </h2>
-          <p
-            :id="clearConfirmTextId"
-            class="clear-confirm__text"
-          >
-            {{ t('settings.general.clearConfirmText') }}
+          <p :id="clearConfirmTextId" class="clear-confirm__text">
+            {{ t("settings.general.clearConfirmText") }}
           </p>
           <label class="clear-confirm__check">
             <input
@@ -694,8 +742,8 @@ async function clearAllLocalData() {
               type="checkbox"
               class="clear-confirm__checkbox"
               :disabled="isClearing"
-            >
-            <span>{{ t('settings.general.clearConfirmCheckbox') }}</span>
+            />
+            <span>{{ t("settings.general.clearConfirmCheckbox") }}</span>
           </label>
           <div class="clear-confirm__actions">
             <button
@@ -704,7 +752,7 @@ async function clearAllLocalData() {
               :disabled="isClearing"
               @click="closeClearConfirm"
             >
-              {{ t('settings.general.clearConfirmCancel') }}
+              {{ t("settings.general.clearConfirmCancel") }}
             </button>
             <button
               type="button"
@@ -712,7 +760,7 @@ async function clearAllLocalData() {
               :disabled="!clearAcknowledged || isClearing"
               @click="clearAllLocalData"
             >
-              {{ t('settings.general.clearConfirmAction') }}
+              {{ t("settings.general.clearConfirmAction") }}
             </button>
           </div>
         </div>
@@ -737,6 +785,13 @@ async function clearAllLocalData() {
   /* NÃO clipar: dropdown de idioma (menu absolute) vaza o card. O accent
      de 4px é absoluto dentro dos limites — não vaza sem o hidden. */
   overflow: visible;
+}
+
+/* Card do idioma acima dos vizinhos — o popup do <select> nativo no
+   Electron pinta no layer da página e o card seguinte (Libras) o cobria.
+   z-index permanente no card do idioma (barato e estável). */
+.general-settings__card:has(.general-settings__lang-select-native) {
+  z-index: 50;
 }
 
 .general-settings__accent {
@@ -772,7 +827,9 @@ async function clearAllLocalData() {
   color: var(--ds-color-primary);
 }
 
-.general-settings__accent--danger ~ .general-settings__header .general-settings__icon {
+.general-settings__accent--danger
+  ~ .general-settings__header
+  .general-settings__icon {
   color: rgb(var(--v-theme-error));
 }
 
@@ -834,7 +891,8 @@ async function clearAllLocalData() {
 }
 
 .general-settings__btn--danger {
-  border: 1px solid color-mix(in srgb, rgb(var(--v-theme-error)) 28%, transparent);
+  border: 1px solid
+    color-mix(in srgb, rgb(var(--v-theme-error)) 28%, transparent);
   background: color-mix(in srgb, rgb(var(--v-theme-error)) 12%, transparent);
   color: rgb(var(--v-theme-error));
 
@@ -880,7 +938,10 @@ async function clearAllLocalData() {
 .general-settings__libras-row select {
   padding: 0.375rem 0.75rem;
   color: var(--ds-color-on-surface);
-  background-color: var(--ds-color-surface-container, rgba(255, 255, 255, 0.08));
+  background-color: var(
+    --ds-color-surface-container,
+    rgba(255, 255, 255, 0.08)
+  );
   border: 1px solid var(--ds-color-outline, rgba(255, 255, 255, 0.25));
   border-radius: 8px;
   cursor: pointer;
@@ -905,7 +966,8 @@ async function clearAllLocalData() {
 
 .general-settings__lang-btn {
   padding: 0.5rem 1.25rem;
-  border: 1px solid color-mix(in srgb, var(--ds-color-on-surface) 12%, transparent);
+  border: 1px solid
+    color-mix(in srgb, var(--ds-color-on-surface) 12%, transparent);
   border-radius: var(--ds-radius-full);
   background: transparent;
   color: var(--ds-color-on-surface-variant);
@@ -929,109 +991,55 @@ async function clearAllLocalData() {
 }
 
 /* Seletor premium de idioma (dropdown custom glass). */
-.general-settings__lang-select {
-  position: relative;
+/* Seletor nativo de idioma — sem overlay, sem clipping. */
+.general-settings__lang-select-native {
   width: min(320px, 100%);
-}
-
-.general-settings__lang-select-trigger {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  width: 100%;
   padding: 0.75rem 1rem;
-  border: 1px solid color-mix(in srgb, var(--ds-color-on-surface) 12%, transparent);
+  border: 1px solid
+    color-mix(in srgb, var(--ds-color-on-surface) 12%, transparent);
   border-radius: var(--ds-radius-md, 0.75rem);
   background: color-mix(in srgb, var(--ds-color-on-surface) 4%, transparent);
   color: var(--ds-color-on-surface);
   font-size: 0.9375rem;
   font-weight: 500;
   cursor: pointer;
-  transition: border-color 200ms ease, box-shadow 200ms ease;
+  appearance: none;
+  background-image:
+    linear-gradient(
+      45deg,
+      transparent 50%,
+      var(--ds-color-on-surface-variant) 50%
+    ),
+    linear-gradient(
+      135deg,
+      var(--ds-color-on-surface-variant) 50%,
+      transparent 50%
+    );
+  background-position:
+    calc(100% - 18px) calc(50% + 2px),
+    calc(100% - 13px) calc(50% + 2px);
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
 
-  span {
-    flex: 1;
-    text-align: left;
+  &:hover,
+  &:focus-visible {
+    border-color: color-mix(in srgb, var(--ds-color-primary) 55%, transparent);
+    box-shadow: 0 0 0 3px
+      color-mix(in srgb, var(--ds-color-primary) 14%, transparent);
+    outline: none;
   }
-}
 
-.general-settings__lang-select-trigger:disabled {
-  opacity: 0.6;
-  cursor: wait;
-}
+  &:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  }
 
-.general-settings__lang-select--open .general-settings__lang-select-trigger,
-.general-settings__lang-select-trigger:hover {
-  border-color: color-mix(in srgb, var(--ds-color-primary) 55%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ds-color-primary) 14%, transparent);
-}
-
-.general-settings__lang-select-chevron {
-  font-size: 1rem;
-  color: var(--ds-color-on-surface-variant);
-}
-
-.general-settings__lang-menu {
-  position: absolute;
-  z-index: 30;
-  top: calc(100% + 0.375rem);
-  left: 0;
-  right: 0;
-  max-height: 320px;
-  overflow-y: auto;
-  margin: 0;
-  padding: 0.375rem;
-  list-style: none;
-  border: 1px solid color-mix(in srgb, var(--ds-color-on-surface) 10%, transparent);
-  border-radius: var(--ds-radius-md, 0.75rem);
-  background: color-mix(in srgb, var(--ds-color-card, var(--ds-color-surface, #17171c)) 92%, transparent);
-  backdrop-filter: blur(18px);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.38);
-}
-
-.general-settings__lang-option {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5625rem 0.75rem;
-  border-radius: calc(var(--ds-radius-md, 0.75rem) - 0.25rem);
-  color: var(--ds-color-on-surface-variant);
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 150ms ease, color 150ms ease;
-
-  &:hover {
-    background: color-mix(in srgb, var(--ds-color-on-surface) 7%, transparent);
+  option {
+    background: var(--ds-color-card, var(--ds-color-surface, #17171c));
     color: var(--ds-color-on-surface);
   }
-}
-
-.general-settings__lang-option-check {
-  font-size: 0.9375rem;
-  visibility: hidden;
-}
-
-.general-settings__lang-option--active {
-  color: var(--ds-color-primary);
-  background: color-mix(in srgb, var(--ds-color-primary) 10%, transparent);
-
-  .general-settings__lang-option-check {
-    visibility: visible;
-  }
-}
-
-/* Transição do dropdown. */
-.lang-pop-enter-active,
-.lang-pop-leave-active {
-  transition: opacity 160ms ease, transform 160ms ease;
-  transform-origin: top center;
-}
-
-.lang-pop-enter-from,
-.lang-pop-leave-to {
-  opacity: 0;
-  transform: translateY(-6px) scale(0.98);
 }
 
 /* Status */
@@ -1164,11 +1172,19 @@ async function clearAllLocalData() {
   }
 
   &--danger {
-    background: color-mix(in srgb, var(--ds-color-error, #ffb4ab) 18%, transparent);
+    background: color-mix(
+      in srgb,
+      var(--ds-color-error, #ffb4ab) 18%,
+      transparent
+    );
     color: var(--ds-color-error, #ffb4ab);
 
     &:hover:not(:disabled) {
-      background: color-mix(in srgb, var(--ds-color-error, #ffb4ab) 28%, transparent);
+      background: color-mix(
+        in srgb,
+        var(--ds-color-error, #ffb4ab) 28%,
+        transparent
+      );
     }
   }
 }
@@ -1207,7 +1223,8 @@ async function clearAllLocalData() {
   transition: width 0.3s ease;
 }
 
-.general-settings__lang-progress--indeterminate .general-settings__lang-progress-fill {
+.general-settings__lang-progress--indeterminate
+  .general-settings__lang-progress-fill {
   position: absolute;
   inset: 0 auto 0 0;
   width: 35%;
@@ -1231,7 +1248,8 @@ async function clearAllLocalData() {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .general-settings__lang-progress--indeterminate .general-settings__lang-progress-fill {
+  .general-settings__lang-progress--indeterminate
+    .general-settings__lang-progress-fill {
     animation: none;
     width: 100%;
     opacity: 0.5;
