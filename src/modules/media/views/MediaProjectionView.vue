@@ -21,6 +21,7 @@ import { DEFAULT_MEDIA_PROJECTION } from '../types/media'
 import VLibrasUnityPlayer from '../../libras/components/VLibrasUnityPlayer.vue'
 import { useLibrasLive } from '../../libras/composables/useLibrasLive'
 import { isLibrasEnabled, getLibrasAvatar, isLibrasSubtitleEnabled, getLibrasSpeed } from '../../libras/services/libras-preferences'
+import { BROWSER_STORAGE_KEYS } from '@shared/constants/storage-keys'
 
 const runtime = ref<MediaProjectionRuntime>({ ...DEFAULT_MEDIA_PROJECTION })
 
@@ -40,13 +41,24 @@ const lyric = computed(() => stripHtmlBreaks(runtime.value.lyric))
 const showTitle = computed(() => runtime.value.isCover)
 
 // F-B.2: intérprete Ícaro no canto — tradução ao vivo do slide (Libras ON).
-const librasEnabled = isLibrasEnabled()
-const librasAvatar = getLibrasAvatar()
-const librasSubtitle = isLibrasSubtitleEnabled()
-const librasSpeed = getLibrasSpeed()
+// HOTFIX: libras.enabled ignorado — :visible era só runtime.active; avatar
+// aparecia na projeção mesmo com Libras desativada. Agora reativo via storage
+// (prefs userPreferences mudam de outra janela e a projeção reavalia).
+const librasEnabled = ref(isLibrasEnabled())
+const librasAvatar = ref(getLibrasAvatar())
+const librasSubtitle = ref(isLibrasSubtitleEnabled())
+const librasSpeed = ref(getLibrasSpeed())
+function refreshLibrasPrefs(): void {
+  librasEnabled.value = isLibrasEnabled()
+  librasAvatar.value = getLibrasAvatar()
+  librasSubtitle.value = isLibrasSubtitleEnabled()
+  librasSpeed.value = getLibrasSpeed()
+  if (!librasEnabled.value) unityPlayer.value?.stop()
+}
 const unityPlayer = ref<InstanceType<typeof VLibrasUnityPlayer> | null>(null)
 const liveLyric = computed(() => (runtime.value.active && !runtime.value.isCover ? lyric.value : ''))
-const librasLive = useLibrasLive(liveLyric, computed(() => runtime.value.active))
+// HOTFIX: disabled => sem gloss (e o watch do gloss já chama stop())
+const librasLive = useLibrasLive(liveLyric, computed(() => runtime.value.active && librasEnabled.value))
 watch(librasLive.gloss, (gloss) => {
   if (gloss) unityPlayer.value?.playGloss(gloss)
   else unityPlayer.value?.stop()
@@ -57,6 +69,7 @@ function applyRuntime(raw: unknown) {
 }
 
 function onStorage(event: StorageEvent) {
+  if (event.key === BROWSER_STORAGE_KEYS.userPreferences) refreshLibrasPrefs()
   if (event.key !== MEDIA_RUNTIME_STORAGE_KEY || !event.newValue) return
   try {
     applyRuntime(JSON.parse(event.newValue) as unknown)
@@ -284,7 +297,7 @@ const projectionFontStyle = useProjectionFont('hymns')
   <VLibrasUnityPlayer
     ref="unityPlayer"
     compact
-    :visible="runtime.active"
+    :visible="runtime.active && librasEnabled"
     :avatar="librasAvatar"
     :subtitle="librasSubtitle"
     :speed="librasSpeed"
