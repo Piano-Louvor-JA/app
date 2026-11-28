@@ -124,7 +124,7 @@ function loadDb(): LocalDb {
 						// Migração BG×cover (regra Rafael): import .slja legado gravava
 						// o BG 16:9 em coverMediaId. O blob segue em slja-<hash>-cover
 						// (IndexedDB) mesmo depois de o editor definir uma capa — a
-						// música guarda sljaHash, então o BG é reativo SEM reimport.
+						// música guarda sljaHash, então o BG é reativado SEM reimport.
 						if (next.backgroundMediaId === undefined && next.sljaHash) {
 							next = {
 								...next,
@@ -132,6 +132,24 @@ function loadDb(): LocalDb {
 									? next.coverMediaId
 									: `slja-${next.sljaHash}-cover`,
 							};
+						}
+						// Migração legado 2 (sem sljaHash, import pré-hash): o BG 16:9
+						// vivia em coverMediaId (sem capa do editor por cima) OU por
+						// estrofe (imageMediaId único compartilhado). Promove pro
+						// backgroundMediaId pra separar BG de cover — SEM reimport.
+						if (next.backgroundMediaId === undefined && !next.sljaHash) {
+							if (next.coverMediaId?.startsWith("slja-")) {
+								next = { ...next, backgroundMediaId: next.coverMediaId };
+							} else {
+								const stanzaImages = [
+									...new Set(
+										next.lyrics.map((l) => l.imageMediaId).filter(Boolean),
+									),
+								];
+								if (stanzaImages.length === 1) {
+									next = { ...next, backgroundMediaId: stanzaImages[0] };
+								}
+							}
 						}
 						return next;
 					})

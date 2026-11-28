@@ -236,7 +236,13 @@ export async function loadCustomMusicTrack(
         showSlide: l.show_slide !== false && l.show_slide !== 0,
         time: l.time ?? '00:00:00',
         instrumentalTime: l.instrumental_time ?? '00:00:00',
-        imageUrl: imageBlob ? URL.createObjectURL(imageBlob) : (l.image_url ?? null),
+        // Legado .slja: o BG vivia por estrofe (imageMediaId duplicado). Com
+        // backgroundMediaId presente (migração), o blob repetido É o fundo
+        // único — estrofe herda o BG da música, não sobrepõe.
+        imageUrl:
+          imageBlob && l.imageMediaId !== local.backgroundMediaId
+            ? URL.createObjectURL(imageBlob)
+            : (l.image_url ?? null),
         imagePosition: l.image_position ?? null,
         isCover: l.order === 1 && Boolean(l.image_url ?? l.imageMediaId),
       }
