@@ -26,13 +26,20 @@ describe("migração legado coverMediaId→backgroundMediaId (.slja)", () => {
 	});
 
 	it("legado slja- em coverMediaId vira backgroundMediaId; coverMediaId zerado", () => {
-		seedDb([{ id: -1, id_collection: -1, name: "Encontro", coverMediaId: "slja-h-cover" }]);
+		seedDb([{ id: -1, id_collection: -1, name: "Encontro", coverMediaId: "slja-h-cover", sljaHash: "h" }]);
 		const db = loadLocalDb();
 		expect(db.musics[0]?.backgroundMediaId).toBe("slja-h-cover");
 		expect(db.musics[0]?.coverMediaId).toBe("slja-h-cover"); // blob preservado p/ cover até editor definir
 	});
 
-	it("cover definida no editor (local-music-*) NÃO vira background", () => {
+	it("legado com capa do editor definida (coverMediaId sobrescrito) reata BG pelo sljaHash", () => {
+		seedDb([{ id: -1, id_collection: -1, name: "Encontro", coverMediaId: "local-music--1-cover", sljaHash: "h" }]);
+		const db = loadLocalDb();
+		expect(db.musics[0]?.backgroundMediaId).toBe("slja-h-cover");
+		expect(db.musics[0]?.coverMediaId).toBe("local-music--1-cover"); // capa preservada
+	});
+
+	it("música sem sljaHash (não .slja) não ganha background", () => {
 		seedDb([{ id: -1, id_collection: -1, name: "Missão", coverMediaId: "local-music--1-cover" }]);
 		const db = loadLocalDb();
 		expect(db.musics[0]?.backgroundMediaId).toBeUndefined();

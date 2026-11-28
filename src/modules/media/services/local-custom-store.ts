@@ -122,10 +122,16 @@ function loadDb(): LocalDb {
 				? parsed.musics.map((m) => {
 						let next = { ...m, status: m.status ?? "published" };
 						// Migração BG×cover (regra Rafael): import .slja legado gravava
-						// o BG 16:9 em coverMediaId. Uma vez migrado, coverMediaId só
-						// pode ser cover quadrada definida no editor — nunca sobrescrito.
-						if (next.backgroundMediaId === undefined && next.coverMediaId?.startsWith("slja-")) {
-							next = { ...next, backgroundMediaId: next.coverMediaId };
+						// o BG 16:9 em coverMediaId. O blob segue em slja-<hash>-cover
+						// (IndexedDB) mesmo depois de o editor definir uma capa — a
+						// música guarda sljaHash, então o BG é reativo SEM reimport.
+						if (next.backgroundMediaId === undefined && next.sljaHash) {
+							next = {
+								...next,
+								backgroundMediaId: next.coverMediaId?.startsWith("slja-")
+									? next.coverMediaId
+									: `slja-${next.sljaHash}-cover`,
+							};
 						}
 						return next;
 					})
